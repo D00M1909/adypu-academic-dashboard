@@ -21,8 +21,8 @@ product, but they are separate repos with separate data.
 | | |
 |---|---|
 | Layout decision | **Option B** (see §5) — decided 26 Aug 2026 |
-| Code written | none yet |
-| Data source for attendance | **unresolved — see §8, this is the main blocker** |
+| Code written | initial implementation in progress |
+| Data source for attendance | **resolved — see §8.1**: Google Form → Sheet, PHP reads it server-side |
 | Visual mockups | `design/adypu-drilldown-design-options.html`, untracked, open in a browser |
 
 ## 3. Brand tokens
@@ -135,36 +135,56 @@ Student  { rollNo, name, division, present }   // if per-student view is built
 
 ## 7. Tech stack
 
-**Recommended: plain HTML/CSS/JS, no build step** — matching the sibling project,
-which does exactly this and works fine. Concretely, how the sibling is put
-together:
+**PHP, no framework** — matching `automatic-timetable-generator`, the sibling
+project's own project (plain PHP, `includes/config.php` pattern, deployed by
+copying files onto XAMPP locally and InfinityFree for a shared link). Concretely:
 
-- One `index.html`, a `css/` folder, a `js/` folder of plain `<script src>` files
-  loaded in dependency order. **Not** ES modules — everything lives on `window`
-  because inline `onclick=` handlers need it. There's an explicit comment in the
-  sibling's `index.html` saying so.
-- Libraries from CDN: SheetJS (`xlsx` 0.18.5), Chart.js, chartjs-plugin-datalabels.
-- Excel is `fetch`ed as an arrayBuffer and parsed client-side with
-  `XLSX.read(data, {type:'array'})`; sheets are flattened to row objects.
-- Total sibling codebase is ~3,100 lines. This project should be smaller.
+- `index.php` server-renders the shell (stat cards, school/year tile grids) from
+  data provided by `includes/attendance.php`.
+- `api/division.php` — a small JSON endpoint the modal's JS calls for a given
+  school + year's division breakdown; also used by the modal's refresh button to
+  force a fresh pull past the cache.
+- `css/dashboard.css` + `js/dashboard.js` — plain non-module JS (`<script src>`,
+  functions on `window` for inline handlers), no CDN libraries needed for v1.
+- `includes/config.php` — MySQL connection (mysqli), lazy (`get_db()` only
+  connects when called) so the app doesn't require a DB to run — see §7.1.
+- No Composer dependencies for v1; add one only if a real need shows up (e.g.
+  parsing a non-CSV export format).
 
-This is a default, not a mandate. A build step is justified if the attendance data
-turns out to need a real backend (see §8) — reassess then.
+### 7.1 Data pipeline (resolves §8.1)
+
+- **Collection:** one Google Form, filled once a day per division by faculty —
+  Date, School, Year, Division, Strength, Present.
+- **Storage of record:** the Google Sheet the Form feeds *is* the source of
+  truth. `includes/attendance.php` fetches its published-to-web CSV export
+  server-side (`file_get_contents`), parses it (`str_getcsv`, no library), and
+  aggregates rows into School → Year → Division, keeping only the latest
+  submission per school/year/division/date (a resubmission overwrites same-day
+  data). Result is cached to `cache/attendance.json` with a 5-minute TTL so the
+  dashboard isn't hitting Google on every request.
+- **Sample data fallback:** until `SHEET_CSV_URL` is configured (the Form/Sheet
+  don't exist yet) or a fetch fails, `includes/attendance.php` serves bundled
+  sample rows shaped like real submissions, so the UI is buildable and testable
+  right now. Swapping to the real Sheet is a one-line env var, no code change.
+- **MySQL — nice to have, not read from yet.** `db/schema.sql` defines `schools`
+  (seeded with the nine ids from §4) and `attendance_records` (same shape as a
+  Sheet row: school, year, division, date, strength, present). The app never
+  queries these tables in v1 — they exist so a daily sync job can start writing
+  attendance history into them later (for trends over time) without a schema
+  change or an app-flow rewrite. `includes/config.php` connects lazily so
+  running the app doesn't require the DB to exist.
+- **Error handling:** if the Sheet is unreachable or a row is malformed, fall
+  back to the last good cached data rather than breaking the page — a
+  transient Google outage shouldn't take down a once-a-day dashboard.
 
 ## 8. Open questions — resolve before or during implementation
 
-1. **Where does attendance data come from? (blocker)** The mockups show live
-   per-student, per-division attendance. The sibling project's data is monthly
-   chairman-report workbooks with no attendance in them at all. So this dashboard
-   has no data source yet. Options: another Excel export from the university's
-   ERP, a real API, or hardcoded sample data to build the UI against first.
-   Recommended: build against sample data shaped like §6, keep the loading behind
-   one function, swap it later.
+1. ~~**Where does attendance data come from?**~~ Resolved — see §7.1.
 2. **"Live Sync Active" and the modal's refresh button** imply polling a live
    source. Decorative for now, or real? Depends on (1).
-3. **The Report button** in the modal — what does it produce? The sibling project
-   has a 575-line `js/reports.js` doing print-style report generation; that is the
-   obvious thing to borrow from.
+3. **The Report button** — removed from the modal for now (26 Aug 2026); it was
+   a stub with no defined output. Re-add only once its report format is decided
+   (PDF? printable view? CSV export?).
 4. **Per-student table** — Option B has no per-student view. Needed for v1?
 5. **Knowledge Partner tab** — the mockup shows a partner list with tags, but no
    drill-down was designed. What happens when a partner is clicked?
