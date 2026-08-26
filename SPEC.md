@@ -124,11 +124,23 @@ later as a second modal or a sub-page.
 hardcode 4 — derive the year tiles from the school's own record. This was the one
 constraint called out explicitly during the design session.
 
+**Branch is a real fourth level, confirmed for Engineering only (26 Aug 2026).**
+Cross-checked against `automatic-timetable-generator`'s live `timetable_db.classes`
+table (same machine, same MySQL server): Engineering's years don't just contain
+bare divisions — 2nd Year alone has AIDS (A–D), CSE (A–E), and ECE (A), where the
+same letter means different divisions depending on branch. A school with no
+confirmed branch data uses a single implicit branch (empty string), and the UI
+skips that step entirely — Year tile click goes straight to the division modal,
+same as before this layer existed. See `includes/attendance.php` for the
+confirmed Engineering structure and its source note. No other school has
+confirmed branch data yet.
+
 Rough shape:
 
 ```
-School { id, name, icon, years[] }
-Year   { label, divisions[] }
+School   { id, name, years[] }
+Year     { label, branches[] }              // branches[] is [''] when unconfirmed
+Branch   { label, divisions[] }
 Division { label, strength, presentToday }
 Student  { rollNo, name, division, present }   // if per-student view is built
 ```

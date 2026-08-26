@@ -1,7 +1,9 @@
 <?php
 // Attendance data pipeline: Google Sheet (published CSV) -> file cache ->
-// School -> Year -> Division tree. See SPEC.md §7.1.
+// School -> Year -> Branch -> Division tree. See SPEC.md §7.1.
 // MySQL (db/schema.sql) is not read from here yet — this is the live path.
+// A school with no branch structure uses the single branch key '' (schools
+// other than eng — no confirmed branch data exists for them yet).
 
 define('SHEET_CSV_URL', getenv('SHEET_CSV_URL') ?: '');
 define('ATTENDANCE_CACHE_FILE', __DIR__ . '/../cache/attendance.json');
@@ -24,28 +26,58 @@ const SCHOOLS = [
 // Used until SHEET_CSV_URL is configured or a fetch fails (SPEC.md §8.1).
 function sample_attendance_rows(): array {
     $today = date('Y-m-d');
-    // Every school gets every one of its years, each with divisions A and B,
-    // so the drill-down works end to end for all nine schools. Engineering
-    // additionally gets its mockup-matching 2nd Year divisions (§5 modal example).
+    $rows = [];
+
+    // School of Engineering: real division/branch structure confirmed from
+    // automatic-timetable-generator's timetable_db.classes (AY 2026-27), read
+    // 26 Aug 2026. Strength is that DB's own scheduling default (60 per
+    // division everywhere, not a real headcount) — kept as-is since it's the
+    // only confirmed number available. Present/day has no real source until
+    // the Google Form exists, so it's a synthetic placeholder below.
+    $engStructure = [
+        '1st Year' => ['Core' => ['A', 'B', 'C', 'D', 'E', 'F'], 'CS' => ['M', 'N', 'O', 'P', 'S', 'T', 'U', 'V', 'W', 'X']],
+        '2nd Year' => ['AIDS' => ['A', 'B', 'C', 'D'], 'CSE' => ['A', 'B', 'C', 'D', 'E'], 'ECE' => ['A']],
+        '3rd Year' => ['AIDS' => ['A', 'B'], 'CS' => ['A'], 'SE' => ['A', 'B']],
+        '4th Year' => ['AIDS' => ['A', 'B'], 'CS' => ['A'], 'SE' => ['A', 'B', 'C']],
+    ];
+    $i = 0;
+    foreach ($engStructure as $year => $branches) {
+        foreach ($branches as $branch => $divisions) {
+            foreach ($divisions as $division) {
+                $i++;
+                $rows[] = [
+                    'school' => 'eng',
+                    'year' => $year,
+                    'branch' => $branch,
+                    'division' => $division,
+                    'strength' => 60,
+                    'present' => 60 - (8 + ($i % 6) * 4),
+                    'date' => $today,
+                ];
+            }
+        }
+    }
+
+    // Other schools: no confirmed branch/division data yet, so branch stays
+    // empty and the drill-down skips straight from Year to the division
+    // modal, same as before this data existed for Engineering.
     $ordinals = ['1st', '2nd', '3rd', '4th', '5th'];
     $yearCounts = [
-        'eng' => 4, 'mgmt' => 4, 'law' => 5, 'design' => 4,
+        'mgmt' => 4, 'law' => 5, 'design' => 4,
         'science' => 4, 'arch' => 4, 'hosp' => 4, 'lib' => 4, 'film' => 4,
     ];
-
-    $rows = [];
     foreach ($yearCounts as $school => $count) {
-        for ($i = 0; $i < $count; $i++) {
-            $year = $ordinals[$i] . ' Year';
-            $divisions = ($school === 'eng' && $i === 1) ? ['A', 'B', 'C', 'D'] : ['A', 'B'];
-            foreach ($divisions as $j => $div) {
+        for ($y = 0; $y < $count; $y++) {
+            $year = $ordinals[$y] . ' Year';
+            foreach (['A', 'B'] as $j => $div) {
                 $strength = 30 + (($j % 2) * 30);
                 $rows[] = [
                     'school' => $school,
                     'year' => $year,
+                    'branch' => '',
                     'division' => $div,
                     'strength' => $strength,
-                    'present' => $strength - (5 + $i * 3 + $j * 2),
+                    'present' => $strength - (5 + $y * 3 + $j * 2),
                     'date' => $today,
                 ];
             }
@@ -75,6 +107,7 @@ function parse_attendance_csv(string $csv): array {
         $rows[] = [
             'school'   => trim($r['school']),
             'year'     => trim($r['year'] ?? ''),
+            'branch'   => trim($r['branch'] ?? ''),
             'division' => trim($r['division'] ?? ''),
             'strength' => (int) ($r['strength'] ?? 0),
             'present'  => (int) ($r['present'] ?? 0),
@@ -84,17 +117,18 @@ function parse_attendance_csv(string $csv): array {
     return $rows;
 }
 
-// Groups flat rows into School -> Year -> Division[], keeping only the latest
-// row per school/year/division/date (a same-day resubmission wins).
+// Groups flat rows into School -> Year -> Branch -> Division[], keeping only
+// the latest row per school/year/branch/division/date (a same-day
+// resubmission wins). Branch is '' for schools with no branch structure.
 function aggregate_attendance(array $rows): array {
     $latest = [];
     foreach ($rows as $r) {
-        $key = $r['school'] . '|' . $r['year'] . '|' . $r['division'] . '|' . $r['date'];
+        $key = $r['school'] . '|' . $r['year'] . '|' . $r['branch'] . '|' . $r['division'] . '|' . $r['date'];
         $latest[$key] = $r;
     }
     $tree = [];
     foreach ($latest as $r) {
-        $tree[$r['school']][$r['year']][] = [
+        $tree[$r['school']][$r['year']][$r['branch']][] = [
             'division' => $r['division'],
             'strength' => $r['strength'],
             'present'  => $r['present'],
@@ -107,10 +141,12 @@ function attendance_totals(array $tree): array {
     $strength = 0;
     $present = 0;
     foreach ($tree as $years) {
-        foreach ($years as $divisions) {
-            foreach ($divisions as $d) {
-                $strength += $d['strength'];
-                $present += $d['present'];
+        foreach ($years as $branches) {
+            foreach ($branches as $divisions) {
+                foreach ($divisions as $d) {
+                    $strength += $d['strength'];
+                    $present += $d['present'];
+                }
             }
         }
     }

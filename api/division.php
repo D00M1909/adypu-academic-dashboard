@@ -4,6 +4,7 @@ header('Content-Type: application/json');
 
 $school = $_GET['school'] ?? '';
 $year = $_GET['year'] ?? '';
+$branch = $_GET['branch'] ?? '';
 $refresh = isset($_GET['refresh']);
 
 if ($school === '' || $year === '' || !isset(SCHOOLS[$school])) {
@@ -13,13 +14,14 @@ if ($school === '' || $year === '' || !isset(SCHOOLS[$school])) {
 }
 
 $tree = get_attendance($refresh);
-$divisions = $tree[$school][$year] ?? [];
-$total = attendance_totals([$school => [$year => $divisions]]);
+$divisions = $tree[$school][$year][$branch] ?? [];
+$total = attendance_totals([$school => [$year => [$branch => $divisions]]]);
 
 echo json_encode([
     'school' => $school,
     'schoolName' => SCHOOLS[$school]['name'],
     'year' => $year,
+    'branch' => $branch,
     'divisions' => $divisions,
     'total' => $total,
     'date' => date('d M Y'),
