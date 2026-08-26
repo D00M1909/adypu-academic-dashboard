@@ -7,6 +7,8 @@ student attendance.
 data model, tech stack, and the open questions blocking implementation. Read it
 before writing code.
 
-## Status
+## Goal
 
-Pre-implementation. No code yet.
+A PHP dashboard faculty and staff can open to see today's attendance at a
+glance, drilling from school down to division without digging through
+spreadsheets.
