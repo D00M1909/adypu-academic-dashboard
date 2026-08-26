@@ -18,6 +18,9 @@ $knowledgePartners = [
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ADYPU Academic Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/dashboard.css?v=<?= filemtime(__DIR__ . '/css/dashboard.css') ?>">
 </head>
 <body>
@@ -89,59 +92,107 @@ $knowledgePartners = [
       <path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
       <path d="m6.18 5.276 3.1 3.899" />
     </symbol>
+    <symbol id="icon-user-check" viewBox="0 0 24 24">
+      <path d="m16 11 2 2 4-4" />
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+    </symbol>
+    <symbol id="icon-refresh" viewBox="0 0 24 24">
+      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+      <path d="M21 3v5h-5" />
+      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+      <path d="M8 16H3v5" />
+    </symbol>
+    <symbol id="icon-x" viewBox="0 0 24 24">
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </symbol>
+    <symbol id="icon-chevron" viewBox="0 0 24 24">
+      <path d="m9 18 6-6-6-6" />
+    </symbol>
   </defs>
 </svg>
 
 <header class="app-header">
-  <h1>ADYPU Academic Dashboard</h1>
-  <nav class="tabs">
-    <button class="tab active" data-tab="adypu">ADYPU</button>
-    <button class="tab" data-tab="partners">Knowledge Partner</button>
-  </nav>
+  <div class="header-inner">
+    <div class="header-row">
+      <div class="brand">
+        <div class="brand-logo"><img src="img/logo.png" alt="Ajeenkya D Y Patil University"></div>
+        <h1>ADYPU: Academic Dashboard</h1>
+      </div>
+      <div class="header-badges">
+        <img src="img/accreditation-badges.jpeg" alt="NAAC A Grade Accreditation, NBA Accredited, NIRF Ranked, Great Place To Work Certified, Times Higher Education Sustainability Impact Rating, and QS I-Gauge Diamond Rating">
+      </div>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="adypu" role="tab" aria-selected="true">ADYPU</button>
+      <button class="tab" data-tab="partners" role="tab" aria-selected="false">Knowledge Partner</button>
+    </nav>
+  </div>
 </header>
 
 <main>
-  <section class="stat-cards">
-    <div class="stat-card">
-      <div class="stat-label">Total Schools</div>
-      <div class="stat-value"><?= count(SCHOOLS) ?></div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Total Strength</div>
-      <div class="stat-value"><?= $totals['strength'] ?></div>
-    </div>
-    <div class="stat-card" id="present-today-card" title="Click for division-wise breakdown">
-      <div class="stat-label">Present Today</div>
-      <div class="stat-value"><?= $totals['present'] ?>/<?= $totals['strength'] ?></div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Attendance Date</div>
-      <div class="stat-value stat-value-date"><?= htmlspecialchars($today) ?></div>
+
+  <section class="stat-row">
+    <button class="stat-hero" id="present-today-card" type="button">
+      <svg class="stat-hero-icon"><use href="#icon-user-check"/></svg>
+      <span class="stat-hero-text">
+        <span class="stat-hero-label">Present Today</span>
+        <span class="stat-hero-value"><?= $totals['present'] ?><span class="stat-hero-sep">/</span><?= $totals['strength'] ?></span>
+      </span>
+      <span class="stat-hero-cta">View breakdown<svg class="stat-hero-cta-icon"><use href="#icon-chevron"/></svg></span>
+    </button>
+
+    <div class="stat-strip">
+      <div class="stat-pill">
+        <span class="stat-pill-value"><?= count(SCHOOLS) ?></span>
+        <span class="stat-pill-label">Schools</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-pill-value"><?= $totals['strength'] ?></span>
+        <span class="stat-pill-label">Total strength</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-pill-value stat-pill-value-date"><?= htmlspecialchars($today) ?></span>
+        <span class="stat-pill-label">Attendance date</span>
+      </div>
     </div>
   </section>
 
   <div id="tab-adypu" class="tab-panel">
+    <nav class="breadcrumb" id="breadcrumb" aria-label="Drill-down path">
+      <span class="crumb crumb-current" data-crumb="schools">Schools</span>
+    </nav>
+
     <section class="tile-section">
       <div class="section-title">
-        <span>Schools</span>
+        <h2>Schools</h2>
         <span class="section-meta"><?= count(SCHOOLS) ?> schools</span>
       </div>
       <div class="tile-grid schools-grid">
         <?php foreach (SCHOOLS as $id => $school): ?>
-        <div class="tile school-tile" data-school="<?= htmlspecialchars($id) ?>">
-          <div class="tile-icon"><svg class="tile-icon-svg"><use href="#icon-<?= htmlspecialchars($id) ?>"/></svg></div>
-          <div class="tile-label"><?= htmlspecialchars($school['name']) ?></div>
-        </div>
+        <button class="tile school-tile" type="button" data-school="<?= htmlspecialchars($id) ?>">
+          <svg class="tile-icon-svg"><use href="#icon-<?= htmlspecialchars($id) ?>"/></svg>
+          <span class="tile-label"><?= htmlspecialchars($school['name']) ?></span>
+        </button>
         <?php endforeach; ?>
       </div>
     </section>
 
     <section class="tile-section" id="years-section" hidden>
       <div class="section-title">
-        <span id="years-title">Years</span>
+        <h2>Years</h2>
         <span class="section-meta" id="years-meta"></span>
       </div>
       <div class="tile-grid years-grid" id="years-grid"></div>
+    </section>
+
+    <section class="tile-section" id="branches-section" hidden>
+      <div class="section-title">
+        <h2>Branches</h2>
+        <span class="section-meta" id="branches-meta"></span>
+      </div>
+      <div class="tile-grid branches-grid" id="branches-grid"></div>
     </section>
   </div>
 
@@ -164,15 +215,17 @@ $knowledgePartners = [
 </main>
 
 <div id="division-modal" class="modal-backdrop" hidden>
-  <div class="modal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
     <div class="modal-header">
-      <h2>Present Students Today</h2>
+      <div class="modal-heading">
+        <h2 id="modal-title">Division-wise Attendance</h2>
+        <p class="modal-subtitle" id="modal-subtitle"></p>
+      </div>
       <div class="modal-actions">
-        <button id="modal-refresh" class="icon-btn" title="Refresh">&#8635;</button>
-        <button id="modal-close" class="icon-btn" title="Close">&times;</button>
+        <button id="modal-refresh" class="icon-btn" type="button" aria-label="Refresh"><svg><use href="#icon-refresh"/></svg></button>
+        <button id="modal-close" class="icon-btn" type="button" aria-label="Close"><svg><use href="#icon-x"/></svg></button>
       </div>
     </div>
-    <p class="modal-subtitle" id="modal-subtitle"></p>
     <div class="division-grid" id="division-grid"></div>
     <div class="division-total" id="division-total"></div>
   </div>
