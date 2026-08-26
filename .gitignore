@@ -3,3 +3,5 @@ node_modules/
 Thumbs.db
 design/*.html
 CLAUDE.md
+cache/*.json
+includes/config.local.php

@@ -1,0 +1,155 @@
+:root {
+  --red-primary: #C21B27;
+  --red-secondary: #99151F;
+  --red-tint: #fef2f2;
+  --total-bg: #fde3e6;
+  --total-text: #7a1017;
+  --surface: #f8fafc;
+  --hairline: #f1f5f9;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background: var(--surface);
+  color: #1e293b;
+}
+
+.app-header {
+  background: linear-gradient(135deg, var(--red-primary), var(--red-secondary));
+  color: white;
+  padding: 20px 24px;
+}
+.app-header h1 { margin: 0 0 12px; font-size: 22px; }
+
+.tabs { display: flex; gap: 8px; }
+.tab {
+  background: rgba(255,255,255,0.15);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.tab.active { background: white; color: var(--red-primary); font-weight: 600; }
+
+main { max-width: 1100px; margin: 0 auto; padding: 24px; }
+
+.stat-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 28px;
+}
+.stat-card {
+  background: linear-gradient(135deg, var(--red-primary), var(--red-secondary));
+  color: white;
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 10px 25px rgba(194,27,39,0.25);
+}
+#present-today-card { cursor: pointer; }
+.stat-label { font-size: 12px; opacity: 0.85; margin-bottom: 6px; }
+.stat-value { font-size: 24px; font-weight: 700; }
+.stat-value-date { font-size: 16px; }
+
+.tile-section { margin-bottom: 28px; }
+.section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+.section-meta { font-size: 13px; color: #64748b; font-weight: 400; }
+
+.tile-grid { display: grid; gap: 12px; }
+.schools-grid, .partners-grid { grid-template-columns: repeat(3, 1fr); }
+.years-grid { grid-template-columns: repeat(4, 1fr); }
+
+.tile {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  padding: 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.tile:hover { border-color: var(--red-primary); }
+.tile.active {
+  background: var(--red-tint);
+  border-color: var(--red-primary);
+  color: var(--red-primary);
+  font-weight: 600;
+}
+.tile-icon { margin-bottom: 8px; }
+.tile-icon-svg {
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke: var(--red-primary);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.tile-label { font-size: 14px; }
+.tile-tag { font-size: 12px; color: #64748b; margin-top: 4px; }
+.partner-tile { cursor: default; }
+.partner-tile:hover { border-color: var(--hairline); }
+
+.modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(15,23,42,0.5);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 50;
+}
+.modal-backdrop[hidden] { display: none; }
+.modal {
+  background: white;
+  border-radius: 18px;
+  padding: 24px;
+  width: 90%;
+  max-width: 480px;
+  box-shadow: 0 20px 50px rgba(0,0,0,.2);
+}
+.modal-header { display: flex; justify-content: space-between; align-items: center; }
+.modal-header h2 { color: var(--red-primary); font-size: 18px; margin: 0; }
+.modal-actions { display: flex; gap: 8px; }
+.icon-btn {
+  border: none;
+  background: var(--red-primary);
+  color: white;
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 16px;
+}
+.modal-subtitle { color: #64748b; font-size: 13px; margin: 8px 0 16px; }
+
+.division-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 16px; }
+.division-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 14px;
+}
+.division-total {
+  display: flex;
+  justify-content: space-between;
+  background: var(--total-bg);
+  color: var(--total-text);
+  font-weight: 600;
+  padding: 10px 12px;
+  border-radius: 10px;
+  margin-top: 12px;
+}
+@media (max-width: 640px) {
+  .stat-cards { grid-template-columns: repeat(2, 1fr); }
+  .schools-grid, .partners-grid, .years-grid { grid-template-columns: repeat(2, 1fr); }
+  .division-grid { grid-template-columns: 1fr; }
+}
