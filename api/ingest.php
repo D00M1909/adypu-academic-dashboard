@@ -64,4 +64,6 @@ echo json_encode([
     'schools'  => count($tree),
     'present'  => $totals['present'],
     'strength' => $totals['strength'],
+    'reported' => $totals['reported'],
+    'classes'  => $totals['classes'],
 ]);
