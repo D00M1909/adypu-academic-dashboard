@@ -175,8 +175,8 @@ $shortSchool = fn(string $id): string => preg_replace('/^School of /', '', SCHOO
         <span class="stat-pill-label">Attendance</span>
       </div>
       <div class="stat-pill">
-        <span class="stat-pill-value" id="stat-absent"><?= $totals['strength'] - $totals['present'] ?></span>
-        <span class="stat-pill-label">Absent</span>
+        <span class="stat-pill-value" id="stat-reported"><?= $totals['reported'] ?><span class="stat-pill-sep">/</span><?= $totals['classes'] ?></span>
+        <span class="stat-pill-label">Classes reported</span>
       </div>
     </div>
   </section>
@@ -197,8 +197,13 @@ $shortSchool = fn(string $id): string => preg_replace('/^School of /', '', SCHOO
         <button class="tile school-tile" type="button" data-school="<?= htmlspecialchars($id) ?>">
           <svg class="tile-icon-svg"><use href="#icon-<?= htmlspecialchars($id) ?>"/></svg>
           <span class="tile-label"><?= htmlspecialchars($school['name']) ?></span>
+          <?php if ($st['reported'] === 0): ?>
+          <span class="tile-stat tile-unreported">Not reported</span>
+          <span class="division-bar"><span class="division-bar-fill" style="width:0"></span></span>
+          <?php else: ?>
           <span class="tile-stat"><?= $st['present'] ?><span class="tile-stat-sep">/</span><?= $st['strength'] ?> &middot; <span class="att-pct <?= att_class($stPct) ?>"><?= $stPct ?>%</span></span>
           <span class="division-bar"><span class="division-bar-fill <?= att_class($stPct) ?>" style="width:<?= $stPct ?>%"></span></span>
+          <?php endif; ?>
         </button>
         <?php endforeach; ?>
       </div>

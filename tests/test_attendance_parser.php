@@ -19,21 +19,68 @@ assert(count($rows) === 5, 'expected 5 parsed rows, got ' . count($rows));
 assert($rows[0]['strength'] === 60, 'strength must come from structure, not the row');
 
 $tree = aggregate_attendance($rows);
-assert(count($tree['eng']['2nd Year']['CSE']) === 2, 'resubmission should collapse to 2 CSE divisions');
-assert(count($tree['eng']['2nd Year']['ECE']) === 1, 'ECE div A should not merge with CSE div A');
 
-$divA = null;
-foreach ($tree['eng']['2nd Year']['CSE'] as $d) {
-    if ($d['division'] === 'A') $divA = $d;
+// The tree always holds every class in the structure, reported or not, so these
+// counts come from structure.php rather than from what was submitted.
+assert(count($tree['eng']['2nd Year']['CSE']) === 5, 'CSE should list all 5 divisions');
+assert(count($tree['eng']['2nd Year']['ECE']) === 1, 'ECE div A should not merge with CSE div A');
+assert(count($tree['mgmt']['1st Year']['']) === 2, 'branchless school should key under empty branch');
+
+function find_div(array $tree, string $school, string $year, string $branch, string $division): ?array {
+    foreach ($tree[$school][$year][$branch] as $d) {
+        if ($d['division'] === $division) return $d;
+    }
+    return null;
 }
+
+$divA = find_div($tree, 'eng', '2nd Year', 'CSE', 'A');
 assert($divA !== null, 'CSE division A missing');
 assert($divA['present'] === 28, 'latest submission should win, got ' . $divA['present']);
+assert($divA['reported'] === true, 'submitted division should be flagged reported');
+assert(find_div($tree, 'eng', '2nd Year', 'ECE', 'A')['present'] === 20, 'ECE div A took CSE div A value');
 
-assert(count($tree['mgmt']['1st Year']['']) === 1, 'branchless school should key under empty branch');
+// A CSE division nobody submitted still exists, at zero and unreported.
+$divC = find_div($tree, 'eng', '2nd Year', 'CSE', 'C');
+assert($divC['reported'] === false && $divC['present'] === 0, 'unsubmitted division should be zero/unreported');
 
 $totals = attendance_totals($tree);
-assert($totals['strength'] === 210, 'total strength wrong: ' . $totals['strength']);
+assert($totals['strength'] === 5190, 'denominator is the whole university: ' . $totals['strength']);
 assert($totals['present'] === 123, 'total present wrong: ' . $totals['present']);
+assert($totals['reported'] === 4, 'four distinct classes were submitted, got ' . $totals['reported']);
+
+// --- The structure leads, submissions only fill it in -----------------------
+// Two Engineering submissions and nothing else must still yield all 9 schools,
+// every year and branch, and the full 5190 denominator. Before this, the tree
+// was built from submitted rows alone: unreported schools showed 0/0 and their
+// years and branches vanished from the drill-down entirely.
+$partial = "timestamp,class (school of engineering — 4th year),present today\n" .
+           '"2026-08-27","School of Engineering / 4th Year / CS / A","47"' . "\n" .
+           '"2026-08-27","School of Engineering / 1st Year / CS / M","48"' . "\n";
+$pTree = aggregate_attendance(parse_attendance_csv($partial));
+assert(count($pTree) === 9, 'all 9 schools must exist, got ' . count($pTree));
+assert(count($pTree['eng']) === 4, 'all 4 Engineering years must exist');
+assert(count($pTree['eng']['2nd Year']) === 3, 'unreported year must keep its branches');
+assert(isset($pTree['law']['5th Year']), 'unreported school must keep its years');
+
+$pt = attendance_totals($pTree);
+assert($pt['strength'] === 5190, 'denominator must be the whole university: ' . $pt['strength']);
+assert($pt['present'] === 95, 'present should count only submissions: ' . $pt['present']);
+assert($pt['reported'] === 2 && $pt['classes'] === 103,
+    "reported count wrong: {$pt['reported']}/{$pt['classes']}");
+
+// A school nobody reported has a real denominator, not 0/0.
+$law = attendance_totals(['law' => $pTree['law']]);
+assert($law['strength'] === 450 && $law['present'] === 0 && $law['reported'] === 0,
+    "unreported school wrong: {$law['present']}/{$law['strength']} reported={$law['reported']}");
+
+// Every division carries a reported flag so the UI can tell "nobody came" from
+// "nobody submitted".
+$reportedDiv = null;
+foreach ($pTree['eng']['4th Year']['CS'] as $d) if ($d['division'] === 'A') $reportedDiv = $d;
+assert($reportedDiv['reported'] === true && $reportedDiv['present'] === 47, 'submitted division wrong');
+foreach ($pTree['eng']['3rd Year']['CS'] as $d) {
+    assert($d['reported'] === false && $d['present'] === 0, 'unreported division should be flagged');
+}
 
 // --- Multi-day sheets: one reading per class, never one per day -------------
 // The Apps Script pushes the entire sheet on every trigger, so from day two it
@@ -45,17 +92,21 @@ $multiDay = "date,school,year,branch,division,strength,present\n" .
             "2026-08-27,law,2nd Year,,A,7,25\n" .
             "2026-08-27,law,2nd Year,,A,7,27\n";  // same-day resubmission wins
 $multiTree = aggregate_attendance(parse_attendance_csv($multiDay));
-assert(count($multiTree['law']['2nd Year']['']) === 1, 'a class must appear once, not once per day');
-$mt = attendance_totals($multiTree);
-assert($mt['strength'] === 30, 'strength counted more than once: ' . $mt['strength']);
-assert($mt['present'] === 27, 'latest reading should win, got ' . $mt['present']);
+$lawA = find_div($multiTree, 'law', '2nd Year', '', 'A');
+assert($lawA['present'] === 27, 'latest reading should win, got ' . $lawA['present']);
+$mt = attendance_totals(['law' => ['2nd Year' => $multiTree['law']['2nd Year']]]);
+// Law 2nd Year is divisions A (30) and B (60); A reported three times across
+// two days and must still contribute its 30 exactly once.
+assert($mt['strength'] === 90, 'strength counted more than once: ' . $mt['strength']);
+assert($mt['reported'] === 1, 'only division A was submitted, got ' . $mt['reported']);
 
 // Order must not matter: an older row arriving after a newer one loses.
 $outOfOrder = "date,school,year,branch,division,strength,present\n" .
               "2026-08-27,law,2nd Year,,A,7,27\n" .
               "2026-08-26,law,2nd Year,,A,7,20\n";
-$oo = attendance_totals(aggregate_attendance(parse_attendance_csv($outOfOrder)));
-assert($oo['present'] === 27, 'an older row overwrote a newer one: ' . $oo['present']);
+$ooTree = aggregate_attendance(parse_attendance_csv($outOfOrder));
+assert(find_div($ooTree, 'law', '2nd Year', '', 'A')['present'] === 27,
+    'an older row overwrote a newer one');
 
 // --- Flat "Class" rows (what the Google Form actually submits) --------------
 $formCsv = "timestamp,class,present\n" .
