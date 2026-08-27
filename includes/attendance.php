@@ -23,66 +23,35 @@ const SCHOOLS = [
     'film'    => ['name' => 'School of Film & Media'],
 ];
 
-// Used until SHEET_CSV_URL is configured or a fetch fails (SPEC.md §8.1).
+// Used until real submissions arrive or a fetch fails (SPEC.md §8.1). Shape
+// matches a real row; the present counts are synthetic — there is no source for
+// them until the Google Form is live. Strength comes from the canonical
+// structure, same as a real submission.
 function sample_attendance_rows(): array {
+    require_once __DIR__ . '/structure.php';
     $today = date('Y-m-d');
     $rows = [];
-
-    // School of Engineering: real division/branch structure confirmed from
-    // automatic-timetable-generator's timetable_db.classes (AY 2026-27), read
-    // 26 Aug 2026. Strength is that DB's own scheduling default (60 per
-    // division everywhere, not a real headcount) — kept as-is since it's the
-    // only confirmed number available. Present/day has no real source until
-    // the Google Form exists, so it's a synthetic placeholder below.
-    $engStructure = [
-        '1st Year' => ['Core' => ['A', 'B', 'C', 'D', 'E', 'F'], 'CS' => ['M', 'N', 'O', 'P', 'S', 'T', 'U', 'V', 'W', 'X']],
-        '2nd Year' => ['AIDS' => ['A', 'B', 'C', 'D'], 'CSE' => ['A', 'B', 'C', 'D', 'E'], 'ECE' => ['A']],
-        '3rd Year' => ['AIDS' => ['A', 'B'], 'CS' => ['A'], 'SE' => ['A', 'B']],
-        '4th Year' => ['AIDS' => ['A', 'B'], 'CS' => ['A'], 'SE' => ['A', 'B', 'C']],
-    ];
     $i = 0;
-    foreach ($engStructure as $year => $branches) {
-        foreach ($branches as $branch => $divisions) {
-            foreach ($divisions as $division) {
-                $i++;
-                $rows[] = [
-                    'school' => 'eng',
-                    'year' => $year,
-                    'branch' => $branch,
-                    'division' => $division,
-                    'strength' => 60,
-                    'present' => 60 - (8 + ($i % 6) * 4),
-                    'date' => $today,
-                ];
-            }
+    $yearIndex = [];
+
+    foreach (class_rows() as $c) {
+        // Two placeholder formulas, kept only so the numbers match what the
+        // dashboard showed before the structure was extracted. Both die with
+        // the sample data.
+        if ($c['school'] === 'eng') {
+            $i++;
+            $present = $c['strength'] - (8 + ($i % 6) * 4);
+        } else {
+            $key = $c['school'] . '|' . $c['year'];
+            $yearIndex[$c['school']] ??= [];
+            $yearIndex[$c['school']][$c['year']] ??= count($yearIndex[$c['school']]);
+            $y = $yearIndex[$c['school']][$c['year']];
+            $j = $c['division'] === 'A' ? 0 : 1;
+            $present = $c['strength'] - (5 + $y * 3 + $j * 2);
         }
+        $rows[] = $c + ['present' => $present, 'date' => $today];
     }
 
-    // Other schools: no confirmed branch/division data yet, so branch stays
-    // empty and the drill-down skips straight from Year to the division
-    // modal, same as before this data existed for Engineering.
-    $ordinals = ['1st', '2nd', '3rd', '4th', '5th'];
-    $yearCounts = [
-        'mgmt' => 4, 'law' => 5, 'design' => 4,
-        'science' => 4, 'arch' => 4, 'hosp' => 4, 'lib' => 4, 'film' => 4,
-    ];
-    foreach ($yearCounts as $school => $count) {
-        for ($y = 0; $y < $count; $y++) {
-            $year = $ordinals[$y] . ' Year';
-            foreach (['A', 'B'] as $j => $div) {
-                $strength = 30 + (($j % 2) * 30);
-                $rows[] = [
-                    'school' => $school,
-                    'year' => $year,
-                    'branch' => '',
-                    'division' => $div,
-                    'strength' => $strength,
-                    'present' => $strength - (5 + $y * 3 + $j * 2),
-                    'date' => $today,
-                ];
-            }
-        }
-    }
     return $rows;
 }
 
@@ -90,6 +59,33 @@ function fetch_sheet_csv(): ?string {
     if (SHEET_CSV_URL === '') return null;
     $csv = @file_get_contents(SHEET_CSV_URL);
     return $csv !== false ? $csv : null;
+}
+
+// Resolves one CSV row to a real class. Two row shapes are accepted: the Form's
+// single "Class" column ("School of Engineering / 2nd Year / CSE / A"), and the
+// four separate columns a hand-maintained sheet or the DB export uses. Either
+// way strength comes from structure.php, never from the row — see SPEC.md §7.1.
+// A row naming a class that doesn't exist returns null and is dropped.
+function class_from_row(array $r): ?array {
+    require_once __DIR__ . '/structure.php';
+
+    if (!empty($r['class'])) {
+        return parse_class_label(trim($r['class']));
+    }
+    if (empty($r['school'])) {
+        return null;
+    }
+
+    $school = school_id_for_name(trim($r['school']));
+    if ($school === null) return null;
+
+    $year     = trim($r['year'] ?? '');
+    $branch   = trim($r['branch'] ?? '');
+    $division = trim($r['division'] ?? '');
+    $strength = class_strength($school, $year, $branch, $division);
+    if ($strength === null) return null;
+
+    return compact('school', 'year', 'branch', 'division', 'strength');
 }
 
 function parse_attendance_csv(string $csv): array {
@@ -103,15 +99,12 @@ function parse_attendance_csv(string $csv): array {
             continue;
         }
         $r = @array_combine($header, $fields);
-        if (!$r || empty($r['school'])) continue;
-        $rows[] = [
-            'school'   => trim($r['school']),
-            'year'     => trim($r['year'] ?? ''),
-            'branch'   => trim($r['branch'] ?? ''),
-            'division' => trim($r['division'] ?? ''),
-            'strength' => (int) ($r['strength'] ?? 0),
-            'present'  => (int) ($r['present'] ?? 0),
-            'date'     => trim($r['date'] ?? ''),
+        if (!$r) continue;
+        $class = class_from_row($r);
+        if ($class === null) continue;
+        $rows[] = $class + [
+            'present' => (int) ($r['present'] ?? 0),
+            'date'    => trim($r['date'] ?? '') ?: date('Y-m-d'),
         ];
     }
     return $rows;
@@ -153,19 +146,44 @@ function attendance_totals(array $tree): array {
     return ['strength' => $strength, 'present' => $present];
 }
 
+function read_attendance_cache(): ?array {
+    if (!is_file(ATTENDANCE_CACHE_FILE)) return null;
+    $cached = json_decode((string) file_get_contents(ATTENDANCE_CACHE_FILE), true);
+    return is_array($cached) && $cached ? $cached : null;
+}
+
 function get_attendance(bool $forceRefresh = false): array {
-    if (!$forceRefresh && is_file(ATTENDANCE_CACHE_FILE)
-        && (time() - filemtime(ATTENDANCE_CACHE_FILE)) < ATTENDANCE_CACHE_TTL) {
-        $cached = json_decode(file_get_contents(ATTENDANCE_CACHE_FILE), true);
-        if (is_array($cached)) return $cached;
+    $cached = read_attendance_cache();
+
+    // Push mode (SPEC.md §7.1): with no SHEET_CSV_URL there is nothing to pull
+    // from, so the cache file IS the record — api/ingest.php replaces it when
+    // Google pushes. It must never expire back to sample data.
+    if (SHEET_CSV_URL === '' && $cached !== null) {
+        return $cached;
+    }
+
+    $fresh = is_file(ATTENDANCE_CACHE_FILE)
+        && (time() - filemtime(ATTENDANCE_CACHE_FILE)) < ATTENDANCE_CACHE_TTL;
+    if (!$forceRefresh && $fresh && $cached !== null) {
+        return $cached;
     }
 
     $csv = fetch_sheet_csv();
+
+    // Sheet unreachable: serve the last good data rather than dropping the
+    // dashboard back to sample numbers, which would look real and be wrong.
+    if ($csv === null && $cached !== null) {
+        return $cached;
+    }
+
     $rows = $csv !== null ? parse_attendance_csv($csv) : sample_attendance_rows();
+    if (!$rows && $cached !== null) {
+        return $cached;
+    }
     $tree = aggregate_attendance($rows);
 
     if (!is_dir(dirname(ATTENDANCE_CACHE_FILE))) {
-        @mkdir(dirname(ATTENDANCE_CACHE_FILE), 0777, true);
+        @mkdir(dirname(ATTENDANCE_CACHE_FILE), 0775, true);
     }
     @file_put_contents(ATTENDANCE_CACHE_FILE, json_encode($tree));
 
