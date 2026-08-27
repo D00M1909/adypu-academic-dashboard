@@ -17,6 +17,80 @@
     });
   });
 
+  // Mirrors att_class() in index.php and --att-* in dashboard.css.
+  function attClass(pct) {
+    if (pct >= 85) return 'att-good';
+    if (pct >= 70) return 'att-warn';
+    return 'att-low';
+  }
+
+  function pct(present, strength) {
+    return strength ? Math.round((present / strength) * 100) : 0;
+  }
+
+  // Totals for whatever the user currently has selected, plus how many things
+  // sit one level below it. state.branch is '' for a branchless school (a real
+  // key in the tree) and null when no branch is selected — the two must not be
+  // conflated or a branchless school would sum to nothing.
+  function scopeTotals() {
+    var data = window.ATTENDANCE_DATA;
+    var present = 0, strength = 0, units = 0, unitLabel = 'Schools';
+
+    var schools = state.school ? [state.school] : Object.keys(data);
+    if (!state.school) units = schools.length;
+
+    schools.forEach(function (s) {
+      var yearMap = data[s] || {};
+      var years = state.year ? [state.year] : Object.keys(yearMap);
+      if (state.school && !state.year) { units = years.length; unitLabel = 'Years'; }
+
+      years.forEach(function (y) {
+        var branchMap = yearMap[y] || {};
+        var branches = state.branch !== null ? [state.branch] : Object.keys(branchMap);
+        if (state.year && state.branch === null) { units = branches.length; unitLabel = 'Branches'; }
+
+        branches.forEach(function (b) {
+          var divisions = branchMap[b] || [];
+          if (state.branch !== null) { units = divisions.length; unitLabel = 'Divisions'; }
+          divisions.forEach(function (d) {
+            present += d.present;
+            strength += d.strength;
+          });
+        });
+      });
+    });
+
+    return { present: present, strength: strength, units: units, unitLabel: unitLabel };
+  }
+
+  // The stat row is server-rendered for the whole university, then rescoped
+  // here on every selection change — otherwise drilling into one branch still
+  // reads as 5190 students, which is the wrong number for what's on screen.
+  function updateStats() {
+    var t = scopeTotals();
+    var p = pct(t.present, t.strength);
+
+    document.getElementById('stat-present').textContent = t.present;
+    document.getElementById('stat-strength').textContent = t.strength;
+    document.getElementById('stat-units').textContent = t.units;
+    document.getElementById('stat-units-label').textContent = t.unitLabel;
+    document.getElementById('stat-absent').textContent = t.strength - t.present;
+
+    var pctEl = document.getElementById('stat-pct');
+    pctEl.textContent = p + '%';
+    pctEl.className = 'stat-pill-value att-pct ' + attClass(p);
+
+    var parts = [];
+    if (state.school) parts.push(window.SCHOOLS[state.school].name);
+    if (state.year) parts.push(state.year);
+    if (state.branch) parts.push(state.branch);
+    // The date only rides along at root. Appending it to a drilled path wraps
+    // the label to two lines and shoves the value out of the card.
+    document.getElementById('stat-scope').textContent = parts.length
+      ? parts.join(' \u00b7 ')
+      : 'Present Today \u00b7 ' + window.ATTENDANCE_DATE;
+  }
+
   function crumbSep() {
     return '<svg class="crumb-sep"><use href="#icon-chevron"/></svg>';
   }
@@ -40,6 +114,7 @@
     breadcrumb.innerHTML = crumbs.join('');
     // Only earns its place once you've drilled past the school grid.
     breadcrumb.hidden = !state.school;
+    updateStats();
   }
 
   // Populates the Branches section for a chosen school+year. Schools with no
@@ -171,19 +246,21 @@
       var grid = document.getElementById('division-grid');
       grid.innerHTML = '';
       data.divisions.forEach(function (d) {
-        var pct = d.strength ? Math.round((d.present / d.strength) * 100) : 0;
+        var divPct = pct(d.present, d.strength);
         var row = document.createElement('div');
         row.className = 'division-row';
         row.innerHTML =
           '<div class="division-row-top">' +
             '<span class="division-name">Division ' + d.division + '</span>' +
-            '<span class="division-count">' + d.present + '<span class="division-count-sep">/</span>' + d.strength + '</span>' +
+            '<span class="division-count">' + d.present + '<span class="division-count-sep">/</span>' + d.strength +
+              ' <span class="att-pct ' + attClass(divPct) + '">' + divPct + '%</span></span>' +
           '</div>' +
-          '<div class="division-bar"><div class="division-bar-fill" style="width:' + pct + '%"></div></div>';
+          '<div class="division-bar"><div class="division-bar-fill ' + attClass(divPct) +
+            '" style="width:' + divPct + '%"></div></div>';
         grid.appendChild(row);
       });
 
-      var totalPct = data.total.strength ? Math.round((data.total.present / data.total.strength) * 100) : 0;
+      var totalPct = pct(data.total.present, data.total.strength);
       document.getElementById('division-total').innerHTML =
         '<span>Total present</span><span class="division-count">' + data.total.present +
         '<span class="division-count-sep">/</span>' + data.total.strength + ' · ' + totalPct + '%</span>';

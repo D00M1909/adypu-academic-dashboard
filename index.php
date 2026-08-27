@@ -24,6 +24,14 @@ $knowledgePartners = [
     ['name' => 'Flyglam',   'schools' => ['mgmt']],
 ];
 
+// Attendance status band. Mirrored by attClass() in js/dashboard.js — change
+// both together, and --att-* in dashboard.css with them.
+function att_class(int $pct): string {
+    if ($pct >= 85) return 'att-good';
+    if ($pct >= 70) return 'att-warn';
+    return 'att-low';
+}
+
 // "School of Engineering" -> "Engineering"; the tile has no room for the prefix.
 $shortSchool = fn(string $id): string => preg_replace('/^School of /', '', SCHOOLS[$id]['name'] ?? $id);
 ?>
@@ -151,23 +159,23 @@ $shortSchool = fn(string $id): string => preg_replace('/^School of /', '', SCHOO
     <button class="stat-hero" id="present-today-card" type="button">
       <svg class="stat-hero-icon"><use href="#icon-user-check"/></svg>
       <span class="stat-hero-text">
-        <span class="stat-hero-label">Present Today &middot; <?= htmlspecialchars($today) ?></span>
-        <span class="stat-hero-value"><?= $totals['present'] ?><span class="stat-hero-sep">/</span><?= $totals['strength'] ?></span>
+        <span class="stat-hero-label" id="stat-scope">Present Today &middot; <?= htmlspecialchars($today) ?></span>
+        <span class="stat-hero-value"><span id="stat-present"><?= $totals['present'] ?></span><span class="stat-hero-sep">/</span><span id="stat-strength"><?= $totals['strength'] ?></span></span>
       </span>
       <span class="stat-hero-cta">View breakdown<svg class="stat-hero-cta-icon"><use href="#icon-chevron"/></svg></span>
     </button>
 
     <div class="stat-strip">
       <div class="stat-pill">
-        <span class="stat-pill-value"><?= count(SCHOOLS) ?></span>
-        <span class="stat-pill-label">Schools</span>
+        <span class="stat-pill-value" id="stat-units"><?= count(SCHOOLS) ?></span>
+        <span class="stat-pill-label" id="stat-units-label">Schools</span>
       </div>
       <div class="stat-pill">
-        <span class="stat-pill-value"><?= $overallPct ?>%</span>
+        <span class="stat-pill-value att-pct <?= att_class($overallPct) ?>" id="stat-pct"><?= $overallPct ?>%</span>
         <span class="stat-pill-label">Attendance</span>
       </div>
       <div class="stat-pill">
-        <span class="stat-pill-value"><?= $totals['strength'] - $totals['present'] ?></span>
+        <span class="stat-pill-value" id="stat-absent"><?= $totals['strength'] - $totals['present'] ?></span>
         <span class="stat-pill-label">Absent</span>
       </div>
     </div>
@@ -189,8 +197,8 @@ $shortSchool = fn(string $id): string => preg_replace('/^School of /', '', SCHOO
         <button class="tile school-tile" type="button" data-school="<?= htmlspecialchars($id) ?>">
           <svg class="tile-icon-svg"><use href="#icon-<?= htmlspecialchars($id) ?>"/></svg>
           <span class="tile-label"><?= htmlspecialchars($school['name']) ?></span>
-          <span class="tile-stat"><?= $st['present'] ?><span class="tile-stat-sep">/</span><?= $st['strength'] ?> &middot; <?= $stPct ?>%</span>
-          <span class="division-bar"><span class="division-bar-fill" style="width:<?= $stPct ?>%"></span></span>
+          <span class="tile-stat"><?= $st['present'] ?><span class="tile-stat-sep">/</span><?= $st['strength'] ?> &middot; <span class="att-pct <?= att_class($stPct) ?>"><?= $stPct ?>%</span></span>
+          <span class="division-bar"><span class="division-bar-fill <?= att_class($stPct) ?>" style="width:<?= $stPct ?>%"></span></span>
         </button>
         <?php endforeach; ?>
       </div>
@@ -251,6 +259,7 @@ $shortSchool = fn(string $id): string => preg_replace('/^School of /', '', SCHOO
 <script>
   window.ATTENDANCE_DATA = <?= json_encode($tree) ?>;
   window.SCHOOLS = <?= json_encode(SCHOOLS) ?>;
+  window.ATTENDANCE_DATE = <?= json_encode($today) ?>;
 </script>
 <script src="js/dashboard.js"></script>
 </body>
