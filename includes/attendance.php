@@ -61,12 +61,15 @@ function fetch_sheet_csv(): ?string {
     return $csv !== false ? $csv : null;
 }
 
-// The one non-empty value among every column whose header starts with "class"
-// — the Form's per-section dropdowns ("Class (School of Law)" and friends).
-// Returns '' when none is filled, which is also the plain four-column case.
-function first_class_value(array $header, array $fields): string {
+// The one non-empty value among every column whose header starts with $prefix.
+// A sectioned Form repeats question titles across sections, so the sheet can
+// carry a dozen "class ..." columns with one filled — and, if Present is placed
+// inside each section rather than shared, a dozen "present" columns too.
+// array_combine keeps only the last of a repeated header, which is blank, so
+// both are resolved here off the raw header/field arrays instead.
+function first_value(array $header, array $fields, string $prefix): string {
     foreach ($header as $i => $name) {
-        if (str_starts_with($name, 'class') && trim((string) ($fields[$i] ?? '')) !== '') {
+        if (str_starts_with($name, $prefix) && trim((string) ($fields[$i] ?? '')) !== '') {
             return trim($fields[$i]);
         }
     }
@@ -112,11 +115,10 @@ function parse_attendance_csv(string $csv): array {
         }
         $r = @array_combine($header, $fields);
         if (!$r) continue;
-        // The Form has one Class dropdown per section, so a row carries a dozen
-        // class columns with exactly one filled. Resolved off the raw header /
-        // field arrays, not $r: identically-named columns collapse in
-        // array_combine and the last (blank) one would win.
-        $r['class'] = first_class_value($header, $fields);
+        // See first_value(): repeated Class / Present columns must be coalesced
+        // off the raw arrays, or array_combine hands back the blank last one.
+        $r['class'] = first_value($header, $fields, 'class');
+        $r['present'] = first_value($header, $fields, 'present');
         $class = class_from_row($r);
         if ($class === null) continue;
         $rows[] = $class + [
