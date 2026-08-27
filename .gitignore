@@ -1,6 +1,6 @@
 node_modules/
 .DS_Store
 Thumbs.db
-design/*.html
+design/
 cache/*.json
 includes/config.local.php
