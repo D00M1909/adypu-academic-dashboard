@@ -2,23 +2,44 @@
  * Pushes the Form's response sheet to the dashboard.
  *
  * Google pushes to us rather than the dashboard pulling from Google because
- * InfinityFree's free plan blocks outbound HTTP from PHP. Inbound is fine.
+ * InfinityFree's free plan blocks outbound HTTP from PHP. Inbound is fine —
+ * except that InfinityFree also serves an anti-bot JavaScript challenge to some
+ * requests, at random. That challenge returns HTTP 200 with an HTML body, so a
+ * naive check of the status code reports success while storing nothing.
+ *
+ * The strategy is retry, not defeat: a blocked run gives up quietly and the
+ * next scheduled run tries again from a different Google IP. Attendance is a
+ * once-a-day number, so being up to 15 minutes late costs nothing. What does
+ * cost something is not noticing a permanent outage, so consecutive failures
+ * are counted and eventually raised as a real error.
  *
  * Setup (once):
  *   1. Open the Form's response Sheet -> Extensions -> Apps Script.
  *   2. Paste this file in, replacing whatever is there.
  *   3. Set INGEST_URL and INGEST_SECRET below. The secret must match the
  *      INGEST_SECRET in includes/config.local.php on the server.
- *   4. Run pushNow() once and approve the permissions prompt. Check the
- *      execution log says ok:true.
- *   5. Triggers (clock icon) -> Add Trigger -> pushNow -> From spreadsheet ->
- *      On form submit. Add a second one: Time-driven -> Hour timer -> every
- *      hour, as a safety net for a submission that arrives while the site is
- *      down.
+ *   4. Run pushNow() once and approve the permissions prompt.
+ *   5. Triggers (clock icon) -> Add Trigger:
+ *        - pushNow / From spreadsheet / On form submit
+ *        - pushNow / Time-driven / Minutes timer / Every 15 minutes
+ *      The first is instant when it gets through; the second is the safety net
+ *      that eventually gets through.
+ *   6. Run pushStatus() any time to see when the last push actually landed.
  */
 
 const INGEST_URL = 'https://YOUR-SITE.rf.gd/api/ingest.php';
 const INGEST_SECRET = 'paste-the-same-secret-as-config.local.php';
+
+// Attempts within a single run. The challenge is served per request, so an
+// immediate retry sometimes gets through; if it doesn't, the next scheduled
+// run will.
+const ATTEMPTS_PER_RUN = 3;
+const RETRY_PAUSE_MS = 3000;
+
+// Consecutive failed runs before this starts throwing. At one run per 15
+// minutes, 8 is about two hours — long enough to ride out the challenge,
+// short enough to catch a genuinely broken site the same morning.
+const FAILURES_BEFORE_ALERT = 8;
 
 function pushNow() {
   if (!/\/api\/ingest\.php$/.test(INGEST_URL)) {
@@ -34,42 +55,96 @@ function pushNow() {
     Logger.log('nothing to push: sheet has no data rows');
     return;
   }
+  const payload = toCsv(values);
 
+  let lastProblem = '';
+  for (let attempt = 1; attempt <= ATTEMPTS_PER_RUN; attempt++) {
+    const outcome = attemptPush(payload);
+    if (outcome.ok) {
+      recordSuccess(outcome.result);
+      return;
+    }
+    lastProblem = outcome.problem;
+    Logger.log('attempt ' + attempt + ' of ' + ATTEMPTS_PER_RUN + ' failed: ' + lastProblem);
+    if (attempt < ATTEMPTS_PER_RUN) Utilities.sleep(RETRY_PAUSE_MS);
+  }
+
+  recordFailure(lastProblem);
+}
+
+function attemptPush(payload) {
   const response = UrlFetchApp.fetch(INGEST_URL, {
     method: 'post',
     contentType: 'text/csv',
-    payload: toCsv(values),
+    payload: payload,
     headers: { 'X-Ingest-Secret': INGEST_SECRET },
     muteHttpExceptions: true,
+    followRedirects: true,
   });
 
   const code = response.getResponseCode();
   const body = response.getContentText();
+
   if (code !== 200) {
-    // Surfaces in the Apps Script execution log and emails the sheet owner on
-    // a failed trigger run, so a broken push doesn't go unnoticed for weeks.
-    throw new Error('ingest failed: ' + code + ' ' + body);
+    return { ok: false, problem: 'HTTP ' + code + ': ' + body.slice(0, 200) };
   }
 
-  // A 200 is not proof of anything. If INGEST_URL points at the site root
-  // instead of api/ingest.php, the dashboard renders and returns 200 HTML —
-  // the push would look successful forever while storing nothing.
+  // A 200 proves nothing here. InfinityFree's challenge and the dashboard's own
+  // homepage both answer 200 with HTML; only our endpoint answers with JSON.
   let result;
   try {
     result = JSON.parse(body);
   } catch (e) {
-    throw new Error(
-      'ingest returned HTML, not JSON — INGEST_URL must end in /api/ingest.php. Got: ' +
-      body.slice(0, 120)
-    );
-  }
-  if (!result.ok) {
-    throw new Error('ingest refused the push: ' + body);
+    const blocked = body.indexOf('__test') !== -1 || body.indexOf('aes.js') !== -1;
+    return {
+      ok: false,
+      problem: blocked
+        ? "blocked by the host's bot check (not our endpoint) — will retry"
+        : 'expected JSON, got HTML — is INGEST_URL pointing at api/ingest.php? ' + body.slice(0, 120),
+    };
   }
 
+  if (!result.ok) {
+    return { ok: false, problem: 'ingest refused the push: ' + body.slice(0, 200) };
+  }
+  return { ok: true, result: result };
+}
+
+function recordSuccess(result) {
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty('lastSuccess', new Date().toISOString());
+  props.setProperty('consecutiveFailures', '0');
   Logger.log(
-    'pushed ' + result.rows + ' rows across ' + result.schools +
-    ' schools — ' + result.present + '/' + result.strength + ' present'
+    'pushed ' + result.rows + ' rows across ' + result.schools + ' schools — ' +
+    result.present + '/' + result.strength + ' present, ' +
+    result.reported + '/' + result.classes + ' classes reported'
+  );
+}
+
+function recordFailure(problem) {
+  const props = PropertiesService.getScriptProperties();
+  const failures = Number(props.getProperty('consecutiveFailures') || '0') + 1;
+  props.setProperty('consecutiveFailures', String(failures));
+  props.setProperty('lastProblem', problem);
+
+  const since = props.getProperty('lastSuccess') || 'never';
+  const summary = failures + ' consecutive failed runs (last success: ' + since + '). ' + problem;
+
+  if (failures >= FAILURES_BEFORE_ALERT) {
+    // Throwing makes Apps Script email the sheet owner. Worth it now: this is
+    // no longer a random block, it is an outage.
+    throw new Error('attendance push has been failing for a while — ' + summary);
+  }
+  Logger.log('giving up this run, next run will retry. ' + summary);
+}
+
+/** Run by hand to see whether pushes are actually landing. */
+function pushStatus() {
+  const props = PropertiesService.getScriptProperties();
+  Logger.log(
+    'last successful push: ' + (props.getProperty('lastSuccess') || 'never') +
+    '\nconsecutive failures: ' + (props.getProperty('consecutiveFailures') || '0') +
+    '\nlast problem: ' + (props.getProperty('lastProblem') || 'none')
   );
 }
 
