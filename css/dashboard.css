@@ -51,9 +51,9 @@ button {
   box-shadow: 0 2px 12px rgba(153, 21, 31, 0.25);
 }
 
-.header-inner { max-width: 1120px; margin: 0 auto; }
-
-.header-row {
+.header-inner {
+  max-width: 1280px;
+  margin: 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -82,16 +82,14 @@ button {
   letter-spacing: -0.01em;
 }
 
-.header-badges {
+.accred-strip {
   background: #fff;
-  border-radius: 10px;
-  padding: 8px 16px;
+  border-bottom: 1px solid var(--hairline);
+  padding: 9px 28px;
   display: flex;
-  align-items: center;
-  box-shadow: var(--shadow-sm);
-  flex-shrink: 0;
+  justify-content: center;
 }
-.header-badges img { display: block; height: 80px; width: auto; }
+.accred-strip img { display: block; height: 52px; width: auto; max-width: 100%; object-fit: contain; }
 
 .tabs {
   display: flex;
@@ -100,7 +98,6 @@ button {
   padding: 4px;
   border-radius: 11px;
   width: fit-content;
-  margin-top: 16px;
 }
 
 .tab {
@@ -119,7 +116,7 @@ button {
 
 /* ---------- Layout ---------- */
 
-main { max-width: 1120px; margin: 0 auto; padding: 28px; }
+main { max-width: 1280px; margin: 0 auto; padding: 28px; }
 
 /* ---------- Stat row ---------- */
 
@@ -193,7 +190,6 @@ main { max-width: 1120px; margin: 0 auto; padding: 28px; }
   box-shadow: var(--shadow-sm);
 }
 .stat-pill-value { font-family: "IBM Plex Mono", monospace; font-size: 19px; font-weight: 600; color: var(--ink); }
-.stat-pill-value-date { font-size: 15px; }
 .stat-pill-label { font-size: 11.5px; font-weight: 600; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.04em; }
 
 /* ---------- Breadcrumb ---------- */
@@ -223,9 +219,9 @@ main { max-width: 1120px; margin: 0 auto; padding: 28px; }
 .section-meta { font-size: 12.5px; color: var(--ink-muted); font-weight: 500; }
 
 .tile-grid { display: grid; gap: 10px; }
-.schools-grid, .partners-grid { grid-template-columns: repeat(3, 1fr); }
-.years-grid { grid-template-columns: repeat(4, 1fr); }
-.branches-grid { grid-template-columns: repeat(3, 1fr); }
+.schools-grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+.partners-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.years-grid, .branches-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
 
 .tile {
   background: var(--surface-raised);
@@ -262,6 +258,12 @@ main { max-width: 1120px; margin: 0 auto; padding: 28px; }
   stroke-linejoin: round;
 }
 .tile-label { font-size: 13.5px; line-height: 1.3; }
+.tile-stat { font-family: "IBM Plex Mono", monospace; font-size: 13px; font-weight: 600; color: var(--ink-muted); }
+.tile-stat-sep { color: var(--ink-faint); font-weight: 500; margin: 0 1px; }
+.school-tile { justify-content: space-between; }
+.school-tile .division-bar { display: block; width: 100%; margin-top: 2px; }
+.school-tile .division-bar-fill { display: block; }
+.tile.active .tile-stat { color: var(--red-primary); }
 .year-tile, .branch-tile { font-size: 14px; font-weight: 600; padding: 14px; }
 
 .tile-tag { font-size: 11.5px; color: var(--ink-muted); }
@@ -360,7 +362,8 @@ main { max-width: 1120px; margin: 0 auto; padding: 28px; }
   .stat-strip { grid-template-columns: repeat(2, 1fr); }
   .schools-grid, .partners-grid, .years-grid, .branches-grid { grid-template-columns: repeat(2, 1fr); }
   .division-grid { grid-template-columns: 1fr; }
-  .header-row { flex-direction: column; align-items: flex-start; }
-  .header-badges img { height: 32px; }
+  .header-inner { flex-direction: column; align-items: flex-start; }
+  .accred-strip { padding: 8px 16px; }
+  .accred-strip img { height: 28px; }
   .brand-logo img { height: 40px; }
 }
