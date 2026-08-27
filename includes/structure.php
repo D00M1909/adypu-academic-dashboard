@@ -4,10 +4,11 @@
 //
 //   1. Strength. Faculty submit only a present count, so the denominator lives
 //      here and can't drift from a daily typo on the Form.
-//   2. The Form's single "Class" dropdown. Google Forms has no dependent
-//      dropdowns, so one flat question lists every class as a label built by
-//      class_label(); parse_class_label() splits it back into its four parts.
-//      Regenerate the option list with: php tools/form-options.php
+//   2. The Form's Class dropdowns. Google Forms has no dependent dropdowns, so
+//      a "School" question jumps to one of the sections in form_sections(),
+//      each listing only its own classes as labels built by class_label();
+//      parse_class_label() splits one back into its four parts.
+//      Regenerate the option lists with: php tools/form-options.php
 //
 // Engineering's structure is real — read from automatic-timetable-generator's
 // timetable_db.classes (AY 2026-27) on 26 Aug 2026. Every strength below is
@@ -127,4 +128,46 @@ function school_id_for_name(string $name): ?string {
 
 function class_strength(string $school, string $year, string $branch, string $division): ?int {
     return class_structure()[$school][$year][$branch][$division] ?? null;
+}
+
+// The Form's sections. Google Forms has no dependent dropdowns, so one "School"
+// question jumps to a section holding only that school's classes. Engineering
+// carries 37 of the 103 classes and is the only school with branches, so it
+// splits one level further, by year — that keeps every list under ~16 options
+// without the 44 sections a full school>year>branch>division chain would need.
+//
+// Returns [section title => [class label, ...]], in the order to build them.
+function form_sections(): array {
+    $out = [];
+    foreach (class_structure() as $school => $years) {
+        $name = SCHOOLS[$school]['name'] ?? $school;
+        $hasBranches = false;
+        foreach ($years as $branches) {
+            if (array_keys($branches) !== ['']) { $hasBranches = true; break; }
+        }
+
+        if (!$hasBranches) {
+            $labels = [];
+            foreach ($years as $year => $branches) {
+                foreach ($branches as $branch => $divisions) {
+                    foreach (array_keys($divisions) as $division) {
+                        $labels[] = class_label($school, $year, $branch, $division);
+                    }
+                }
+            }
+            $out[$name] = $labels;
+            continue;
+        }
+
+        foreach ($years as $year => $branches) {
+            $labels = [];
+            foreach ($branches as $branch => $divisions) {
+                foreach (array_keys($divisions) as $division) {
+                    $labels[] = class_label($school, $year, $branch, $division);
+                }
+            }
+            $out["$name \u{2014} $year"] = $labels;
+        }
+    }
+    return $out;
 }

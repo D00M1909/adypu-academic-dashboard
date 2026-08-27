@@ -1,7 +1,6 @@
 <?php
-// Prints the option list for the Form's single "Class" dropdown, one per line,
-// ready to paste into Google Forms (it splits pasted multi-line text into
-// separate options automatically).
+// Prints the Form's sections and their dropdown options, ready to paste into
+// Google Forms (it splits pasted multi-line text into separate options).
 //
 //   php tools/form-options.php > class-options.txt
 //
@@ -11,6 +10,20 @@
 
 require_once __DIR__ . '/../includes/structure.php';
 
-foreach (class_rows() as $c) {
-    echo class_label($c['school'], $c['year'], $c['branch'], $c['division']), "\n";
+$sections = form_sections();
+
+echo "SECTION LIST — build these in order, then point the School question at them\n";
+echo str_repeat('=', 74), "\n\n";
+foreach ($sections as $title => $labels) {
+    printf("%-42s %2d options\n", $title, count($labels));
+}
+
+foreach ($sections as $title => $labels) {
+    echo "\n\n", str_repeat('=', 74), "\n";
+    echo "SECTION: $title\n";
+    echo "Question title: Class (", $title, ")\n";
+    echo str_repeat('=', 74), "\n";
+    foreach ($labels as $label) {
+        echo $label, "\n";
+    }
 }

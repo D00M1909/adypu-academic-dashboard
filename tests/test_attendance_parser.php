@@ -51,6 +51,45 @@ assert($formRows[1]['school'] === 'law' && $formRows[1]['branch'] === '', 'branc
 assert($formRows[1]['strength'] === 60, 'law 1st Year div B strength wrong: ' . $formRows[1]['strength']);
 assert($formRows[0]['date'] !== '', 'missing date column should default to today');
 
+// --- Sectioned form rows: one class column per section, one filled ----------
+// Headers are deliberately duplicated ("class (...)" twice over) because Google
+// repeats a question title across sections; array_combine collapses those, so
+// the value must be resolved off the raw header/field arrays instead.
+$sectioned =
+    "timestamp,school,class (school of engineering — 2nd year),class (school of law),class (school of law)\n" .
+    '"26/08/2026 09:14:02","School of Engineering","School of Engineering / 2nd Year / CSE / B","",""' . "\n" .
+    '"26/08/2026 09:15:10","School of Law","","School of Law / 2nd Year / A",""' . "\n" .
+    '"26/08/2026 09:16:44","School of Law","","","School of Law / 3rd Year / B"' . "\n";
+
+$secRows = parse_attendance_csv($sectioned);
+assert(count($secRows) === 3, 'expected 3 sectioned rows, got ' . count($secRows));
+assert($secRows[0]['school'] === 'eng' && $secRows[0]['division'] === 'B', 'eng section row mis-parsed');
+assert($secRows[1]['school'] === 'law' && $secRows[1]['year'] === '2nd Year', 'law section row mis-parsed');
+// The last row's value sits in the SECOND duplicate column — the one
+// array_combine keeps. The first duplicate is blank and must not win.
+assert($secRows[2]['year'] === '3rd Year' && $secRows[2]['division'] === 'B', 'duplicate class header collapsed');
+
+// A row with every class column blank names no class and must be dropped, not
+// silently attributed to whatever the school column says.
+$blank = "timestamp,school,class (school of law)\n" . '"26/08/2026 09:17:00","School of Law",""' . "\n";
+assert(count(parse_attendance_csv($blank)) === 0, 'row with no class selected should be dropped');
+
+// --- Every section's options are real, unique classes -----------------------
+$sections = form_sections();
+assert(count($sections) === 12, 'expected 12 form sections, got ' . count($sections));
+$seen = [];
+foreach ($sections as $title => $labels) {
+    assert($labels !== [], "section '$title' has no options");
+    foreach ($labels as $label) {
+        assert(parse_class_label($label) !== null, "section option is not a real class: $label");
+        assert(!isset($seen[$label]), "class appears in two sections: $label");
+        $seen[$label] = true;
+    }
+}
+// No class may be missing from the Form, or it can never be submitted.
+assert(count($seen) === count(class_rows()),
+    'sections cover ' . count($seen) . ' classes but ' . count(class_rows()) . ' exist');
+
 // --- Label round-trips ------------------------------------------------------
 foreach (class_rows() as $c) {
     $label = class_label($c['school'], $c['year'], $c['branch'], $c['division']);
