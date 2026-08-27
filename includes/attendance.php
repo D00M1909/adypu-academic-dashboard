@@ -136,14 +136,22 @@ function parse_attendance_csv(string $csv): array {
     return $rows;
 }
 
-// Groups flat rows into School -> Year -> Branch -> Division[], keeping only
-// the latest row per school/year/branch/division/date (a same-day
-// resubmission wins). Branch is '' for schools with no branch structure.
+// Groups flat rows into School -> Year -> Branch -> Division[], keeping exactly
+// ONE reading per class: the latest date wins, and among equal dates the later
+// row wins (rows arrive in sheet order, so a resubmission beats the original).
+// Branch is '' for schools with no branch structure.
+//
+// The key deliberately excludes the date. The Apps Script pushes the whole
+// sheet every time, so by day two it carries every previous day's rows too —
+// keying by date would file the same division under several dates and count
+// its strength once per day.
 function aggregate_attendance(array $rows): array {
     $latest = [];
     foreach ($rows as $r) {
-        $key = $r['school'] . '|' . $r['year'] . '|' . $r['branch'] . '|' . $r['division'] . '|' . $r['date'];
-        $latest[$key] = $r;
+        $key = $r['school'] . '|' . $r['year'] . '|' . $r['branch'] . '|' . $r['division'];
+        if (!isset($latest[$key]) || $r['date'] >= $latest[$key]['date']) {
+            $latest[$key] = $r;
+        }
     }
     $tree = [];
     foreach ($latest as $r) {
