@@ -11,10 +11,18 @@ if (file_exists(__DIR__ . '/config.local.php')) {
     require __DIR__ . '/config.local.php';
 }
 
-define('DB_HOST', defined('DB_HOST') ? DB_HOST : (getenv('DB_HOST') ?: 'localhost'));
-define('DB_USER', defined('DB_USER') ? DB_USER : (getenv('DB_USER') ?: 'root'));
-define('DB_PASS', defined('DB_PASS') ? DB_PASS : (getenv('DB_PASS') ?: ''));
-define('DB_NAME', defined('DB_NAME') ? DB_NAME : (getenv('DB_NAME') ?: 'adypu_dashboard'));
+// `defined() || define()`, not `define(defined() ? ...)`: define() runs either
+// way and re-defining an existing constant raises a warning, which lands in the
+// page output on any host where config.local.php actually sets these.
+defined('DB_HOST') || define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
+defined('DB_USER') || define('DB_USER', getenv('DB_USER') ?: 'root');
+defined('DB_PASS') || define('DB_PASS', getenv('DB_PASS') ?: '');
+defined('DB_NAME') || define('DB_NAME', getenv('DB_NAME') ?: 'adypu_dashboard');
+
+// Shared secret the Apps Script in tools/apps-script.gs sends with every push
+// to api/ingest.php. Empty means ingest is disabled and refuses every request —
+// set it in config.local.php, never here (this file is committed).
+defined('INGEST_SECRET') || define('INGEST_SECRET', getenv('INGEST_SECRET') ?: '');
 
 function get_db(): mysqli {
     static $conn = null;
