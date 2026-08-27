@@ -74,6 +74,17 @@ assert($secRows[2]['year'] === '3rd Year' && $secRows[2]['division'] === 'B', 'd
 $blank = "timestamp,school,class (school of law)\n" . '"26/08/2026 09:17:00","School of Law",""' . "\n";
 assert(count(parse_attendance_csv($blank)) === 0, 'row with no class selected should be dropped');
 
+// A Present question placed inside each section instead of a shared one repeats
+// that column too. array_combine keeps the blank last copy, which parsed as
+// present=0 — a silent total-absence reading, not a visible error.
+$dupPresent =
+    "timestamp,school,class (school of law),present,class (school of design),present\n" .
+    '"26/08/2026 09:15:10","School of Law","School of Law / 2nd Year / A","44","",""' . "\n";
+$dup = parse_attendance_csv($dupPresent);
+assert(count($dup) === 1, 'expected 1 row from duplicated-present sheet');
+assert($dup[0]['present'] === 44, 'duplicated present column zeroed the count: ' . $dup[0]['present']);
+assert($dup[0]['strength'] === 30, 'strength wrong: ' . $dup[0]['strength']);
+
 // --- Every section's options are real, unique classes -----------------------
 $sections = form_sections();
 assert(count($sections) === 12, 'expected 12 form sections, got ' . count($sections));
