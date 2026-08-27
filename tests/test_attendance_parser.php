@@ -35,6 +35,28 @@ $totals = attendance_totals($tree);
 assert($totals['strength'] === 210, 'total strength wrong: ' . $totals['strength']);
 assert($totals['present'] === 123, 'total present wrong: ' . $totals['present']);
 
+// --- Multi-day sheets: one reading per class, never one per day -------------
+// The Apps Script pushes the entire sheet on every trigger, so from day two it
+// carries every earlier day's rows. Keying by date would file one division
+// under several dates and count its strength once per day.
+$multiDay = "date,school,year,branch,division,strength,present\n" .
+            "law,,,,,,\n" . // malformed row, must be ignored
+            "2026-08-26,law,2nd Year,,A,7,20\n" .
+            "2026-08-27,law,2nd Year,,A,7,25\n" .
+            "2026-08-27,law,2nd Year,,A,7,27\n";  // same-day resubmission wins
+$multiTree = aggregate_attendance(parse_attendance_csv($multiDay));
+assert(count($multiTree['law']['2nd Year']['']) === 1, 'a class must appear once, not once per day');
+$mt = attendance_totals($multiTree);
+assert($mt['strength'] === 30, 'strength counted more than once: ' . $mt['strength']);
+assert($mt['present'] === 27, 'latest reading should win, got ' . $mt['present']);
+
+// Order must not matter: an older row arriving after a newer one loses.
+$outOfOrder = "date,school,year,branch,division,strength,present\n" .
+              "2026-08-27,law,2nd Year,,A,7,27\n" .
+              "2026-08-26,law,2nd Year,,A,7,20\n";
+$oo = attendance_totals(aggregate_attendance(parse_attendance_csv($outOfOrder)));
+assert($oo['present'] === 27, 'an older row overwrote a newer one: ' . $oo['present']);
+
 // --- Flat "Class" rows (what the Google Form actually submits) --------------
 $formCsv = "timestamp,class,present\n" .
            "26/08/2026 09:14:02,School of Engineering / 2nd Year / CSE / A,52\n" .
