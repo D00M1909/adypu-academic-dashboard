@@ -111,7 +111,14 @@ function parse_attendance_csv(string $csv): array {
         $fields = str_getcsv($line);
         if ($header === null) {
             $header = array_map(fn($h) => strtolower(trim($h)), $fields);
-            continue;
+            // Without a Present column every row would parse as present = 0 —
+            // a silent university-wide absence rather than a visible error.
+            // Reject the whole sheet instead; api/ingest.php turns an empty
+            // parse into a 422 and leaves the last good data in place.
+            foreach ($header as $name) {
+                if (str_starts_with($name, 'present')) continue 2;
+            }
+            return [];
         }
         $r = @array_combine($header, $fields);
         if (!$r) continue;

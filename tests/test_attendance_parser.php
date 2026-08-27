@@ -56,22 +56,23 @@ assert($formRows[0]['date'] !== '', 'missing date column should default to today
 // repeats a question title across sections; array_combine collapses those, so
 // the value must be resolved off the raw header/field arrays instead.
 $sectioned =
-    "timestamp,school,class (school of engineering — 2nd year),class (school of law),class (school of law)\n" .
-    '"26/08/2026 09:14:02","School of Engineering","School of Engineering / 2nd Year / CSE / B","",""' . "\n" .
-    '"26/08/2026 09:15:10","School of Law","","School of Law / 2nd Year / A",""' . "\n" .
-    '"26/08/2026 09:16:44","School of Law","","","School of Law / 3rd Year / B"' . "\n";
+    "timestamp,school,class (school of engineering — 2nd year),class (school of law),class (school of law),present today\n" .
+    '"26/08/2026 09:14:02","School of Engineering","School of Engineering / 2nd Year / CSE / B","","","52"' . "\n" .
+    '"26/08/2026 09:15:10","School of Law","","School of Law / 2nd Year / A","","44"' . "\n" .
+    '"26/08/2026 09:16:44","School of Law","","","School of Law / 3rd Year / B","39"' . "\n";
 
 $secRows = parse_attendance_csv($sectioned);
 assert(count($secRows) === 3, 'expected 3 sectioned rows, got ' . count($secRows));
 assert($secRows[0]['school'] === 'eng' && $secRows[0]['division'] === 'B', 'eng section row mis-parsed');
 assert($secRows[1]['school'] === 'law' && $secRows[1]['year'] === '2nd Year', 'law section row mis-parsed');
+assert($secRows[0]['present'] === 52 && $secRows[1]['present'] === 44, 'present lost across sectioned columns');
 // The last row's value sits in the SECOND duplicate column — the one
 // array_combine keeps. The first duplicate is blank and must not win.
 assert($secRows[2]['year'] === '3rd Year' && $secRows[2]['division'] === 'B', 'duplicate class header collapsed');
 
 // A row with every class column blank names no class and must be dropped, not
 // silently attributed to whatever the school column says.
-$blank = "timestamp,school,class (school of law)\n" . '"26/08/2026 09:17:00","School of Law",""' . "\n";
+$blank = "timestamp,school,class (school of law),present\n" . '"26/08/2026 09:17:00","School of Law","","31"' . "\n";
 assert(count(parse_attendance_csv($blank)) === 0, 'row with no class selected should be dropped');
 
 // A Present question placed inside each section instead of a shared one repeats
@@ -84,6 +85,19 @@ $dup = parse_attendance_csv($dupPresent);
 assert(count($dup) === 1, 'expected 1 row from duplicated-present sheet');
 assert($dup[0]['present'] === 44, 'duplicated present column zeroed the count: ' . $dup[0]['present']);
 assert($dup[0]['strength'] === 30, 'strength wrong: ' . $dup[0]['strength']);
+
+// The Present question may be renamed for clarity as long as it still starts
+// with "Present" — that prefix is the contract between the form and the parser.
+$renamed = "timestamp,class (school of law),present today\n" .
+           '"26/08/2026 09:15:10","School of Law / 2nd Year / A","44"' . "\n";
+$ren = parse_attendance_csv($renamed);
+assert(count($ren) === 1 && $ren[0]['present'] === 44, 'a "Present ..." suffix should still match');
+
+// A sheet with no Present column at all is rejected outright. Parsing it as
+// zeros would read as a university-wide absence instead of a broken form.
+$noPresent = "timestamp,class (school of law),students present\n" .
+             '"26/08/2026 09:15:10","School of Law / 2nd Year / A","44"' . "\n";
+assert(parse_attendance_csv($noPresent) === [], 'sheet without a Present column must be rejected');
 
 // --- Every section's options are real, unique classes -----------------------
 $sections = form_sections();

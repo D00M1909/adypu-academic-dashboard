@@ -45,7 +45,7 @@ if (!$rows) {
     // Never overwrite good data with nothing. An empty parse means the sheet
     // was cleared, its headers were renamed, or every row named a class that
     // doesn't exist — all of which are mistakes, not "today nobody attended".
-    fail(422, 'no valid rows parsed — check the sheet headers and Class values');
+    fail(422, 'no valid rows parsed — the sheet needs a column whose name starts with "Present", and Class values that match the form options');
 }
 
 $tree = aggregate_attendance($rows);
