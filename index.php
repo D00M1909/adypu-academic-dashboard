@@ -4,6 +4,7 @@ require_once __DIR__ . '/includes/attendance.php';
 $tree = get_attendance();
 $totals = attendance_totals($tree);
 $today = date('d M Y');
+$overallPct = $totals['strength'] ? (int) round($totals['present'] / $totals['strength'] * 100) : 0;
 
 $knowledgePartners = [
     ['name' => 'Partner Institute of Technology', 'tag' => 'Engineering'],
@@ -115,14 +116,9 @@ $knowledgePartners = [
 
 <header class="app-header">
   <div class="header-inner">
-    <div class="header-row">
-      <div class="brand">
-        <div class="brand-logo"><img src="img/logo.png" alt="Ajeenkya D Y Patil University"></div>
-        <h1>ADYPU: Academic Dashboard</h1>
-      </div>
-      <div class="header-badges">
-        <img src="img/accreditation-badges.jpeg" alt="NAAC A Grade Accreditation, NBA Accredited, NIRF Ranked, Great Place To Work Certified, Times Higher Education Sustainability Impact Rating, and QS I-Gauge Diamond Rating">
-      </div>
+    <div class="brand">
+      <div class="brand-logo"><img src="img/logo.png" alt="Ajeenkya D Y Patil University"></div>
+      <h1>ADYPU: Academic Dashboard</h1>
     </div>
     <nav class="tabs" role="tablist">
       <button class="tab active" data-tab="adypu" role="tab" aria-selected="true">ADYPU</button>
@@ -131,13 +127,17 @@ $knowledgePartners = [
   </div>
 </header>
 
+<div class="accred-strip">
+  <img src="img/accreditation-badges.jpeg" alt="NAAC A Grade Accreditation, NBA Accredited, NIRF Ranked, Great Place To Work Certified, Times Higher Education Sustainability Impact Rating, and QS I-Gauge Diamond Rating">
+</div>
+
 <main>
 
   <section class="stat-row">
     <button class="stat-hero" id="present-today-card" type="button">
       <svg class="stat-hero-icon"><use href="#icon-user-check"/></svg>
       <span class="stat-hero-text">
-        <span class="stat-hero-label">Present Today</span>
+        <span class="stat-hero-label">Present Today &middot; <?= htmlspecialchars($today) ?></span>
         <span class="stat-hero-value"><?= $totals['present'] ?><span class="stat-hero-sep">/</span><?= $totals['strength'] ?></span>
       </span>
       <span class="stat-hero-cta">View breakdown<svg class="stat-hero-cta-icon"><use href="#icon-chevron"/></svg></span>
@@ -149,20 +149,18 @@ $knowledgePartners = [
         <span class="stat-pill-label">Schools</span>
       </div>
       <div class="stat-pill">
-        <span class="stat-pill-value"><?= $totals['strength'] ?></span>
-        <span class="stat-pill-label">Total strength</span>
+        <span class="stat-pill-value"><?= $overallPct ?>%</span>
+        <span class="stat-pill-label">Attendance</span>
       </div>
       <div class="stat-pill">
-        <span class="stat-pill-value stat-pill-value-date"><?= htmlspecialchars($today) ?></span>
-        <span class="stat-pill-label">Attendance date</span>
+        <span class="stat-pill-value"><?= $totals['strength'] - $totals['present'] ?></span>
+        <span class="stat-pill-label">Absent</span>
       </div>
     </div>
   </section>
 
   <div id="tab-adypu" class="tab-panel">
-    <nav class="breadcrumb" id="breadcrumb" aria-label="Drill-down path">
-      <span class="crumb crumb-current" data-crumb="schools">Schools</span>
-    </nav>
+    <nav class="breadcrumb" id="breadcrumb" aria-label="Drill-down path" hidden></nav>
 
     <section class="tile-section">
       <div class="section-title">
@@ -170,10 +168,15 @@ $knowledgePartners = [
         <span class="section-meta"><?= count(SCHOOLS) ?> schools</span>
       </div>
       <div class="tile-grid schools-grid">
-        <?php foreach (SCHOOLS as $id => $school): ?>
+        <?php foreach (SCHOOLS as $id => $school):
+          $st = attendance_totals([$id => $tree[$id] ?? []]);
+          $stPct = $st['strength'] ? (int) round($st['present'] / $st['strength'] * 100) : 0;
+        ?>
         <button class="tile school-tile" type="button" data-school="<?= htmlspecialchars($id) ?>">
           <svg class="tile-icon-svg"><use href="#icon-<?= htmlspecialchars($id) ?>"/></svg>
           <span class="tile-label"><?= htmlspecialchars($school['name']) ?></span>
+          <span class="tile-stat"><?= $st['present'] ?><span class="tile-stat-sep">/</span><?= $st['strength'] ?> &middot; <?= $stPct ?>%</span>
+          <span class="division-bar"><span class="division-bar-fill" style="width:<?= $stPct ?>%"></span></span>
         </button>
         <?php endforeach; ?>
       </div>

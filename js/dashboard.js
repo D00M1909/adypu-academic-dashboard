@@ -38,6 +38,8 @@
     var last = crumbs.length - 1;
     crumbs[last] = crumbs[last].replace('class="crumb"', 'class="crumb crumb-current"');
     breadcrumb.innerHTML = crumbs.join('');
+    // Only earns its place once you've drilled past the school grid.
+    breadcrumb.hidden = !state.school;
   }
 
   // Populates the Branches section for a chosen school+year. Schools with no
