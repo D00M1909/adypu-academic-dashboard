@@ -21,25 +21,31 @@
  *   4. Run pushNow() once and approve the permissions prompt.
  *   5. Triggers (clock icon) -> Add Trigger:
  *        - pushNow / From spreadsheet / On form submit
- *        - pushNow / Time-driven / Minutes timer / Every 15 minutes
+ *        - pushNow / Time-driven / Minutes timer / Every 5 minutes
  *      The first is instant when it gets through; the second is the safety net
- *      that eventually gets through.
+ *      that eventually gets through. Five minutes rather than fifteen because
+ *      only about a third of runs get past the host's bot check, so the gap
+ *      between successes is several times the trigger interval.
  *   6. Run pushStatus() any time to see when the last push actually landed.
  */
 
 const INGEST_URL = 'https://YOUR-SITE.rf.gd/api/ingest.php';
 const INGEST_SECRET = 'paste-the-same-secret-as-config.local.php';
 
-// Attempts within a single run. The challenge is served per request, so an
-// immediate retry sometimes gets through; if it doesn't, the next scheduled
-// run will.
-const ATTEMPTS_PER_RUN = 3;
+// Attempts within a single run. Measured on 27 Aug 2026 across ~20 runs: when
+// the first attempt was blocked, attempts 2 and 3 were blocked every single
+// time. The challenge tracks the calling IP, and a retry three seconds later
+// comes from the same one — so in-run retries bought nothing and cost ~8s per
+// blocked run. Recovery comes from the NEXT run, minutes later, on a different
+// Google IP. Raise this only if that stops being true.
+const ATTEMPTS_PER_RUN = 1;
 const RETRY_PAUSE_MS = 3000;
 
-// Consecutive failed runs before this starts throwing. At one run per 15
-// minutes, 8 is about two hours — long enough to ride out the challenge,
-// short enough to catch a genuinely broken site the same morning.
-const FAILURES_BEFORE_ALERT = 8;
+// Consecutive failed runs before this starts throwing. Keep this at roughly two
+// hours' worth of runs: long enough to ride out a bad streak of the host's bot
+// check, short enough to catch a genuinely broken site the same morning.
+// At one run per 5 minutes, 24 runs is two hours.
+const FAILURES_BEFORE_ALERT = 24;
 
 function pushNow() {
   if (!/\/api\/ingest\.php$/.test(INGEST_URL)) {
