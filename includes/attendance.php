@@ -136,16 +136,23 @@ function parse_attendance_csv(string $csv): array {
     return $rows;
 }
 
-// Groups flat rows into School -> Year -> Branch -> Division[], keeping exactly
-// ONE reading per class: the latest date wins, and among equal dates the later
-// row wins (rows arrive in sheet order, so a resubmission beats the original).
-// Branch is '' for schools with no branch structure.
+// Builds School -> Year -> Branch -> Division[] from the CANONICAL class list
+// in structure.php, then overlays whatever has actually been submitted.
 //
-// The key deliberately excludes the date. The Apps Script pushes the whole
-// sheet every time, so by day two it carries every previous day's rows too —
-// keying by date would file the same division under several dates and count
-// its strength once per day.
+// The structure leads, not the submissions. A class nobody has reported today
+// still exists, still contributes its strength to the denominator, and is
+// marked reported => false so the UI can say "not reported" instead of showing
+// a school as 0/0 — which reads as "this school has no students".
+//
+// Among a class's submitted rows, the latest date wins, and among equal dates
+// the later row wins (rows arrive in sheet order, so a resubmission beats the
+// original). The key deliberately excludes the date: the Apps Script pushes the
+// whole sheet every time, so by day two it carries every previous day's rows —
+// keying by date would file one division under several dates and count its
+// strength once per day.
 function aggregate_attendance(array $rows): array {
+    require_once __DIR__ . '/structure.php';
+
     $latest = [];
     foreach ($rows as $r) {
         $key = $r['school'] . '|' . $r['year'] . '|' . $r['branch'] . '|' . $r['division'];
@@ -153,31 +160,46 @@ function aggregate_attendance(array $rows): array {
             $latest[$key] = $r;
         }
     }
+
     $tree = [];
-    foreach ($latest as $r) {
-        $tree[$r['school']][$r['year']][$r['branch']][] = [
-            'division' => $r['division'],
-            'strength' => $r['strength'],
-            'present'  => $r['present'],
+    foreach (class_rows() as $c) {
+        $key = $c['school'] . '|' . $c['year'] . '|' . $c['branch'] . '|' . $c['division'];
+        $submitted = $latest[$key] ?? null;
+        $tree[$c['school']][$c['year']][$c['branch']][] = [
+            'division' => $c['division'],
+            'strength' => $c['strength'],
+            'present'  => $submitted ? $submitted['present'] : 0,
+            'reported' => $submitted !== null,
         ];
     }
     return $tree;
 }
 
+// Also counts how many of the classes in scope have actually reported. Without
+// that, "0 present" and "nobody submitted" are indistinguishable.
 function attendance_totals(array $tree): array {
     $strength = 0;
     $present = 0;
+    $classes = 0;
+    $reported = 0;
     foreach ($tree as $years) {
         foreach ($years as $branches) {
             foreach ($branches as $divisions) {
                 foreach ($divisions as $d) {
                     $strength += $d['strength'];
                     $present += $d['present'];
+                    $classes++;
+                    if (!empty($d['reported'])) $reported++;
                 }
             }
         }
     }
-    return ['strength' => $strength, 'present' => $present];
+    return [
+        'strength' => $strength,
+        'present'  => $present,
+        'classes'  => $classes,
+        'reported' => $reported,
+    ];
 }
 
 function read_attendance_cache(): ?array {

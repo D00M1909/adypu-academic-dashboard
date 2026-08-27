@@ -35,6 +35,7 @@
   function scopeTotals() {
     var data = window.ATTENDANCE_DATA;
     var present = 0, strength = 0, units = 0, unitLabel = 'Schools';
+    var classes = 0, reported = 0;
 
     var schools = state.school ? [state.school] : Object.keys(data);
     if (!state.school) units = schools.length;
@@ -55,12 +56,18 @@
           divisions.forEach(function (d) {
             present += d.present;
             strength += d.strength;
+            classes++;
+            if (d.reported) reported++;
           });
         });
       });
     });
 
-    return { present: present, strength: strength, units: units, unitLabel: unitLabel };
+    return {
+      present: present, strength: strength,
+      units: units, unitLabel: unitLabel,
+      classes: classes, reported: reported
+    };
   }
 
   // The stat row is server-rendered for the whole university, then rescoped
@@ -74,7 +81,8 @@
     document.getElementById('stat-strength').textContent = t.strength;
     document.getElementById('stat-units').textContent = t.units;
     document.getElementById('stat-units-label').textContent = t.unitLabel;
-    document.getElementById('stat-absent').textContent = t.strength - t.present;
+    document.getElementById('stat-reported').innerHTML =
+      t.reported + '<span class="stat-pill-sep">/</span>' + t.classes;
 
     var pctEl = document.getElementById('stat-pct');
     pctEl.textContent = p + '%';
@@ -249,20 +257,27 @@
         var divPct = pct(d.present, d.strength);
         var row = document.createElement('div');
         row.className = 'division-row';
+        // An unreported class has present = 0, which would otherwise render as
+        // a full-red 0% bar — indistinguishable from a class where nobody came.
+        var readout = d.reported
+          ? d.present + '<span class="division-count-sep">/</span>' + d.strength +
+            ' <span class="att-pct ' + attClass(divPct) + '">' + divPct + '%</span>'
+          : '<span class="tile-unreported">Not reported</span>';
         row.innerHTML =
           '<div class="division-row-top">' +
             '<span class="division-name">Division ' + d.division + '</span>' +
-            '<span class="division-count">' + d.present + '<span class="division-count-sep">/</span>' + d.strength +
-              ' <span class="att-pct ' + attClass(divPct) + '">' + divPct + '%</span></span>' +
+            '<span class="division-count">' + readout + '</span>' +
           '</div>' +
-          '<div class="division-bar"><div class="division-bar-fill ' + attClass(divPct) +
-            '" style="width:' + divPct + '%"></div></div>';
+          '<div class="division-bar"><div class="division-bar-fill ' +
+            (d.reported ? attClass(divPct) : '') + '" style="width:' +
+            (d.reported ? divPct : 0) + '%"></div></div>';
         grid.appendChild(row);
       });
 
       var totalPct = pct(data.total.present, data.total.strength);
       document.getElementById('division-total').innerHTML =
-        '<span>Total present</span><span class="division-count">' + data.total.present +
+        '<span>Total present <small>(' + data.total.reported + ' of ' + data.total.classes +
+        ' reported)</small></span><span class="division-count">' + data.total.present +
         '<span class="division-count-sep">/</span>' + data.total.strength + ' · ' + totalPct + '%</span>';
 
       showModal();
