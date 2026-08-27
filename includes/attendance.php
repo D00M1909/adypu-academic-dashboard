@@ -61,9 +61,21 @@ function fetch_sheet_csv(): ?string {
     return $csv !== false ? $csv : null;
 }
 
-// Resolves one CSV row to a real class. Two row shapes are accepted: the Form's
-// single "Class" column ("School of Engineering / 2nd Year / CSE / A"), and the
-// four separate columns a hand-maintained sheet or the DB export uses. Either
+// The one non-empty value among every column whose header starts with "class"
+// — the Form's per-section dropdowns ("Class (School of Law)" and friends).
+// Returns '' when none is filled, which is also the plain four-column case.
+function first_class_value(array $header, array $fields): string {
+    foreach ($header as $i => $name) {
+        if (str_starts_with($name, 'class') && trim((string) ($fields[$i] ?? '')) !== '') {
+            return trim($fields[$i]);
+        }
+    }
+    return '';
+}
+
+// Resolves one CSV row to a real class. Two row shapes are accepted: a "class"
+// column holding a full label ("School of Engineering / 2nd Year / CSE / A"),
+// and the four separate columns a hand-maintained sheet or the DB export uses. Either
 // way strength comes from structure.php, never from the row — see SPEC.md §7.1.
 // A row naming a class that doesn't exist returns null and is dropped.
 function class_from_row(array $r): ?array {
@@ -100,6 +112,11 @@ function parse_attendance_csv(string $csv): array {
         }
         $r = @array_combine($header, $fields);
         if (!$r) continue;
+        // The Form has one Class dropdown per section, so a row carries a dozen
+        // class columns with exactly one filled. Resolved off the raw header /
+        // field arrays, not $r: identically-named columns collapse in
+        // array_combine and the last (blank) one would win.
+        $r['class'] = first_class_value($header, $fields);
         $class = class_from_row($r);
         if ($class === null) continue;
         $rows[] = $class + [
