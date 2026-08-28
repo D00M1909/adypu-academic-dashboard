@@ -1,13 +1,20 @@
 <?php
-// Attendance data pipeline: Google Sheet (published CSV) -> file cache ->
+// Attendance data pipeline: Google Form -> Apps Script push -> file cache ->
 // School -> Year -> Branch -> Division tree. See SPEC.md §7.1.
 // MySQL (db/schema.sql) is not read from here yet — this is the live path.
 // A school with no branch structure uses the single branch key '' (schools
 // other than eng — no confirmed branch data exists for them yet).
+//
+// The cache holds one present count per class per DAY, so any date range can
+// be rebuilt from it. See day_map() for the shape and aggregate_days() for
+// what a range's numbers mean.
 
-define('SHEET_CSV_URL', getenv('SHEET_CSV_URL') ?: '');
+// Every date in the app is a campus date: which day a class met, which day is
+// "latest". The host's clock is UTC, so without this the day rolls over at
+// 5:30am IST and a morning's submissions file themselves under yesterday.
+date_default_timezone_set('Asia/Kolkata');
+
 define('ATTENDANCE_CACHE_FILE', __DIR__ . '/../cache/attendance.json');
-define('ATTENDANCE_CACHE_TTL', 300);
 
 // Icon per school is presentational (see the SVG sprite in index.php, symbol
 // ids match these keys) — not stored here.
@@ -23,10 +30,11 @@ const SCHOOLS = [
     'film'    => ['name' => 'School of Film & Media'],
 ];
 
-// Used until real submissions arrive or a fetch fails (SPEC.md §8.1). Shape
-// matches a real row; the present counts are synthetic — there is no source for
-// them until the Google Form is live. Strength comes from the canonical
-// structure, same as a real submission.
+// Used until real submissions arrive (SPEC.md §8.1). Shape matches a real row;
+// the present counts are synthetic. Strength comes from the canonical
+// structure, same as a real submission. Deliberately never written to the
+// cache file — in push mode that file IS the record, and seeding it with
+// invented numbers makes fake data look pushed.
 function sample_attendance_rows(): array {
     require_once __DIR__ . '/structure.php';
     $today = date('Y-m-d');
@@ -55,18 +63,12 @@ function sample_attendance_rows(): array {
     return $rows;
 }
 
-function fetch_sheet_csv(): ?string {
-    if (SHEET_CSV_URL === '') return null;
-    $csv = @file_get_contents(SHEET_CSV_URL);
-    return $csv !== false ? $csv : null;
-}
-
 // The one non-empty value among every column whose header starts with $prefix.
 // A sectioned Form repeats question titles across sections, so the sheet can
-// carry a dozen "class ..." columns with one filled — and, if Present is placed
-// inside each section rather than shared, a dozen "present" columns too.
+// carry a dozen "class ..." columns with one filled — and, if Present or Date
+// is placed inside each section rather than shared, a dozen of those too.
 // array_combine keeps only the last of a repeated header, which is blank, so
-// both are resolved here off the raw header/field arrays instead.
+// they are resolved here off the raw header/field arrays instead.
 function first_value(array $header, array $fields, string $prefix): string {
     foreach ($header as $i => $name) {
         if (str_starts_with($name, $prefix) && trim((string) ($fields[$i] ?? '')) !== '') {
@@ -74,6 +76,21 @@ function first_value(array $header, array $fields, string $prefix): string {
         }
     }
     return '';
+}
+
+// One yyyy-mm-dd date out of whatever a cell holds, or null. The Apps Script
+// formats real Date cells as yyyy-mm-dd; a hand-typed sheet or an export that
+// never went through it gives d/m/Y, the Form's locale. Day-first is assumed:
+// 03/04/2026 is 3 April, matching how the Form displays it to faculty.
+function row_date(string $value): ?string {
+    $value = trim($value);
+    if (preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $value, $m)) {
+        return "$m[1]-$m[2]-$m[3]";
+    }
+    if (preg_match('#^(\d{1,2})/(\d{1,2})/(\d{4})#', $value, $m)) {
+        return sprintf('%04d-%02d-%02d', (int) $m[3], (int) $m[2], (int) $m[1]);
+    }
+    return null;
 }
 
 // Resolves one CSV row to a real class. Two row shapes are accepted: a "class"
@@ -125,6 +142,7 @@ function parse_attendance_csv(string $csv, ?array &$skipped = null): array {
     $lines = array_filter(explode("\n", str_replace("\r\n", "\n", $csv)), fn($l) => trim($l) !== '');
     $rows = [];
     $header = null;
+    $today = date('Y-m-d');
     foreach ($lines as $line) {
         $fields = str_getcsv($line);
         if ($header === null) {
@@ -154,57 +172,129 @@ function parse_attendance_csv(string $csv, ?array &$skipped = null): array {
             if ($named !== '') $skipped[] = $named;
             continue;
         }
+        // The day the class met, which is not the day the form was filled in:
+        // the Form's Date question wins, the submission timestamp is the
+        // fallback (so rows submitted before that question existed keep their
+        // real day instead of collapsing onto the push date), and today is the
+        // last resort. A future date is a typo for the year, and would park a
+        // reading at the end of the calendar where the "latest day" default
+        // view would then sit on it forever, so it is not accepted.
+        $date = $today;
+        foreach ([first_value($header, $fields, 'date'), first_value($header, $fields, 'timestamp')] as $candidate) {
+            $parsed = row_date($candidate);
+            if ($parsed !== null && $parsed <= $today) { $date = $parsed; break; }
+        }
         $rows[] = $class + [
             'present' => (int) ($r['present'] ?? 0),
-            'date'    => trim($r['date'] ?? '') ?: date('Y-m-d'),
+            'date'    => $date,
         ];
     }
     return $rows;
 }
 
-// Builds School -> Year -> Branch -> Division[] from the CANONICAL class list
-// in structure.php, then overlays whatever has actually been submitted.
-//
-// The structure leads, not the submissions. A class nobody has reported today
-// still exists, still contributes its strength to the denominator, and is
-// marked reported => false so the UI can say "not reported" instead of showing
-// a school as 0/0 — which reads as "this school has no students".
-//
-// Among a class's submitted rows, the latest date wins, and among equal dates
-// the later row wins (rows arrive in sheet order, so a resubmission beats the
-// original). The key deliberately excludes the date: the Apps Script pushes the
-// whole sheet every time, so by day two it carries every previous day's rows —
-// keying by date would file one division under several dates and count its
-// strength once per day.
-function aggregate_attendance(array $rows): array {
-    require_once __DIR__ . '/structure.php';
+// The tree's flat key for one class. No segment can contain '|', so it splits
+// back cleanly and can be prefix-matched to scope a drill-down (js/charts.js).
+function class_key(array $c): string {
+    return $c['school'] . '|' . $c['year'] . '|' . $c['branch'] . '|' . $c['division'];
+}
 
-    $latest = [];
+// date => class key => present. This is what the cache stores: one number per
+// class per day, so any range can be rebuilt, and small enough to json_decode
+// on every request where keeping the raw rows would not be.
+//
+// A class submitting twice on the same day overwrites, so the later row wins —
+// rows arrive in sheet order, and a resubmission is a correction.
+//
+// ponytail: grows without bound, roughly 600KB a school year. Prune to a
+// rolling window, or move to db/schema.sql, when the decode starts to hurt.
+function day_map(array $rows): array {
+    $days = [];
     foreach ($rows as $r) {
-        $key = $r['school'] . '|' . $r['year'] . '|' . $r['branch'] . '|' . $r['division'];
-        if (!isset($latest[$key]) || $r['date'] >= $latest[$key]['date']) {
-            $latest[$key] = $r;
+        $days[$r['date']][class_key($r)] = (int) $r['present'];
+    }
+    ksort($days);
+    return $days;
+}
+
+// Which dates a request actually covers. A missing end defaults to the newest
+// day that has any data: a single real, labelled day can't be an averaging
+// artefact, and unlike "today" it is never empty in the morning before the
+// first form of the day arrives.
+function resolve_range(array $days, ?string $from = null, ?string $to = null): array {
+    $latest = $days ? max(array_keys($days)) : date('Y-m-d');
+    $from = $from ?: ($to ?: $latest);
+    $to   = $to ?: $from;
+    if ($from > $to) [$from, $to] = [$to, $from];
+    return [$from, $to];
+}
+
+// Builds School -> Year -> Branch -> Division[] from the CANONICAL class list
+// in structure.php, then overlays the days inside [$from, $to].
+//
+// The structure leads, not the submissions. A class nobody reported in the
+// range still exists, still contributes its strength to the denominator, and
+// is marked reported => false so the UI can say "not reported" instead of
+// showing a school as 0/0 — which reads as "this school has no students".
+//
+// present is the class's AVERAGE over the days it reported, never the sum: a
+// range has to stay comparable to a single day, and dividing by days nobody
+// reported would punish a class for its faculty's silence rather than for
+// absence. 'days' rides along so the UI can say how much of the range the
+// number actually rests on — a class that reported once in a week must not be
+// able to pass that off as the week.
+function aggregate_days(array $days, ?string $from = null, ?string $to = null): array {
+    require_once __DIR__ . '/structure.php';
+    [$from, $to] = resolve_range($days, $from, $to);
+
+    $sum = [];
+    $count = [];
+    foreach ($days as $date => $classes) {
+        if ($date < $from || $date > $to) continue;
+        foreach ($classes as $key => $present) {
+            $sum[$key] = ($sum[$key] ?? 0) + (int) $present;
+            $count[$key] = ($count[$key] ?? 0) + 1;
         }
     }
 
     $tree = [];
     foreach (class_rows() as $c) {
-        $key = $c['school'] . '|' . $c['year'] . '|' . $c['branch'] . '|' . $c['division'];
-        $submitted = $latest[$key] ?? null;
+        $key = class_key($c);
+        $n = $count[$key] ?? 0;
         $tree[$c['school']][$c['year']][$c['branch']][] = [
             'division' => $c['division'],
             'strength' => $c['strength'],
-            'present'  => $submitted ? $submitted['present'] : 0,
-            'reported' => $submitted !== null,
+            'present'  => $n ? (int) round($sum[$key] / $n) : 0,
+            'reported' => $n > 0,
+            'days'     => $n,
         ];
     }
     return $tree;
 }
 
-// Also counts how many of the classes in scope have actually reported. Without
-// that, "0 present" and "nobody submitted" are indistinguishable.
+function aggregate_attendance(array $rows, ?string $from = null, ?string $to = null): array {
+    return aggregate_days(day_map($rows), $from, $to);
+}
+
+// The days one class actually reported inside the range. The tile shows an
+// average; this is what it rests on, so the modal can name the dates rather
+// than let a number imply the whole range was reported.
+function class_dates(array $days, string $key, string $from, string $to): array {
+    $dates = [];
+    foreach ($days as $date => $classes) {
+        if ($date >= $from && $date <= $to && isset($classes[$key])) $dates[] = $date;
+    }
+    sort($dates);
+    return $dates;
+}
+
+// Also counts how many of the classes in scope have actually reported, and
+// their combined strength. Without the reported count, "0 present" and "nobody
+// submitted" are indistinguishable; without strength_reported, every
+// percentage is diluted by classes that simply never filled the form in — at
+// 9am that reads as a near-empty university rather than as a missing form.
 function attendance_totals(array $tree): array {
     $strength = 0;
+    $strengthReported = 0;
     $present = 0;
     $classes = 0;
     $reported = 0;
@@ -215,17 +305,30 @@ function attendance_totals(array $tree): array {
                     $strength += $d['strength'];
                     $present += $d['present'];
                     $classes++;
-                    if (!empty($d['reported'])) $reported++;
+                    if (!empty($d['reported'])) {
+                        $reported++;
+                        $strengthReported += $d['strength'];
+                    }
                 }
             }
         }
     }
     return [
-        'strength' => $strength,
-        'present'  => $present,
-        'classes'  => $classes,
-        'reported' => $reported,
+        'strength'          => $strength,
+        'strength_reported' => $strengthReported,
+        'present'           => $present,
+        'classes'           => $classes,
+        'reported'          => $reported,
     ];
+}
+
+// Attendance as a percentage of the classes that actually reported. Paired
+// everywhere with the reported/classes count, which is what stops it being a
+// half-truth: 87% of 45 classes says exactly what it says.
+function attendance_pct(array $totals): int {
+    return $totals['strength_reported']
+        ? (int) round($totals['present'] / $totals['strength_reported'] * 100)
+        : 0;
 }
 
 function read_attendance_cache(): ?array {
@@ -234,40 +337,41 @@ function read_attendance_cache(): ?array {
     return is_array($cached) && $cached ? $cached : null;
 }
 
-function get_attendance(bool $forceRefresh = false): array {
+// Push mode (SPEC.md §7.1): InfinityFree blocks outbound HTTP from PHP, so
+// Google pushes to api/ingest.php and this file IS the record. Nothing here
+// expires or refetches — there is nothing to refetch from.
+function get_attendance_days(): array {
     $cached = read_attendance_cache();
+    if (isset($cached['days']) && is_array($cached['days'])) return $cached['days'];
+    // A cache from before the day map holds a bare tree with no dates in it;
+    // get_attendance() serves that one as-is. Nothing at all means a fresh
+    // checkout, where the sample rows keep the charts and the tiles telling
+    // the same story instead of one showing numbers and the other "no data".
+    if ($cached !== null) return [];
+    return day_map(sample_attendance_rows());
+}
 
-    // Push mode (SPEC.md §7.1): with no SHEET_CSV_URL there is nothing to pull
-    // from, so the cache file IS the record — api/ingest.php replaces it when
-    // Google pushes. It must never expire back to sample data.
-    if (SHEET_CSV_URL === '' && $cached !== null) {
-        return $cached;
-    }
+function get_attendance(?string $from = null, ?string $to = null): array {
+    $days = get_attendance_days();
+    if ($days) return aggregate_days($days, $from, $to);
 
-    $fresh = is_file(ATTENDANCE_CACHE_FILE)
-        && (time() - filemtime(ATTENDANCE_CACHE_FILE)) < ATTENDANCE_CACHE_TTL;
-    if (!$forceRefresh && $fresh && $cached !== null) {
-        return $cached;
-    }
+    // ponytail: a cache written before the day map existed holds the bare tree,
+    // which has no dates, so the range is ignored and it is served as-is. The
+    // next push replaces it. Delete this once every deployment has pushed.
+    $cached = read_attendance_cache();
+    if ($cached !== null) return $cached;
 
-    $csv = fetch_sheet_csv();
+    return aggregate_attendance(sample_attendance_rows(), $from, $to);
+}
 
-    // Sheet unreachable: serve the last good data rather than dropping the
-    // dashboard back to sample numbers, which would look real and be wrong.
-    if ($csv === null && $cached !== null) {
-        return $cached;
-    }
-
-    $rows = $csv !== null ? parse_attendance_csv($csv) : sample_attendance_rows();
-    if (!$rows && $cached !== null) {
-        return $cached;
-    }
-    $tree = aggregate_attendance($rows);
-
-    if (!is_dir(dirname(ATTENDANCE_CACHE_FILE))) {
-        @mkdir(dirname(ATTENDANCE_CACHE_FILE), 0775, true);
-    }
-    @file_put_contents(ATTENDANCE_CACHE_FILE, json_encode($tree));
-
-    return $tree;
+// How a range reads on screen. One day is just that day; a real range names
+// both ends, because an average with no dates against it is a number nobody
+// can check.
+function range_label(string $from, string $to): string {
+    $f = date_create($from);
+    $t = date_create($to);
+    if (!$f || !$t) return $from;
+    if ($from === $to) return $f->format('d M Y');
+    $sameYear = $f->format('Y') === $t->format('Y');
+    return $f->format($sameYear ? 'd M' : 'd M Y') . ' to ' . $t->format('d M Y');
 }

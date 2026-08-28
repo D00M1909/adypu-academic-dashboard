@@ -27,6 +27,12 @@
  *      only about a third of runs get past the host's bot check, so the gap
  *      between successes is several times the trigger interval.
  *   6. Run pushStatus() any time to see when the last push actually landed.
+ *
+ * The Form needs a Date question in its first section, shared by every school,
+ * so faculty can report a class they held yesterday. Its column is what the
+ * dashboard's date range filters on; without it a row falls back to the day it
+ * was submitted. See toCsv(): Date cells are formatted yyyy-MM-dd for the
+ * parser, and that must not change.
  */
 
 const INGEST_URL = 'https://YOUR-SITE.rf.gd/api/ingest.php';
@@ -121,7 +127,8 @@ function recordSuccess(result) {
   props.setProperty('lastSuccess', new Date().toISOString());
   props.setProperty('consecutiveFailures', '0');
   Logger.log(
-    'pushed ' + result.rows + ' rows across ' + result.schools + ' schools — ' +
+    'pushed ' + result.rows + ' rows across ' + result.days + ' days. ' +
+    'On ' + result.latest + ' (the day the dashboard opens on): ' +
     result.present + '/' + result.strength + ' present, ' +
     result.reported + '/' + result.classes + ' classes reported'
   );

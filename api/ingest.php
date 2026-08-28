@@ -48,22 +48,31 @@ if (!$rows) {
     fail(422, 'no valid rows parsed — the sheet needs a column whose name starts with "Present", and Class values that match the form options');
 }
 
-$tree = aggregate_attendance($rows);
+
+// One present count per class per day (includes/attendance.php day_map), so
+// the dashboard can rebuild any date range from this file. A full replace,
+// not a merge: the whole sheet arrives every time, so a row corrected in
+// Google always wins here, and a row deleted there disappears here.
+$days = day_map($rows);
 
 if (!is_dir(dirname(ATTENDANCE_CACHE_FILE))) {
     @mkdir(dirname(ATTENDANCE_CACHE_FILE), 0775, true);
 }
-if (@file_put_contents(ATTENDANCE_CACHE_FILE, json_encode($tree)) === false) {
+if (@file_put_contents(ATTENDANCE_CACHE_FILE, json_encode(['days' => $days])) === false) {
     fail(500, 'could not write the cache file — check that cache/ is writable');
 }
 
-$totals = attendance_totals($tree);
+// Reported over the default view's range (the newest day with data), which is
+// what the dashboard will actually show, so the push log and the site agree.
+[$from, $to] = resolve_range($days);
+$totals = attendance_totals(aggregate_days($days, $from, $to));
 echo json_encode([
     'ok'       => true,
     'rows'     => count($rows),
-    'schools'  => count($tree),
+    'days'     => count($days),
+    'latest'   => $to,
     'present'  => $totals['present'],
-    'strength' => $totals['strength'],
+    'strength' => $totals['strength_reported'],
     'reported' => $totals['reported'],
     'classes'  => $totals['classes'],
     // Rows the Form holds but the structure doesn't recognise. Echoed back so
