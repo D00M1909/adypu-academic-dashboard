@@ -138,7 +138,7 @@ button {
   letter-spacing: 0.02em;
   text-transform: uppercase;
   color: var(--ink-muted);
-  max-width: 42ch;
+  max-width: 56ch;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -224,7 +224,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
 .tile-grid { display: grid; gap: 10px; }
 .schools-grid { grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); }
 .partners-grid { grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr)); }
-.years-grid, .branches-grid { grid-template-columns: repeat(auto-fill, minmax(min(180px, 100%), 1fr)); }
+.years-grid, .branches-grid, .divisions-grid { grid-template-columns: repeat(auto-fill, minmax(min(180px, 100%), 1fr)); }
 
 .tile {
   min-width: 0;
@@ -272,8 +272,10 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
 
 .tile-unreported { font-family: inherit; font-size: 12.5px; font-weight: 500; color: var(--ink-faint); font-style: italic; }
 .school-tile { justify-content: space-between; }
-.school-tile .division-bar { display: block; width: 100%; margin-top: 2px; }
-.school-tile .division-bar-fill { display: block; }
+.school-tile .division-bar,
+.division-tile .division-bar { display: block; width: 100%; margin-top: 2px; }
+.school-tile .division-bar-fill,
+.division-tile .division-bar-fill { display: block; }
 .tile.active .tile-stat { color: var(--red-primary); }
 .tile.active .att-pct { color: inherit; }
 .year-tile, .branch-tile { font-size: 14px; font-weight: 600; padding: 14px; }
@@ -376,7 +378,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
   main { padding: 20px 16px; }
   /* Wrapped over three rows, a sticky header would eat half a phone screen. */
   .app-header { position: static; }
-  .schools-grid, .partners-grid, .years-grid, .branches-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .schools-grid, .partners-grid, .years-grid, .branches-grid, .divisions-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .division-grid { grid-template-columns: minmax(0, 1fr); }
   .header-inner { flex-direction: column; align-items: flex-start; }
   .brand-logo img { height: 40px; }
@@ -389,7 +391,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
 
 /* A phone: two school tiles side by side clip their own names. */
 @media (max-width: 440px) {
-  .schools-grid, .partners-grid, .years-grid, .branches-grid { grid-template-columns: minmax(0, 1fr); }
+  .schools-grid, .partners-grid, .years-grid, .branches-grid, .divisions-grid { grid-template-columns: minmax(0, 1fr); }
   .range-dates { justify-content: space-between; }
 }
 
@@ -479,6 +481,20 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
   cursor: pointer;
 }
 .range-apply:hover { background: var(--red-secondary); }
+.range-export {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--red-primary);
+  background: var(--surface-raised);
+  border: 1px solid var(--red-tint-strong);
+  border-radius: 10px;
+  padding: 7px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.range-export:hover { background: var(--red-tint); }
+.print-range { display: none; }
 
 /* This follows the base range-bar rule so it can override the desktop header
    offset. On phones the header is deliberately static, leaving the controls
@@ -607,3 +623,102 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
 }
 .compliance-fill { width: 100%; background: var(--red-primary); border-radius: 4px; }
 .compliance-label { font-size: 10.5px; color: var(--ink-faint); }
+
+/* ---------- Print / Save as PDF ----------
+   The export button opens the browser's native print dialog. Keeping the
+   report as normal HTML and changing only its print box avoids a separate
+   PDF renderer getting out of sync with the selected date range. */
+@media print {
+  /* No size or orientation here on purpose. Chrome's own "Save as PDF" honours
+     an @page size, but a virtual printer driver (Microsoft Print to PDF is the
+     usual Windows default) ignores it and keeps its own portrait Letter sheet,
+     then stamps the landscape layout onto it sideways. Adopting whatever paper
+     the destination offers, and laying out to fit it, is the only version that
+     comes out upright everywhere. */
+  @page { margin: 12mm; }
+
+  *, *::before, *::after {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  html, body { background: #fff; }
+  body { min-width: 0; }
+  .app-header {
+    position: static;
+    padding: 8px 0;
+    background: #fff;
+    border-bottom: 1px solid var(--hairline);
+    box-shadow: none;
+  }
+  .header-inner { max-width: none; flex-wrap: nowrap; }
+  .brand-logo { box-shadow: none; padding: 3px 5px; }
+  .brand-logo img { height: 34px; }
+  .app-header h1 { color: var(--ink); font-size: 18px; }
+  .tabs { display: none; }
+
+  main { max-width: none; padding: 12px 0 0; }
+  .range-bar {
+    position: static;
+    display: flex;
+    gap: 10px;
+    padding: 0 0 10px;
+    margin: 0 0 10px;
+    background: #fff;
+    border-bottom: 1px solid var(--hairline);
+    box-shadow: none;
+  }
+  .range-bar::before { display: none; }
+  .range-presets, .range-dates { display: none; }
+  .range-summary {
+    box-shadow: none;
+    border: 1px solid var(--hairline);
+    padding: 6px 10px;
+  }
+  .print-range {
+    display: block;
+    align-self: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-muted);
+  }
+  .breadcrumb { margin: 0 0 10px; }
+  .crumb-button { background: transparent; border: 0; padding: 0; }
+
+  .tile-section { margin-bottom: 14px; break-inside: avoid; page-break-inside: avoid; }
+  .tile, .chart-card { box-shadow: none; break-inside: avoid; page-break-inside: avoid; }
+  .schools-grid { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .years-grid, .branches-grid, .divisions-grid { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+  .chart-grid { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+  .chart-card { padding: 10px; }
+  .no-print { display: none !important; }
+  /* Drilled in, the breadcrumb states the school, year and branch in one
+     line, so printing three grids of tiles to say the same thing again buys
+     nothing but a page. The divisions stay: they are the data, not the path. */
+  body.is-drilled #schools-section,
+  body.is-drilled #years-section,
+  body.is-drilled #branches-section { display: none; }
+  /* If the division popup is open when Export PDF is clicked, print it as a
+     normal report section after the dashboard instead of printing its screen
+     overlay. A closed popup remains excluded via its hidden attribute. */
+  .modal-backdrop:not([hidden]).is-open {
+    position: static;
+    display: block !important;
+    padding: 0;
+    margin-top: 12px;
+    background: transparent;
+    backdrop-filter: none;
+    opacity: 1;
+    break-before: page;
+    page-break-before: always;
+  }
+  .modal-backdrop:not([hidden]).is-open .modal {
+    max-width: none;
+    padding: 14px;
+    border: 1px solid var(--hairline);
+    border-radius: 12px;
+    box-shadow: none;
+    transform: none;
+    opacity: 1;
+  }
+  .modal-backdrop:not([hidden]).is-open .modal-actions { display: none; }
+}

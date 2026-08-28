@@ -222,18 +222,20 @@ $shortSchool = fn(string $id): string => preg_replace('/^School of /', '', SCHOO
       <label for="range-to">To</label>
       <input type="date" id="range-to" name="to" value="<?= htmlspecialchars($to) ?>" min="<?= htmlspecialchars($dataDates[0]) ?>" max="<?= htmlspecialchars(date('Y-m-d')) ?>">
       <button class="range-apply" type="submit">Apply</button>
+      <button class="range-export no-print" id="range-export" type="button" title="In the print dialog, choose Save as PDF: the Windows Print to PDF driver ignores the page orientation and the file name.">Export PDF</button>
     </div>
+    <span class="print-range">Date range: <?= htmlspecialchars($rangeLabel) ?></span>
   </form>
 
   <div id="tab-adypu" class="tab-panel">
     <nav class="breadcrumb" id="breadcrumb" aria-label="Drill-down path" hidden></nav>
 
-    <section class="tile-section">
+    <section class="tile-section" id="schools-section">
       <div class="section-title">
         <h2>Schools</h2>
-        <span class="section-meta"><?= count(SCHOOLS) ?> schools</span>
+        <span class="section-meta" id="schools-meta"><?= count(SCHOOLS) ?> schools</span>
       </div>
-      <div class="tile-grid schools-grid">
+      <div class="tile-grid schools-grid" id="schools-grid">
         <?php foreach (SCHOOLS as $id => $school):
           $st = attendance_totals([$id => $tree[$id] ?? []]);
           $stPct = attendance_pct($st);
@@ -268,6 +270,14 @@ $shortSchool = fn(string $id): string => preg_replace('/^School of /', '', SCHOO
         <span class="section-meta" id="branches-meta"></span>
       </div>
       <div class="tile-grid branches-grid" id="branches-grid"></div>
+    </section>
+
+    <section class="tile-section" id="divisions-section" hidden>
+      <div class="section-title">
+        <h2>Divisions</h2>
+        <span class="section-meta" id="divisions-meta"></span>
+      </div>
+      <div class="tile-grid divisions-grid" id="divisions-grid"></div>
     </section>
 
     <section class="tile-section">

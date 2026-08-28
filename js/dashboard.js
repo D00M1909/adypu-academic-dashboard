@@ -1,5 +1,5 @@
 (function () {
-  var state = { school: null, year: null, branch: null };
+  var state = { school: null, year: null, branch: null, division: null };
   var modal = document.getElementById('division-modal');
   var breadcrumb = document.getElementById('breadcrumb');
 
@@ -49,6 +49,7 @@
         branches.forEach(function (b) {
           var divisions = branchMap[b] || [];
           divisions.forEach(function (d) {
+            if (state.division !== null && d.division !== state.division) return;
             present += d.present;
             classes++;
             // Mirrors attendance_totals() in includes/attendance.php: the
@@ -83,14 +84,24 @@
     pctEl.className = 'att-pct ' + (t.reported ? attClass(p) : '');
 
     var parts = [];
-    if (state.school) parts.push(window.SCHOOLS[state.school].name);
+    // "School of " on the front of a four-part path is what pushed the
+    // division off the end of the card; the crumb trail spells it out anyway.
+    if (state.school) parts.push(window.SCHOOLS[state.school].name.replace(/^School of /, ''));
     if (state.year) parts.push(state.year);
     if (state.branch) parts.push(state.branch);
+    if (state.division) parts.push('Division ' + state.division);
     // Drilled in, the path is the useful label; the range stays visible in the
     // date bar. At root there is no path, so the range takes its place.
     document.getElementById('stat-scope').textContent = parts.length
       ? parts.join(' \u00b7 ')
       : 'Present \u00b7 ' + window.ATTENDANCE_RANGE.label;
+
+    // Both Chrome's "Save as PDF" and the Windows print driver take the
+    // suggested filename from the document title, so the export names itself
+    // after the breadcrumb and the range instead of "index".
+    document.title = 'ADYPU Attendance - ' +
+      (parts.length ? parts.join(' ') : 'All schools') +
+      ' - ' + window.ATTENDANCE_RANGE.label;
 
     window.Charts.render(state, t);
   }
@@ -110,6 +121,9 @@
     if (state.branch) {
       crumbs.push({ key: 'branch', label: state.branch });
     }
+    if (state.division) {
+      crumbs.push({ key: 'division', label: 'Division ' + state.division });
+    }
     breadcrumb.innerHTML = crumbs.map(function (crumb, index) {
       var current = index === crumbs.length - 1;
       var item = current
@@ -124,10 +138,9 @@
 
   // Populates the Branches section for a chosen school+year. Schools with no
   // confirmed branch data use the single branch key '' — for those, skip the
-  // branch step entirely and go straight to the division modal, same as
-  // before branches existed. autoOpen controls whether that skip-through also
-  // opens the modal (true on an explicit year click, false on auto-selection).
-  function updateBranches(schoolId, year, autoOpen, selectedBranch) {
+  // branch step entirely and go straight to that key's divisions, same as
+  // before branches existed.
+  function updateBranches(schoolId, year, selectedBranch, selectedDivision) {
     var branches = Object.keys(window.ATTENDANCE_DATA[schoolId][year] || {});
     var section = document.getElementById('branches-section');
     var grid = document.getElementById('branches-grid');
@@ -137,8 +150,7 @@
       section.hidden = true;
       grid.innerHTML = '';
       state.branch = '';
-      renderBreadcrumb();
-      if (autoOpen) openDivisionModal();
+      renderDivisions(schoolId, year, '', selectedDivision);
       return;
     }
 
@@ -153,8 +165,7 @@
         state.branch = branch;
         grid.querySelectorAll('.branch-tile').forEach(function (t) { t.classList.remove('active'); });
         tile.classList.add('active');
-        renderBreadcrumb();
-        openDivisionModal();
+        renderDivisions(schoolId, year, branch, null);
       });
       if (branch === state.branch) tile.classList.add('active');
       grid.appendChild(tile);
@@ -162,10 +173,74 @@
 
     document.getElementById('branches-meta').textContent = branches.length + (branches.length === 1 ? ' branch' : ' branches');
     section.hidden = false;
+    if (state.branch !== null) {
+      renderDivisions(schoolId, year, state.branch, selectedDivision);
+    } else {
+      hideDivisions();
+      renderBreadcrumb();
+    }
+  }
+
+  function hideDivisions() {
+    state.division = null;
+    document.getElementById('divisions-section').hidden = true;
+    document.getElementById('divisions-grid').innerHTML = '';
+  }
+
+  // The leaf of the drill-down. Selecting one narrows the summary card, the
+  // breadcrumb and every chart to that single class, which is what the date
+  // range makes worth doing: one division's week, on its own.
+  function renderDivisions(schoolId, year, branch, selectedDivision) {
+    var divisions = (window.ATTENDANCE_DATA[schoolId][year] || {})[branch] || [];
+    var section = document.getElementById('divisions-section');
+    var grid = document.getElementById('divisions-grid');
+
+    state.division = null;
+    grid.innerHTML = '';
+    divisions.forEach(function (d) {
+      var divPct = pct(d.present, d.strength);
+      var tile = document.createElement('button');
+      tile.type = 'button';
+      tile.className = 'tile division-tile';
+      tile.dataset.division = d.division;
+      tile.innerHTML =
+        '<span class="tile-label">Division ' + d.division + '</span>' +
+        (d.reported
+          ? '<span class="tile-stat">' + d.present + '<span class="tile-stat-sep">/</span>' +
+            d.strength + ' \u00b7 <span class="att-pct ' + attClass(divPct) + '">' + divPct + '%</span></span>' +
+            '<span class="division-bar"><span class="division-bar-fill ' + attClass(divPct) +
+              '" style="width:' + divPct + '%"></span></span>'
+          : '<span class="tile-stat tile-unreported">Not reported</span>' +
+            '<span class="division-bar"><span class="division-bar-fill" style="width:0"></span></span>');
+      tile.addEventListener('click', function () {
+        var selecting = state.division !== d.division;
+        state.division = selecting ? d.division : null;
+        grid.querySelectorAll('.division-tile').forEach(function (t) {
+          t.classList.toggle('active', t.dataset.division === state.division);
+        });
+        renderBreadcrumb();
+        // The same breakdown the summary card opens: picking a division is
+        // exactly when you want its branch's numbers side by side.
+        if (selecting) openDivisionModal();
+      });
+      grid.appendChild(tile);
+    });
+
+    if (divisions.length && selectedDivision) {
+      var match = grid.querySelector('[data-division="' + selectedDivision + '"]');
+      if (match) {
+        state.division = selectedDivision;
+        match.classList.add('active');
+      }
+    }
+
+    document.getElementById('divisions-meta').textContent =
+      divisions.length + (divisions.length === 1 ? ' division' : ' divisions');
+    section.hidden = divisions.length === 0;
     renderBreadcrumb();
   }
 
-  function renderYears(schoolId, selectedYear, selectedBranch) {
+  function renderYears(schoolId, selectedYear, selectedBranch, selectedDivision) {
     var years = Object.keys(window.ATTENDANCE_DATA[schoolId] || {});
     var grid = document.getElementById('years-grid');
     grid.innerHTML = '';
@@ -179,8 +254,9 @@
         state.year = year;
         grid.querySelectorAll('.year-tile').forEach(function (t) { t.classList.remove('active'); });
         tile.classList.add('active');
-        renderBreadcrumb();
-        updateBranches(schoolId, year, true);
+        state.branch = null;
+        hideDivisions();
+        updateBranches(schoolId, year, null, null);
       });
       grid.appendChild(tile);
     });
@@ -193,28 +269,43 @@
       Array.prototype.forEach.call(grid.children, function (tile) {
         if (tile.dataset.year === state.year) tile.classList.add('active');
       });
-      updateBranches(schoolId, state.year, false, selectedBranch);
+      updateBranches(schoolId, state.year, selectedBranch, selectedDivision);
     }
     renderBreadcrumb();
   }
 
-  function selectSchool(schoolId, selectedYear, selectedBranch) {
-    document.querySelectorAll('.school-tile').forEach(function (t) {
-      t.classList.toggle('active', t.dataset.school === schoolId);
-    });
+  function selectSchool(schoolId, selectedYear, selectedBranch, selectedDivision) {
+    markSchool(schoolId);
     state.school = schoolId;
     state.year = null;
     state.branch = null;
-    renderYears(schoolId, selectedYear, selectedBranch);
+    state.division = null;
+    renderYears(schoolId, selectedYear, selectedBranch, selectedDivision);
+  }
+
+  // Which school tile is lit, and whether the grid is in drill-down mode. The
+  // print stylesheet hides the tiles that are not lit: on paper the eight
+  // schools you did not pick are noise, however useful they are as navigation.
+  function markSchool(schoolId) {
+    document.querySelectorAll('.school-tile').forEach(function (t) {
+      t.classList.toggle('active', t.dataset.school === schoolId);
+    });
+    // Drives the print rules: once you have drilled in, the navigation grids
+    // are just a picture of the breadcrumb and waste a page.
+    document.body.classList.toggle('is-drilled', !!schoolId);
+    var grid = document.getElementById('schools-grid');
+    grid.classList.toggle('is-drilled', !!schoolId);
+    var total = document.querySelectorAll('.school-tile').length;
+    document.getElementById('schools-meta').textContent =
+      schoolId ? '1 of ' + total + ' schools' : total + ' schools';
   }
 
   function showSchoolLevel(schoolId) {
-    document.querySelectorAll('.school-tile').forEach(function (t) {
-      t.classList.toggle('active', t.dataset.school === schoolId);
-    });
+    markSchool(schoolId);
     state.school = schoolId;
     state.year = null;
     state.branch = null;
+    hideDivisions();
     document.getElementById('branches-section').hidden = true;
     document.getElementById('branches-grid').innerHTML = '';
 
@@ -231,8 +322,9 @@
         state.year = year;
         grid.querySelectorAll('.year-tile').forEach(function (t) { t.classList.remove('active'); });
         tile.classList.add('active');
-        renderBreadcrumb();
-        updateBranches(schoolId, year, true);
+        state.branch = null;
+        hideDivisions();
+        updateBranches(schoolId, year, null, null);
       });
       grid.appendChild(tile);
     });
@@ -255,14 +347,18 @@
       state.school = null;
       state.year = null;
       state.branch = null;
-      document.querySelectorAll('.school-tile').forEach(function (tile) { tile.classList.remove('active'); });
+      markSchool(null);
+      hideDivisions();
       document.getElementById('years-section').hidden = true;
       document.getElementById('branches-section').hidden = true;
       renderBreadcrumb();
     } else if (crumb.dataset.crumb === 'school' && state.school) {
       showSchoolLevel(state.school);
     } else if (crumb.dataset.crumb === 'year' && state.school && state.year) {
-      updateBranches(state.school, state.year, false);
+      state.branch = null;
+      updateBranches(state.school, state.year, null, null);
+    } else if (crumb.dataset.crumb === 'branch' && state.school && state.year) {
+      renderDivisions(state.school, state.year, state.branch, null);
     }
   });
 
@@ -427,6 +523,16 @@
   });
 
   document.getElementById('stat-summary').addEventListener('click', function () { openDivisionModal(); });
+  // Ctrl+P bypasses the button, and some print paths read the title later than
+  // the click, so the name is set again on the way into the dialog. It is
+  // deliberately not restored afterwards: the file is saved after afterprint
+  // fires, and putting the old title back first is what leaves a PDF called
+  // "ADYPU Academic Dashboard".
+  window.addEventListener('beforeprint', updateStats);
+  document.getElementById('range-export').addEventListener('click', function () {
+    updateStats();
+    window.print();
+  });
   document.getElementById('modal-refresh').addEventListener('click', function () { openDivisionModal(); });
   document.getElementById('modal-close').addEventListener('click', hideModal);
   modal.addEventListener('click', function (e) {
@@ -439,7 +545,7 @@
     var savedDrilldown = JSON.parse(sessionStorage.getItem('adypu-drilldown'));
     sessionStorage.removeItem('adypu-drilldown');
     if (savedDrilldown && window.ATTENDANCE_DATA[savedDrilldown.school]) {
-      selectSchool(savedDrilldown.school, savedDrilldown.year, savedDrilldown.branch);
+      selectSchool(savedDrilldown.school, savedDrilldown.year, savedDrilldown.branch, savedDrilldown.division);
     } else {
       updateStats();
     }
