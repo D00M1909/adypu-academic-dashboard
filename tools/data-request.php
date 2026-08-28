@@ -3,7 +3,7 @@
 // and must not be merged:
 //
 //   php tools/data-request.php engineering > 01-engineering-headcounts.csv
-//   php tools/data-request.php structure   > 02-structure-request.csv
+//   php tools/data-request.php structure     02-structure-request.xlsx
 //
 // Engineering's structure is real, read from the timetable DB — it needs a
 // headcount against each known division. Every other school's structure is
@@ -13,8 +13,10 @@
 // that do not exist.
 
 require_once __DIR__ . '/../includes/structure.php';
+require_once __DIR__ . '/xlsx.php';
 
 $mode = $argv[1] ?? '';
+$outFile = $argv[2] ?? '02-structure-request.xlsx';
 $out = fopen('php://output', 'w');
 
 if ($mode === 'engineering') {
@@ -34,31 +36,58 @@ if ($mode === 'engineering') {
     exit;
 }
 
-if ($mode !== 'structure') {
-    fwrite(STDERR, "usage: php tools/data-request.php engineering|structure\n");
+if ($mode !== 'structure' && $mode !== 'structure-csv') {
+    fwrite(STDERR, "usage: php tools/data-request.php engineering|structure [outfile.xlsx]|structure-csv\n");
     exit(1);
 }
 
-fputcsv($out, ['CLASS STRUCTURE AND STUDENT NUMBERS - PLEASE COMPLETE']);
-fputcsv($out, []);
-fputcsv($out, ['We do not yet have the real class structure for these schools, so this form is deliberately blank.']);
-fputcsv($out, ['Please add one row for every division that exists, and delete any blank rows you do not use.']);
-fputcsv($out, []);
-fputcsv($out, ['YEAR', 'Whatever you call it - "1st Year", "Semester 3", etc. Use your own wording.']);
-fputcsv($out, ['BRANCH', 'Specialisation or stream, e.g. "CSE". LEAVE BLANK if the year is not split into branches.']);
-fputcsv($out, ['DIVISION', 'The individual class or section, e.g. "A", "B1". If a year has only one class, write one row.']);
-fputcsv($out, ['ENROLLED', 'Students enrolled in THAT division - not the total for the programme or the year.']);
-fputcsv($out, []);
-fputcsv($out, ['EXAMPLE of a completed row - delete this line:']);
-fputcsv($out, ['2nd Year', 'Corporate Law', 'A', '48', 'merged with B last semester']);
-fputcsv($out, []);
+$intro = [
+    [['b', 'CLASS STRUCTURE AND STUDENT NUMBERS - PLEASE COMPLETE']],
+    [],
+    ['We do not yet have the real class structure for these schools, so this form is deliberately blank.'],
+    ['Please add one row for every division that exists, and delete any blank rows you do not use.'],
+    [],
+    [['b', 'YEAR'], 'Year of study, e.g. "1st Year", "2nd Year".'],
+    [['b', 'BRANCH'], 'Specialisation or stream, e.g. "CSE".'],
+    [['b', 'DIVISION'], 'The individual class or section, e.g. "A", "B".'],
+    [['b', 'ENROLLED'], 'Students enrolled in the division.'],
+];
+
+$header = ['Year', 'Branch (blank if none)', 'Division', 'ENROLLED STUDENTS', 'Comments'];
+$blankRows = 24;
+
+// One tab per school. A single CSV cannot hold tabs, so the structure request
+// is a real workbook; the CSV path stays for anyone who wants it flat.
+if ($mode === 'structure') {
+    $sheets = ['Instructions' => ['cols' => [12, 95], 'rows' => $intro]];
+    foreach (SCHOOLS as $id => $school) {
+        if ($id === 'eng') continue;
+        $rows = [
+            [['b', strtoupper($school['name'])]],
+            [],
+            array_map(fn($h) => ['b', $h], $header),
+        ];
+        for ($i = 0; $i < $blankRows; $i++) $rows[] = [];
+        // "School of Management" -> "Management": the tab is already in context.
+        $tab = preg_replace('/^School of /', '', $school['name']);
+        $sheets[$tab] = ['cols' => [16, 26, 12, 20, 34], 'rows' => $rows];
+    }
+    write_xlsx($outFile, $sheets);
+    fwrite(STDERR, "wrote $outFile (" . count($sheets) . " tabs)\n");
+    exit;
+}
+
+// structure-csv: the same request, flattened, every school stacked in one sheet.
+foreach ($intro as $row) {
+    fputcsv($out, array_map(fn($c) => is_array($c) ? $c[1] : $c, $row));
+}
 
 foreach (SCHOOLS as $id => $school) {
     if ($id === 'eng') continue;
     fputcsv($out, []);
     fputcsv($out, [strtoupper($school['name'])]);
-    fputcsv($out, ['Year', 'Branch (blank if none)', 'Division', 'ENROLLED STUDENTS', 'Comments']);
-    for ($i = 0; $i < 24; $i++) {
+    fputcsv($out, $header);
+    for ($i = 0; $i < $blankRows; $i++) {
         fputcsv($out, ['', '', '', '', '']);
     }
 }
