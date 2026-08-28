@@ -125,6 +125,14 @@ function recordSuccess(result) {
     result.present + '/' + result.strength + ' present, ' +
     result.reported + '/' + result.classes + ' classes reported'
   );
+  // Rows the sheet holds that name no class the dashboard knows. They are not
+  // an error the push can fix, but they are silently missing numbers, so say so.
+  if (result.skipped && result.skipped.length) {
+    Logger.log(
+      'IGNORED ' + result.skipped.length + ' row(s) naming no known class:\n  ' +
+      result.skipped.join('\n  ')
+    );
+  }
 }
 
 function recordFailure(problem) {

@@ -40,7 +40,7 @@ if ($csv === false || trim($csv) === '') {
     fail(400, 'empty body');
 }
 
-$rows = parse_attendance_csv($csv);
+$rows = parse_attendance_csv($csv, $skipped);
 if (!$rows) {
     // Never overwrite good data with nothing. An empty parse means the sheet
     // was cleared, its headers were renamed, or every row named a class that
@@ -66,4 +66,7 @@ echo json_encode([
     'strength' => $totals['strength'],
     'reported' => $totals['reported'],
     'classes'  => $totals['classes'],
+    // Rows the Form holds but the structure doesn't recognise. Echoed back so
+    // the Apps Script log names them instead of them just not being counted.
+    'skipped'  => array_values(array_unique($skipped)),
 ]);
