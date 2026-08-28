@@ -1,6 +1,9 @@
 (function () {
   var state = { school: null, year: null, branch: null };
   var modal = document.getElementById('division-modal');
+  var pdfModal = document.getElementById('pdf-report-modal');
+  var pdfForm = document.getElementById('pdf-report-form');
+  var pdfError = document.getElementById('pdf-report-error');
   var breadcrumb = document.getElementById('breadcrumb');
 
   document.querySelectorAll('.tab').forEach(function (tab) {
@@ -238,6 +241,63 @@
     if (e.key === 'Escape') hideModal();
   }
 
+  function showPdfModal() {
+    if (!pdfModal) return;
+    pdfModal.hidden = false;
+    if (pdfError) {
+      pdfError.hidden = true;
+      pdfError.textContent = '';
+    }
+    requestAnimationFrame(function () { pdfModal.classList.add('is-open'); });
+    document.addEventListener('keydown', onPdfKeydown);
+    var from = document.getElementById('pdf-from-date');
+    if (from) from.focus();
+  }
+
+  function hidePdfModal() {
+    if (!pdfModal) return;
+    pdfModal.classList.remove('is-open');
+    document.removeEventListener('keydown', onPdfKeydown);
+    setTimeout(function () { pdfModal.hidden = true; }, 180);
+  }
+
+  function onPdfKeydown(e) {
+    if (e.key === 'Escape') hidePdfModal();
+  }
+
+  function showPdfError(message) {
+    if (!pdfError) return;
+    pdfError.textContent = message;
+    pdfError.hidden = false;
+  }
+
+  function validDateValue(value) {
+    return /^\d{4}-\d{2}-\d{2}$/.test(value);
+  }
+
+  function submitPdfReport(e) {
+    e.preventDefault();
+    var from = document.getElementById('pdf-from-date').value;
+    var to = document.getElementById('pdf-to-date').value;
+
+    if (!from || !to) {
+      showPdfError('Please select both From Date and To Date.');
+      return;
+    }
+    if (!validDateValue(from) || !validDateValue(to)) {
+      showPdfError('Please select valid dates.');
+      return;
+    }
+    if (from > to) {
+      showPdfError('From Date cannot be later than To Date.');
+      return;
+    }
+
+    hidePdfModal();
+    window.location.href = 'api/pdf-report.php?from=' + encodeURIComponent(from) +
+      '&to=' + encodeURIComponent(to);
+  }
+
   function openDivisionModal(refresh) {
     var pick = firstAvailableSelection();
     if (!pick.schoolId || !pick.year) return;
@@ -289,5 +349,12 @@
   document.getElementById('modal-close').addEventListener('click', hideModal);
   modal.addEventListener('click', function (e) {
     if (e.target === modal) hideModal();
+  });
+  document.getElementById('pdf-report-card').addEventListener('click', showPdfModal);
+  document.getElementById('pdf-report-close').addEventListener('click', hidePdfModal);
+  document.getElementById('pdf-report-cancel').addEventListener('click', hidePdfModal);
+  pdfForm.addEventListener('submit', submitPdfReport);
+  pdfModal.addEventListener('click', function (e) {
+    if (e.target === pdfModal) hidePdfModal();
   });
 })();

@@ -1,21 +1,14 @@
 <?php
 // Receives the Form's response sheet, pushed by the Apps Script in
-// tools/apps-script.gs. Google pushes to us rather than us pulling from Google
-// because InfinityFree's free plan blocks outbound HTTP from PHP — inbound is
-// fine (SPEC.md §7.1).
-//
-// Contract: POST, body is the whole sheet as CSV text, secret in the
-// X-Ingest-Secret header. Responds 200 with the row/class counts it stored.
-//
-// The whole sheet arrives every time, not a delta — it's a few thousand rows at
-// most, and a full replace means a corrected row in Google always wins here.
+// tools/apps-script.gs. The whole sheet arrives every time, not a delta.
 
 require_once __DIR__ . '/../includes/attendance.php';
 require_once __DIR__ . '/../includes/config.php';
 
 header('Content-Type: application/json');
 
-function fail(int $code, string $msg): never {
+function fail(int $code, string $msg): never
+{
     http_response_code($code);
     echo json_encode(['ok' => false, 'error' => $msg]);
     exit;
@@ -29,7 +22,6 @@ if (!defined('INGEST_SECRET') || INGEST_SECRET === '') {
     fail(503, 'INGEST_SECRET is not configured on this server');
 }
 
-// hash_equals, not ===, so a wrong secret can't be recovered by timing.
 $given = $_SERVER['HTTP_X_INGEST_SECRET'] ?? '';
 if (!hash_equals(INGEST_SECRET, $given)) {
     fail(403, 'bad secret');
@@ -42,10 +34,38 @@ if ($csv === false || trim($csv) === '') {
 
 $rows = parse_attendance_csv($csv, $skipped);
 if (!$rows) {
-    // Never overwrite good data with nothing. An empty parse means the sheet
-    // was cleared, its headers were renamed, or every row named a class that
-    // doesn't exist — all of which are mistakes, not "today nobody attended".
-    fail(422, 'no valid rows parsed — the sheet needs a column whose name starts with "Present", and Class values that match the form options');
+    fail(422, 'no valid rows parsed - the sheet needs a column whose name starts with "Present", and Class values that match the form options');
+}
+
+$db = get_db();
+$stmt = $db->prepare("
+  INSERT INTO attendance_records
+    (school_id, year_label, branch, division, record_date, strength, present)
+  VALUES (?, ?, ?, ?, ?, ?, ?)
+  ON DUPLICATE KEY UPDATE
+    strength = VALUES(strength),
+    present = VALUES(present),
+    submitted_at = CURRENT_TIMESTAMP
+");
+
+if (!$stmt) {
+    fail(500, 'could not prepare attendance history storage');
+}
+
+foreach ($rows as $r) {
+    $stmt->bind_param(
+        'sssssii',
+        $r['school'],
+        $r['year'],
+        $r['branch'],
+        $r['division'],
+        $r['date'],
+        $r['strength'],
+        $r['present']
+    );
+    if (!$stmt->execute()) {
+        fail(500, 'could not save attendance history');
+    }
 }
 
 $tree = aggregate_attendance($rows);
@@ -54,7 +74,7 @@ if (!is_dir(dirname(ATTENDANCE_CACHE_FILE))) {
     @mkdir(dirname(ATTENDANCE_CACHE_FILE), 0775, true);
 }
 if (@file_put_contents(ATTENDANCE_CACHE_FILE, json_encode($tree)) === false) {
-    fail(500, 'could not write the cache file — check that cache/ is writable');
+    fail(500, 'could not write the cache file - check that cache/ is writable');
 }
 
 $totals = attendance_totals($tree);
@@ -70,3 +90,4 @@ echo json_encode([
     // the Apps Script log names them instead of them just not being counted.
     'skipped'  => array_values(array_unique($skipped)),
 ]);
+
