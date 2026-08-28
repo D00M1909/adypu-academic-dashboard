@@ -226,4 +226,86 @@ foreach (class_rows() as $c) {
 $labels = array_map(fn($c) => class_label($c['school'], $c['year'], $c['branch'], $c['division']), class_rows());
 assert(count($labels) === count(array_unique($labels)), 'duplicate class labels in the dropdown');
 
+
+// --- The date a class met, which is not the date the form was filled in -----
+// The Form's own Date question wins. The submission timestamp is the fallback,
+// so rows submitted before that question existed keep the day they were sent
+// instead of collapsing onto the day of the push that re-read them.
+$dated = "timestamp,date of class,class,present\n" .
+    '"2026-08-27","2026-08-25","School of Law / 2nd Year / A","21"' . "\n" .   // date question wins
+    '"26/08/2026 09:14:02","","School of Law / 2nd Year / B","22"' . "\n" .    // d/m/Y timestamp fallback
+    '"2026-08-24","2099-01-01","School of Law / 3rd Year / A","23"' . "\n";    // future typo ignored
+$datedRows = parse_attendance_csv($dated);
+assert($datedRows[0]['date'] === '2026-08-25', 'date question should beat the timestamp: ' . $datedRows[0]['date']);
+assert($datedRows[1]['date'] === '2026-08-26', 'd/m/Y timestamp mis-parsed: ' . $datedRows[1]['date']);
+assert($datedRows[2]['date'] === '2026-08-24', 'a future date must not be taken: ' . $datedRows[2]['date']);
+assert(row_date('not a date') === null, 'junk must not parse as a date');
+
+// A Date question sitting inside each section repeats the column, exactly like
+// Class and Present. The blank copies must not win.
+$dupDate = "timestamp,date (law),date (design),class,present\n" .
+    '"2026-08-27","","2026-08-23","School of Design / 1st Year / A","19"' . "\n";
+assert(parse_attendance_csv($dupDate)[0]['date'] === '2026-08-23', 'duplicate date column collapsed');
+
+// --- Ranges: an average over the days reported, never a sum -----------------
+$week = "date,class,present\n" .
+    "2026-08-24,School of Law / 2nd Year / A,20\n" .
+    "2026-08-25,School of Law / 2nd Year / A,30\n" .
+    "2026-08-26,School of Law / 2nd Year / A,25\n" .
+    "2026-08-26,School of Law / 2nd Year / A,28\n" . // same-day correction wins
+    "2026-08-26,School of Law / 2nd Year / B,40\n";
+$weekRows = parse_attendance_csv($week);
+$days = day_map($weekRows);
+assert(count($days) === 3, 'expected 3 distinct days, got ' . count($days));
+assert($days['2026-08-26']['law|2nd Year||A'] === 28, 'same-day resubmission should overwrite');
+
+$rangeTree = aggregate_days($days, '2026-08-24', '2026-08-26');
+$lawA = find_div($rangeTree, 'law', '2nd Year', '', 'A');
+assert($lawA['present'] === 26, 'average of 20/30/28 should be 26, got ' . $lawA['present']);
+assert($lawA['days'] === 3, 'reported-day count wrong: ' . $lawA['days']);
+$lawB = find_div($rangeTree, 'law', '2nd Year', '', 'B');
+assert($lawB['present'] === 40 && $lawB['days'] === 1, 'a class reporting one day of three must say so');
+
+// A range is comparable to a single day: strength is counted once, not once
+// per day, or three days of one division would read as 90 students.
+$rt = attendance_totals(['law' => ['2nd Year' => $rangeTree['law']['2nd Year']]]);
+assert($rt['strength'] === 90, 'strength counted per day: ' . $rt['strength']);
+assert($rt['strength_reported'] === 90 && $rt['reported'] === 2, 'both divisions reported in range');
+
+// Narrowing the range narrows the data, and a day outside it is not counted.
+$oneDay = aggregate_days($days, '2026-08-24', '2026-08-24');
+assert(find_div($oneDay, 'law', '2nd Year', '', 'A')['present'] === 20, 'range end not honoured');
+assert(find_div($oneDay, 'law', '2nd Year', '', 'B')['reported'] === false, 'a day outside the range leaked in');
+
+// No range means the newest day that has data — a real, labelled day rather
+// than "today", which is empty every morning until the first form arrives.
+assert(resolve_range($days) === ['2026-08-26', '2026-08-26'], 'default range should be the latest day');
+assert(resolve_range($days, '2026-08-26', '2026-08-24') === ['2026-08-24', '2026-08-26'],
+    'a backwards range should be swapped, not returned empty');
+assert(find_div(aggregate_days($days), 'law', '2nd Year', '', 'A')['present'] === 28,
+    'the default view should be the latest day, not an average of everything');
+
+// The dates behind an average, so the modal can name them.
+assert(class_dates($days, 'law|2nd Year||A', '2026-08-24', '2026-08-26') ===
+    ['2026-08-24', '2026-08-25', '2026-08-26'], 'reported dates wrong');
+assert(class_dates($days, 'law|2nd Year||B', '2026-08-24', '2026-08-25') === [], 'dates outside the range leaked in');
+
+// --- Percentages divide by the classes that reported ------------------------
+// Diluting by classes that never filled the form in reads as an empty
+// university at 9am rather than as a missing form. attendance_pct pairs with
+// reported/classes, which is what keeps it honest.
+$partialDay = aggregate_days(day_map(parse_attendance_csv(
+    "date,class,present\n2026-08-26,School of Law / 2nd Year / A,15\n"
+)));
+$pd = attendance_totals($partialDay);
+assert($pd['strength'] === 5190, 'full strength should still be reported: ' . $pd['strength']);
+assert($pd['strength_reported'] === 30, 'reported strength wrong: ' . $pd['strength_reported']);
+assert(attendance_pct($pd) === 50, 'percentage should be over reported classes only: ' . attendance_pct($pd));
+assert(attendance_pct(attendance_totals(aggregate_days([]))) === 0, 'no data must not divide by zero');
+
+// --- Range labels -----------------------------------------------------------
+assert(range_label('2026-08-26', '2026-08-26') === '26 Aug 2026', range_label('2026-08-26', '2026-08-26'));
+assert(range_label('2026-08-24', '2026-08-26') === '24 Aug to 26 Aug 2026', range_label('2026-08-24', '2026-08-26'));
+assert(range_label('2025-12-30', '2026-01-02') === '30 Dec 2025 to 02 Jan 2026', range_label('2025-12-30', '2026-01-02'));
+
 echo "OK\n";
