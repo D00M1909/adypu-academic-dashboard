@@ -172,6 +172,19 @@ $noPresent = "timestamp,class (school of law),students present\n" .
              '"26/08/2026 09:15:10","School of Law / 2nd Year / A","44"' . "\n";
 assert(parse_attendance_csv($noPresent) === [], 'sheet without a Present column must be rejected');
 
+// A row naming a class the structure doesn't have is still dropped, but it must
+// now come back in $skipped — silently vanishing is how a stale Form option
+// stops being counted for weeks without anyone noticing. A blank row is an
+// empty response, not a mismatch, so it must NOT be reported.
+$mixed = "timestamp,class (school of engineering),present\n" .
+    '"26/08/2026 09:15:10","School of Engineering / 2nd Year / CSE / A","45"' . "\n" .
+    '"26/08/2026 09:16:10","School of Engineering / 2nd Year / CSE / ","41"' . "\n" .
+    '"26/08/2026 09:17:10","","0"' . "\n";
+$kept = parse_attendance_csv($mixed, $skipped);
+assert(count($kept) === 1, 'expected 1 usable row, got ' . count($kept));
+assert($skipped === ['School of Engineering / 2nd Year / CSE /'],
+    'skipped rows not reported: ' . json_encode($skipped));
+
 // --- Every section's options are real, unique classes -----------------------
 $sections = form_sections();
 assert(count($sections) === 12, 'expected 12 form sections, got ' . count($sections));

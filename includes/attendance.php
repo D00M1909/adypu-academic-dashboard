@@ -103,7 +103,11 @@ function class_from_row(array $r): ?array {
     return compact('school', 'year', 'branch', 'division', 'strength');
 }
 
-function parse_attendance_csv(string $csv): array {
+// $skipped collects one label per row that named no real class. A dropped row
+// is the failure mode nobody notices: the push reports the rows it stored, so a
+// Form option that no longer matches the structure just quietly stops counting.
+function parse_attendance_csv(string $csv, ?array &$skipped = null): array {
+    $skipped = [];
     $lines = array_filter(explode("\n", str_replace("\r\n", "\n", $csv)), fn($l) => trim($l) !== '');
     $rows = [];
     $header = null;
@@ -127,7 +131,15 @@ function parse_attendance_csv(string $csv): array {
         $r['class'] = first_value($header, $fields, 'class');
         $r['present'] = first_value($header, $fields, 'present');
         $class = class_from_row($r);
-        if ($class === null) continue;
+        if ($class === null) {
+            // A row with nothing filled in is an empty Form response, not a
+            // mismatch — only report rows that named something.
+            $named = $r['class'] !== '' ? $r['class'] : trim(implode(CLASS_SEP, [
+                $r['school'] ?? '', $r['year'] ?? '', $r['branch'] ?? '', $r['division'] ?? '',
+            ]), " /");
+            if ($named !== '') $skipped[] = $named;
+            continue;
+        }
         $rows[] = $class + [
             'present' => (int) ($r['present'] ?? 0),
             'date'    => trim($r['date'] ?? '') ?: date('Y-m-d'),
