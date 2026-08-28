@@ -1,6 +1,10 @@
 <?php
 require_once __DIR__ . '/includes/attendance.php';
 
+// The numbers change whenever Google pushes, which is any time. Without this
+// the host's edge serves a page rendered before the last push.
+header('Cache-Control: no-store');
+
 $tree = get_attendance();
 $totals = attendance_totals($tree);
 $today = date('d M Y');
