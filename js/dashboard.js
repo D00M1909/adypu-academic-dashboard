@@ -19,7 +19,7 @@
 
   // Mirrors att_class() in index.php and --att-* in dashboard.css.
   function attClass(pct) {
-    if (pct >= 85) return 'att-good';
+    if (pct >= 75) return 'att-good';
     if (pct >= 70) return 'att-warn';
     return 'att-low';
   }
@@ -28,44 +28,40 @@
     return strength ? Math.round((present / strength) * 100) : 0;
   }
 
-  // Totals for whatever the user currently has selected, plus how many things
-  // sit one level below it. state.branch is '' for a branchless school (a real
-  // key in the tree) and null when no branch is selected — the two must not be
-  // conflated or a branchless school would sum to nothing.
+  // Totals for whatever the user currently has selected. state.branch is '' for
+  // a branchless school (a real key in the tree) and null when no branch is
+  // selected — the two must not be conflated or a branchless school would sum
+  // to nothing.
   function scopeTotals() {
     var data = window.ATTENDANCE_DATA;
-    var present = 0, strength = 0, units = 0, unitLabel = 'Schools';
-    var classes = 0, reported = 0;
+    var present = 0, classes = 0, reported = 0, strengthReported = 0;
 
     var schools = state.school ? [state.school] : Object.keys(data);
-    if (!state.school) units = schools.length;
 
     schools.forEach(function (s) {
       var yearMap = data[s] || {};
       var years = state.year ? [state.year] : Object.keys(yearMap);
-      if (state.school && !state.year) { units = years.length; unitLabel = 'Years'; }
 
       years.forEach(function (y) {
         var branchMap = yearMap[y] || {};
         var branches = state.branch !== null ? [state.branch] : Object.keys(branchMap);
-        if (state.year && state.branch === null) { units = branches.length; unitLabel = 'Branches'; }
 
         branches.forEach(function (b) {
           var divisions = branchMap[b] || [];
-          if (state.branch !== null) { units = divisions.length; unitLabel = 'Divisions'; }
           divisions.forEach(function (d) {
             present += d.present;
-            strength += d.strength;
             classes++;
-            if (d.reported) reported++;
+            // Mirrors attendance_totals() in includes/attendance.php: the
+            // percentage divides by the classes that actually reported, or a
+            // morning with six forms in reads as an empty university.
+            if (d.reported) { reported++; strengthReported += d.strength; }
           });
         });
       });
     });
 
     return {
-      present: present, strength: strength,
-      units: units, unitLabel: unitLabel,
+      present: present, strengthReported: strengthReported,
       classes: classes, reported: reported
     };
   }
@@ -75,28 +71,28 @@
   // reads as 5190 students, which is the wrong number for what's on screen.
   function updateStats() {
     var t = scopeTotals();
-    var p = pct(t.present, t.strength);
+    var p = pct(t.present, t.strengthReported);
 
     document.getElementById('stat-present').textContent = t.present;
-    document.getElementById('stat-strength').textContent = t.strength;
-    document.getElementById('stat-units').textContent = t.units;
-    document.getElementById('stat-units-label').textContent = t.unitLabel;
-    document.getElementById('stat-reported').innerHTML =
-      t.reported + '<span class="stat-pill-sep">/</span>' + t.classes;
+    document.getElementById('stat-strength').textContent = t.strengthReported;
+    document.getElementById('stat-reported').textContent = t.reported;
+    document.getElementById('stat-classes').textContent = t.classes;
 
     var pctEl = document.getElementById('stat-pct');
-    pctEl.textContent = p + '%';
-    pctEl.className = 'stat-pill-value att-pct ' + attClass(p);
+    pctEl.textContent = t.reported ? p + '%' : '--';
+    pctEl.className = 'att-pct ' + (t.reported ? attClass(p) : '');
 
     var parts = [];
     if (state.school) parts.push(window.SCHOOLS[state.school].name);
     if (state.year) parts.push(state.year);
     if (state.branch) parts.push(state.branch);
-    // The date only rides along at root. Appending it to a drilled path wraps
-    // the label to two lines and shoves the value out of the card.
+    // Drilled in, the path is the useful label; the range stays visible in the
+    // date bar. At root there is no path, so the range takes its place.
     document.getElementById('stat-scope').textContent = parts.length
       ? parts.join(' \u00b7 ')
-      : 'Present Today \u00b7 ' + window.ATTENDANCE_DATE;
+      : 'Present \u00b7 ' + window.ATTENDANCE_RANGE.label;
+
+    window.Charts.render(state, t);
   }
 
   function crumbSep() {
@@ -104,22 +100,23 @@
   }
 
   function renderBreadcrumb() {
-    var crumbs = ['<span class="crumb" data-crumb="schools">Schools</span>'];
+    var crumbs = [{ key: 'schools', label: 'Schools' }];
     if (state.school) {
-      crumbs.push(crumbSep());
-      crumbs.push('<span class="crumb" data-crumb="school">' + window.SCHOOLS[state.school].name + '</span>');
+      crumbs.push({ key: 'school', label: window.SCHOOLS[state.school].name });
     }
     if (state.year) {
-      crumbs.push(crumbSep());
-      crumbs.push('<span class="crumb" data-crumb="year">' + state.year + '</span>');
+      crumbs.push({ key: 'year', label: state.year });
     }
     if (state.branch) {
-      crumbs.push(crumbSep());
-      crumbs.push('<span class="crumb" data-crumb="branch">' + state.branch + '</span>');
+      crumbs.push({ key: 'branch', label: state.branch });
     }
-    var last = crumbs.length - 1;
-    crumbs[last] = crumbs[last].replace('class="crumb"', 'class="crumb crumb-current"');
-    breadcrumb.innerHTML = crumbs.join('');
+    breadcrumb.innerHTML = crumbs.map(function (crumb, index) {
+      var current = index === crumbs.length - 1;
+      var item = current
+        ? '<span class="crumb crumb-current" aria-current="page">' + crumb.label + '</span>'
+        : '<button class="crumb crumb-button" type="button" data-crumb="' + crumb.key + '">' + crumb.label + '</button>';
+      return (index ? crumbSep() : '') + item;
+    }).join('');
     // Only earns its place once you've drilled past the school grid.
     breadcrumb.hidden = !state.school;
     updateStats();
@@ -130,7 +127,7 @@
   // branch step entirely and go straight to the division modal, same as
   // before branches existed. autoOpen controls whether that skip-through also
   // opens the modal (true on an explicit year click, false on auto-selection).
-  function updateBranches(schoolId, year, autoOpen) {
+  function updateBranches(schoolId, year, autoOpen, selectedBranch) {
     var branches = Object.keys(window.ATTENDANCE_DATA[schoolId][year] || {});
     var section = document.getElementById('branches-section');
     var grid = document.getElementById('branches-grid');
@@ -141,11 +138,11 @@
       grid.innerHTML = '';
       state.branch = '';
       renderBreadcrumb();
-      if (autoOpen) openDivisionModal(false);
+      if (autoOpen) openDivisionModal();
       return;
     }
 
-    state.branch = null;
+    state.branch = branches.indexOf(selectedBranch) !== -1 ? selectedBranch : null;
     grid.innerHTML = '';
     branches.forEach(function (branch) {
       var tile = document.createElement('button');
@@ -157,8 +154,9 @@
         grid.querySelectorAll('.branch-tile').forEach(function (t) { t.classList.remove('active'); });
         tile.classList.add('active');
         renderBreadcrumb();
-        openDivisionModal(false);
+        openDivisionModal();
       });
+      if (branch === state.branch) tile.classList.add('active');
       grid.appendChild(tile);
     });
 
@@ -167,7 +165,7 @@
     renderBreadcrumb();
   }
 
-  function renderYears(schoolId) {
+  function renderYears(schoolId, selectedYear, selectedBranch) {
     var years = Object.keys(window.ATTENDANCE_DATA[schoolId] || {});
     var grid = document.getElementById('years-grid');
     grid.innerHTML = '';
@@ -191,22 +189,81 @@
     document.getElementById('years-meta').textContent = years.length + (years.length === 1 ? ' year' : ' years');
 
     if (years.length) {
-      state.year = years[0];
-      grid.firstChild.classList.add('active');
-      updateBranches(schoolId, years[0], false);
+      state.year = years.indexOf(selectedYear) !== -1 ? selectedYear : years[0];
+      Array.prototype.forEach.call(grid.children, function (tile) {
+        if (tile.dataset.year === state.year) tile.classList.add('active');
+      });
+      updateBranches(schoolId, state.year, false, selectedBranch);
     }
+    renderBreadcrumb();
+  }
+
+  function selectSchool(schoolId, selectedYear, selectedBranch) {
+    document.querySelectorAll('.school-tile').forEach(function (t) {
+      t.classList.toggle('active', t.dataset.school === schoolId);
+    });
+    state.school = schoolId;
+    state.year = null;
+    state.branch = null;
+    renderYears(schoolId, selectedYear, selectedBranch);
+  }
+
+  function showSchoolLevel(schoolId) {
+    document.querySelectorAll('.school-tile').forEach(function (t) {
+      t.classList.toggle('active', t.dataset.school === schoolId);
+    });
+    state.school = schoolId;
+    state.year = null;
+    state.branch = null;
+    document.getElementById('branches-section').hidden = true;
+    document.getElementById('branches-grid').innerHTML = '';
+
+    var years = Object.keys(window.ATTENDANCE_DATA[schoolId] || {});
+    var grid = document.getElementById('years-grid');
+    grid.innerHTML = '';
+    years.forEach(function (year) {
+      var tile = document.createElement('button');
+      tile.type = 'button';
+      tile.className = 'tile year-tile';
+      tile.dataset.year = year;
+      tile.textContent = year;
+      tile.addEventListener('click', function () {
+        state.year = year;
+        grid.querySelectorAll('.year-tile').forEach(function (t) { t.classList.remove('active'); });
+        tile.classList.add('active');
+        renderBreadcrumb();
+        updateBranches(schoolId, year, true);
+      });
+      grid.appendChild(tile);
+    });
+    document.getElementById('years-section').hidden = years.length === 0;
+    document.getElementById('years-meta').textContent = years.length + (years.length === 1 ? ' year' : ' years');
     renderBreadcrumb();
   }
 
   document.querySelectorAll('.school-tile').forEach(function (tile) {
     tile.addEventListener('click', function () {
-      document.querySelectorAll('.school-tile').forEach(function (t) { t.classList.remove('active'); });
-      tile.classList.add('active');
-      state.school = tile.dataset.school;
+      selectSchool(tile.dataset.school);
+    });
+  });
+
+  breadcrumb.addEventListener('click', function (e) {
+    var crumb = e.target.closest('[data-crumb]');
+    if (!crumb) return;
+
+    if (crumb.dataset.crumb === 'schools') {
+      state.school = null;
       state.year = null;
       state.branch = null;
-      renderYears(state.school);
-    });
+      document.querySelectorAll('.school-tile').forEach(function (tile) { tile.classList.remove('active'); });
+      document.getElementById('years-section').hidden = true;
+      document.getElementById('branches-section').hidden = true;
+      renderBreadcrumb();
+    } else if (crumb.dataset.crumb === 'school' && state.school) {
+      showSchoolLevel(state.school);
+    } else if (crumb.dataset.crumb === 'year' && state.school && state.year) {
+      updateBranches(state.school, state.year, false);
+    }
   });
 
   function firstAvailableSelection() {
@@ -238,18 +295,20 @@
     if (e.key === 'Escape') hideModal();
   }
 
-  function openDivisionModal(refresh) {
+  function openDivisionModal() {
     var pick = firstAvailableSelection();
     if (!pick.schoolId || !pick.year) return;
 
     var url = 'api/division.php?school=' + encodeURIComponent(pick.schoolId) +
       '&year=' + encodeURIComponent(pick.year) +
       '&branch=' + encodeURIComponent(pick.branch || '') +
-      (refresh ? '&refresh=1' : '');
+      '&from=' + encodeURIComponent(window.ATTENDANCE_RANGE.from) +
+      '&to=' + encodeURIComponent(window.ATTENDANCE_RANGE.to);
 
     fetch(url).then(function (r) { return r.json(); }).then(function (data) {
       document.getElementById('modal-subtitle').textContent =
-        data.schoolName + ' · ' + data.year + (data.branch ? ' · ' + data.branch : '') + ' · ' + data.date;
+        data.schoolName + ' · ' + data.year + (data.branch ? ' · ' + data.branch : '') +
+        ' · ' + data.rangeLabel;
 
       var grid = document.getElementById('division-grid');
       grid.innerHTML = '';
@@ -263,9 +322,16 @@
           ? d.present + '<span class="division-count-sep">/</span>' + d.strength +
             ' <span class="att-pct ' + attClass(divPct) + '">' + divPct + '%</span>'
           : '<span class="tile-unreported">Not reported</span>';
+        // Over a range the count is an average, so the days behind it have to
+        // be on screen: two days out of seven must not read as the week.
+        var dates = d.dates || [];
+        var days = dates.length > 1
+          ? '<span class="division-days" title="Reported on ' + dates.join(', ') + '">avg of ' +
+              dates.length + ' days</span>'
+          : '';
         row.innerHTML =
           '<div class="division-row-top">' +
-            '<span class="division-name">Division ' + d.division + '</span>' +
+            '<span class="division-name">Division ' + d.division + days + '</span>' +
             '<span class="division-count">' + readout + '</span>' +
           '</div>' +
           '<div class="division-bar"><div class="division-bar-fill ' +
@@ -274,20 +340,119 @@
         grid.appendChild(row);
       });
 
-      var totalPct = pct(data.total.present, data.total.strength);
+      var totalPct = data.pct;
       document.getElementById('division-total').innerHTML =
         '<span>Total present <small>(' + data.total.reported + ' of ' + data.total.classes +
         ' reported)</small></span><span class="division-count">' + data.total.present +
-        '<span class="division-count-sep">/</span>' + data.total.strength + ' · ' + totalPct + '%</span>';
+        '<span class="division-count-sep">/</span>' + data.total.strength_reported + ' · ' + totalPct + '%</span>';
 
       showModal();
     });
   }
 
-  document.getElementById('present-today-card').addEventListener('click', function () { openDivisionModal(false); });
-  document.getElementById('modal-refresh').addEventListener('click', function () { openDivisionModal(true); });
+  // Presets fill the two native date inputs and submit the form: the page
+  // re-renders server-side for the new range, which keeps one set of range
+  // maths in PHP instead of a second copy here. They anchor on the newest day
+  // that has data, not on today, so "7 days" is never a week of empty ones.
+  function isoDaysBefore(iso, n) {
+    var bits = iso.split('-').map(Number);
+    // A YYYY-MM-DD is a calendar day, not a moment in the visitor's timezone.
+    // UTC arithmetic keeps an inclusive 7-day range six days wide everywhere.
+    var d = new Date(Date.UTC(bits[0], bits[1] - 1, bits[2]));
+    d.setUTCDate(d.getUTCDate() - n);
+    return d.toISOString().slice(0, 10);
+  }
+
+  function dashboardToday() {
+    var parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit'
+    }).formatToParts(new Date());
+    var fields = {};
+    parts.forEach(function (part) { fields[part.type] = part.value; });
+    return fields.year + '-' + fields.month + '-' + fields.day;
+  }
+
+  // Changing the range is a real navigation, so the browser drops you back at
+  // the top of the page. Remember where you were and return there once the
+  // charts have laid out.
+  function rememberScroll() {
+    try {
+      sessionStorage.setItem('adypu-scroll', String(window.scrollY));
+      if (state.school) {
+        sessionStorage.setItem('adypu-drilldown', JSON.stringify(state));
+      } else {
+        sessionStorage.removeItem('adypu-drilldown');
+      }
+    } catch (e) {}
+  }
+
+  document.getElementById('range-form').addEventListener('submit', rememberScroll);
+
+  document.querySelectorAll('.range-preset').forEach(function (button) {
+    button.addEventListener('click', function () {
+      var preset = button.dataset.preset;
+      var form = document.getElementById('range-form');
+      var presetInput = document.getElementById('range-preset');
+      var today = dashboardToday();
+      // form.submit() does not fire the submit event, so this cannot ride on
+      // the listener above.
+      rememberScroll();
+
+      if (preset === 'latest') {
+        // No parameters at all: the server picks the newest day with data.
+        window.location.search = '';
+        return;
+      }
+      var latest = window.ATTENDANCE_RANGE.latest;
+      var to = preset === 'today' ? today : latest;
+      var from = preset === 'today' ? today : isoDaysBefore(latest, Number(preset) - 1);
+      // When today's data is also the newest data, the dates alone cannot say
+      // whether the user chose Today or Latest day. Carry the selected intent.
+      presetInput.value = preset;
+      form.querySelector('#range-from').value = from;
+      form.querySelector('#range-to').value = to;
+      form.submit();
+    });
+  });
+
+  // Editing either native date input turns the selection into a custom range.
+  // The server can still light a matching preset as a fallback, but a stale
+  // intent from an earlier click must never force the wrong chip active.
+  document.querySelectorAll('#range-from, #range-to').forEach(function (input) {
+    function clearPresetIntent() {
+      document.getElementById('range-preset').value = '';
+    }
+    input.addEventListener('input', clearPresetIntent);
+    input.addEventListener('change', clearPresetIntent);
+  });
+
+  document.getElementById('stat-summary').addEventListener('click', function () { openDivisionModal(); });
+  document.getElementById('modal-refresh').addEventListener('click', function () { openDivisionModal(); });
   document.getElementById('modal-close').addEventListener('click', hideModal);
   modal.addEventListener('click', function (e) {
     if (e.target === modal) hideModal();
   });
+
+  // First paint: Insights would sit empty until the first drill-down without
+  // this, since updateStats() is otherwise only reached from a click.
+  try {
+    var savedDrilldown = JSON.parse(sessionStorage.getItem('adypu-drilldown'));
+    sessionStorage.removeItem('adypu-drilldown');
+    if (savedDrilldown && window.ATTENDANCE_DATA[savedDrilldown.school]) {
+      selectSchool(savedDrilldown.school, savedDrilldown.year, savedDrilldown.branch);
+    } else {
+      updateStats();
+    }
+  } catch (e) {
+    updateStats();
+  }
+
+  // After the charts, so the page is its full height and the scroll lands.
+  try {
+    var y = sessionStorage.getItem('adypu-scroll');
+    if (y !== null) {
+      sessionStorage.removeItem('adypu-scroll');
+      window.scrollTo(0, Number(y));
+    }
+  } catch (e) {}
 })();

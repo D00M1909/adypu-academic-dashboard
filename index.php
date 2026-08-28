@@ -1,14 +1,58 @@
 <?php
 require_once __DIR__ . '/includes/attendance.php';
+require_once __DIR__ . '/includes/structure.php';
 
 // The numbers change whenever Google pushes, which is any time. Without this
 // the host's edge serves a page rendered before the last push.
 header('Cache-Control: no-store');
 
-$tree = get_attendance();
+// The range the page is showing. Both ends missing means the newest day that
+// has data (resolve_range), so the landing view is one real, labelled day and
+// never the empty page "today" gives every morning before the first form.
+$days = get_attendance_days();
+[$from, $to] = resolve_range($days, row_date($_GET['from'] ?? ''), row_date($_GET['to'] ?? ''));
+$tree = $days ? aggregate_days($days, $from, $to) : get_attendance($from, $to);
 $totals = attendance_totals($tree);
-$today = date('d M Y');
-$overallPct = $totals['strength'] ? (int) round($totals['present'] / $totals['strength'] * 100) : 0;
+$rangeLabel = range_label($from, $to);
+$overallPct = attendance_pct($totals);
+
+// Only the days on screen go to the client, for the charts. A month is about
+// 60KB of JSON inline; a year would be 600KB, which is the ceiling on picking
+// a very long range (see the ponytail note on day_map()).
+$rangeDays = array_filter($days, fn($d) => $d >= $from && $d <= $to, ARRAY_FILTER_USE_KEY);
+$classStrength = [];
+foreach (class_rows() as $c) $classStrength[class_key($c)] = $c['strength'];
+$dataDates = $days ? [min(array_keys($days)), max(array_keys($days))] : [$from, $to];
+
+// Which preset chip the current range is, so the bar shows what you are
+// looking at. Date-only strings must stay date-only: parsing them in the
+// browser's local timezone used to make a 7-day click become an 8-day range.
+// PHP uses the dashboard's Asia/Kolkata timezone (set in attendance.php), and
+// DateTimeImmutable avoids strtotime treating "-6" like a timezone offset.
+$presetRanges = [
+    'latest' => [$dataDates[1], $dataDates[1]],
+    'today' => [date('Y-m-d'), date('Y-m-d')],
+    '7' => [(new DateTimeImmutable($dataDates[1]))->modify('-6 days')->format('Y-m-d'), $dataDates[1]],
+    '30' => [(new DateTimeImmutable($dataDates[1]))->modify('-29 days')->format('Y-m-d'), $dataDates[1]],
+];
+$requestedPreset = $_GET['preset'] ?? '';
+if (!isset($presetRanges[$requestedPreset])) $requestedPreset = '';
+
+// `today` and `latest` can resolve to exactly the same dates. Keep the
+// explicit intent from a chip click so the control the user selected lights
+// up, while direct/custom ranges still fall back to their matching chip.
+$activePreset = '';
+if ($requestedPreset && [$from, $to] === $presetRanges[$requestedPreset]) {
+    $activePreset = $requestedPreset;
+} else {
+    foreach (['latest', 'today', '7', '30'] as $preset) {
+        if ([$from, $to] === $presetRanges[$preset]) {
+            $activePreset = $preset;
+            break;
+        }
+    }
+}
+$presetClass = fn(string $p): string => 'range-preset' . ($activePreset === $p ? ' is-active' : '');
 
 // Read from the 'Partners Admission MIS' sheet of
 // ../adypuacademicreport/ADYPU_Master_Dashboard_Data_July_2026.xlsx on
@@ -31,7 +75,7 @@ $knowledgePartners = [
 // Attendance status band. Mirrored by attClass() in js/dashboard.js — change
 // both together, and --att-* in dashboard.css with them.
 function att_class(int $pct): string {
-    if ($pct >= 85) return 'att-good';
+    if ($pct >= 75) return 'att-good';
     if ($pct >= 70) return 'att-warn';
     return 'att-low';
 }
@@ -47,7 +91,7 @@ $shortSchool = fn(string $id): string => preg_replace('/^School of /', '', SCHOO
 <title>ADYPU Academic Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/dashboard.css?v=<?= filemtime(__DIR__ . '/css/dashboard.css') ?>">
 </head>
 <body>
@@ -153,37 +197,33 @@ $shortSchool = fn(string $id): string => preg_replace('/^School of /', '', SCHOO
   </div>
 </header>
 
-<div class="accred-strip">
-  <img src="img/accreditation-badges.jpeg" alt="NAAC A Grade Accreditation, NBA Accredited, NIRF Ranked, Great Place To Work Certified, Times Higher Education Sustainability Impact Rating, and QS I-Gauge Diamond Rating">
-</div>
-
 <main>
 
-  <section class="stat-row">
-    <button class="stat-hero" id="present-today-card" type="button">
-      <svg class="stat-hero-icon"><use href="#icon-user-check"/></svg>
-      <span class="stat-hero-text">
-        <span class="stat-hero-label" id="stat-scope">Present Today &middot; <?= htmlspecialchars($today) ?></span>
-        <span class="stat-hero-value"><span id="stat-present"><?= $totals['present'] ?></span><span class="stat-hero-sep">/</span><span id="stat-strength"><?= $totals['strength'] ?></span></span>
-      </span>
-      <span class="stat-hero-cta">View breakdown<svg class="stat-hero-cta-icon"><use href="#icon-chevron"/></svg></span>
-    </button>
-
-    <div class="stat-strip">
-      <div class="stat-pill">
-        <span class="stat-pill-value" id="stat-units"><?= count(SCHOOLS) ?></span>
-        <span class="stat-pill-label" id="stat-units-label">Schools</span>
-      </div>
-      <div class="stat-pill">
-        <span class="stat-pill-value att-pct <?= att_class($overallPct) ?>" id="stat-pct"><?= $overallPct ?>%</span>
-        <span class="stat-pill-label">Attendance</span>
-      </div>
-      <div class="stat-pill">
-        <span class="stat-pill-value" id="stat-reported"><?= $totals['reported'] ?><span class="stat-pill-sep">/</span><?= $totals['classes'] ?></span>
-        <span class="stat-pill-label">Classes reported</span>
-      </div>
+  <form class="range-bar" method="get" id="range-form">
+    <input type="hidden" name="preset" id="range-preset" value="<?= htmlspecialchars($activePreset) ?>">
+    <div class="range-presets">
+      <button class="<?= $presetClass('latest') ?>" type="button" data-preset="latest" aria-pressed="<?= $activePreset === 'latest' ? 'true' : 'false' ?>">Latest day</button>
+      <button class="<?= $presetClass('today') ?>" type="button" data-preset="today" aria-pressed="<?= $activePreset === 'today' ? 'true' : 'false' ?>">Today</button>
+      <button class="<?= $presetClass('7') ?>" type="button" data-preset="7" aria-pressed="<?= $activePreset === '7' ? 'true' : 'false' ?>">7 days</button>
+      <button class="<?= $presetClass('30') ?>" type="button" data-preset="30" aria-pressed="<?= $activePreset === '30' ? 'true' : 'false' ?>">30 days</button>
     </div>
-  </section>
+    <button class="range-summary" id="stat-summary" type="button">
+      <span class="range-summary-scope" id="stat-scope">Present &middot; <?= htmlspecialchars($rangeLabel) ?></span>
+      <span class="range-summary-figures">
+        <span class="range-summary-count"><span id="stat-present"><?= $totals['present'] ?></span><span class="range-summary-sep">/</span><span id="stat-strength"><?= $totals['strength_reported'] ?></span></span>
+        <span class="att-pct <?= att_class($overallPct) ?>" id="stat-pct"><?= $overallPct ?>%</span>
+        <span class="range-summary-coverage"><span id="stat-reported"><?= $totals['reported'] ?></span> of <span id="stat-classes"><?= $totals['classes'] ?></span> reported</span>
+        <svg class="range-summary-icon" aria-hidden="true"><use href="#icon-chevron"/></svg>
+      </span>
+    </button>
+    <div class="range-dates">
+      <label for="range-from">From</label>
+      <input type="date" id="range-from" name="from" value="<?= htmlspecialchars($from) ?>" min="<?= htmlspecialchars($dataDates[0]) ?>" max="<?= htmlspecialchars(date('Y-m-d')) ?>">
+      <label for="range-to">To</label>
+      <input type="date" id="range-to" name="to" value="<?= htmlspecialchars($to) ?>" min="<?= htmlspecialchars($dataDates[0]) ?>" max="<?= htmlspecialchars(date('Y-m-d')) ?>">
+      <button class="range-apply" type="submit">Apply</button>
+    </div>
+  </form>
 
   <div id="tab-adypu" class="tab-panel">
     <nav class="breadcrumb" id="breadcrumb" aria-label="Drill-down path" hidden></nav>
@@ -196,7 +236,7 @@ $shortSchool = fn(string $id): string => preg_replace('/^School of /', '', SCHOO
       <div class="tile-grid schools-grid">
         <?php foreach (SCHOOLS as $id => $school):
           $st = attendance_totals([$id => $tree[$id] ?? []]);
-          $stPct = $st['strength'] ? (int) round($st['present'] / $st['strength'] * 100) : 0;
+          $stPct = attendance_pct($st);
         ?>
         <button class="tile school-tile" type="button" data-school="<?= htmlspecialchars($id) ?>">
           <svg class="tile-icon-svg"><use href="#icon-<?= htmlspecialchars($id) ?>"/></svg>
@@ -205,8 +245,9 @@ $shortSchool = fn(string $id): string => preg_replace('/^School of /', '', SCHOO
           <span class="tile-stat tile-unreported">Not reported</span>
           <span class="division-bar"><span class="division-bar-fill" style="width:0"></span></span>
           <?php else: ?>
-          <span class="tile-stat"><?= $st['present'] ?><span class="tile-stat-sep">/</span><?= $st['strength'] ?> &middot; <span class="att-pct <?= att_class($stPct) ?>"><?= $stPct ?>%</span></span>
+          <span class="tile-stat"><?= $st['present'] ?><span class="tile-stat-sep">/</span><?= $st['strength_reported'] ?> &middot; <span class="att-pct <?= att_class($stPct) ?>"><?= $stPct ?>%</span></span>
           <span class="division-bar"><span class="division-bar-fill <?= att_class($stPct) ?>" style="width:<?= $stPct ?>%"></span></span>
+          <span class="tile-meta<?= $st['reported'] < $st['classes'] ? ' tile-meta-gap' : '' ?>"><?= $st['reported'] ?> of <?= $st['classes'] ?> classes reported</span>
           <?php endif; ?>
         </button>
         <?php endforeach; ?>
@@ -227,6 +268,31 @@ $shortSchool = fn(string $id): string => preg_replace('/^School of /', '', SCHOO
         <span class="section-meta" id="branches-meta"></span>
       </div>
       <div class="tile-grid branches-grid" id="branches-grid"></div>
+    </section>
+
+    <section class="tile-section">
+      <div class="section-title">
+        <h2>Insights</h2>
+        <span class="section-meta" id="charts-scope"></span>
+      </div>
+      <div class="chart-grid">
+        <figure class="chart-card">
+          <figcaption>Present vs absent</figcaption>
+          <div class="chart-body" id="chart-donut"></div>
+        </figure>
+        <figure class="chart-card">
+          <figcaption>Attendance by day</figcaption>
+          <div class="chart-body" id="chart-trend"></div>
+        </figure>
+        <figure class="chart-card">
+          <figcaption id="chart-bars-caption">Attendance by school</figcaption>
+          <div class="chart-body" id="chart-bars"></div>
+        </figure>
+        <figure class="chart-card">
+          <figcaption>Classes reporting each day</figcaption>
+          <div class="chart-body" id="chart-compliance"></div>
+        </figure>
+      </div>
     </section>
   </div>
 
@@ -268,8 +334,17 @@ $shortSchool = fn(string $id): string => preg_replace('/^School of /', '', SCHOO
 <script>
   window.ATTENDANCE_DATA = <?= json_encode($tree) ?>;
   window.SCHOOLS = <?= json_encode(SCHOOLS) ?>;
-  window.ATTENDANCE_DATE = <?= json_encode($today) ?>;
+  window.ATTENDANCE_RANGE = <?= json_encode([
+      'from' => $from, 'to' => $to, 'label' => $rangeLabel,
+      'latest' => $dataDates[1], 'earliest' => $dataDates[0],
+  ]) ?>;
+  // Per-day, per-class present counts for the range on screen, and every
+  // class's strength: between them the charts can rescope to any drill-down
+  // without another request.
+  window.ATTENDANCE_DAYS = <?= json_encode((object) $rangeDays) ?>;
+  window.CLASS_STRENGTH = <?= json_encode($classStrength) ?>;
 </script>
-<script src="js/dashboard.js"></script>
+<script src="js/charts.js?v=<?= filemtime(__DIR__ . '/js/charts.js') ?>"></script>
+<script src="js/dashboard.js?v=<?= filemtime(__DIR__ . '/js/dashboard.js') ?>"></script>
 </body>
 </html>
