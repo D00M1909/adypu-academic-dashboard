@@ -17,6 +17,22 @@
     });
   });
 
+  // The theme itself is applied by the inline script in index.php's head, so
+  // this only has to flip and remember it. Nothing else reads the value: every
+  // colour on the page comes from a token in dashboard.css.
+  var themeToggle = document.getElementById('theme-toggle');
+  function paintToggle(theme) {
+    themeToggle.setAttribute('aria-pressed', theme === 'dark' ? 'true' : 'false');
+    themeToggle.setAttribute('aria-label', theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+  }
+  paintToggle(document.documentElement.dataset.theme);
+  themeToggle.addEventListener('click', function () {
+    var theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = theme;
+    paintToggle(theme);
+    try { localStorage.setItem('adypu-theme', theme); } catch (e) {}
+  });
+
   // Mirrors att_class() in index.php and --att-* in dashboard.css.
   function attClass(pct) {
     if (pct >= 75) return 'att-good';
