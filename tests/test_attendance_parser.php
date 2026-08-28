@@ -185,6 +185,16 @@ assert(count($kept) === 1, 'expected 1 usable row, got ' . count($kept));
 assert($skipped === ['School of Engineering / 2nd Year / CSE /'],
     'skipped rows not reported: ' . json_encode($skipped));
 
+// A section whose Class question is titled so it doesn't start with "Class"
+// still holds a perfectly good label. Real case, 28 Aug 2026: eng 2nd Year went
+// uncounted for it. The label's shape must win over the column's name.
+$oddHeader = "timestamp,school,year,which section are you reporting for?,present\n" .
+    '"28/08/2026 10:20:15","School of Engineering","2nd Year","School of Engineering / 2nd Year / CSE / A","45"' . "\n";
+$odd = parse_attendance_csv($oddHeader, $oddSkipped);
+assert(count($odd) === 1, 'unnamed class column dropped the row: ' . json_encode($oddSkipped));
+assert($odd[0]['branch'] === 'CSE' && $odd[0]['division'] === 'A' && $odd[0]['present'] === 45,
+    'label found by shape mis-parsed: ' . json_encode($odd[0]));
+
 // --- Every section's options are real, unique classes -----------------------
 $sections = form_sections();
 assert(count($sections) === 12, 'expected 12 form sections, got ' . count($sections));

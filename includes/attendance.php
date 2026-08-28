@@ -87,6 +87,20 @@ function class_from_row(array $r): ?array {
     if (!empty($r['class'])) {
         return parse_class_label(trim($r['class']));
     }
+
+    // The Class question can be titled anything, and one section titled so that
+    // it doesn't start with "Class" left first_value() empty while the label sat
+    // in the row all along — a whole class quietly uncounted. The label's shape
+    // is the dependable signal, not the header: take any cell that parses to a
+    // real class. Nothing else in a response can accidentally match, since it
+    // must name a school, year, branch and division that all exist.
+    foreach ($r as $value) {
+        if (is_string($value) && str_contains($value, CLASS_SEP)) {
+            $class = parse_class_label(trim($value));
+            if ($class !== null) return $class;
+        }
+    }
+
     if (empty($r['school'])) {
         return null;
     }
