@@ -33,7 +33,7 @@ one level below your selection, and how many classes filed a form each day. That
 last one is the honesty check, since a great percentage resting on three forms
 should look like exactly that.
 
-![The four charts](docs/screenshots/insights.png)
+![The four charts](docs/screenshots/insights-charts.png)
 
 ## How the data gets here
 
