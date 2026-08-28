@@ -19,13 +19,19 @@ Live: <https://adypu-academic-dashboard.fast-page.org/>
   breakdown names the dates behind every average.
 - **Drill down and everything follows.** Pick a school, year, branch or a single
   division; the summary, breadcrumb and all four charts rescope to it.
-- **Charts with no chart library.** Present against absent, attendance per day
-  against the 75% rule, a ranked comparison one level below your selection, and
-  how many classes filed a form each day.
 - **Export as PDF.** The page prints itself as a dated report, named after the
   breadcrumb, showing only the school in view.
 
 ![Drilling down to a division](docs/screenshots/drilldown.png)
+
+## Insights
+
+Four charts, all hand-drawn SVG and CSS, no chart library. They rescope with the
+drill-down and cover the range you picked: present against absent, attendance
+per day against the university's 75% rule, a ranked comparison of whatever sits
+one level below your selection, and how many classes filed a form each day. That
+last one is the honesty check, since a great percentage resting on three forms
+should look like exactly that.
 
 ![The four charts](docs/screenshots/insights.png)
 
