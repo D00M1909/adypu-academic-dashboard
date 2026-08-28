@@ -1,0 +1,4 @@
+# The dashboard is deployed to Linux shared hosting and edited on Windows.
+# Without this, a Windows editor or FTP client rewrites every line ending and
+# turns a three-line change into a whole-file diff.
+* text=auto eol=lf
