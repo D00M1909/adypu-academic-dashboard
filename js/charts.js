@@ -17,7 +17,11 @@ window.Charts = (function () {
     if (state.school) parts.push(state.school);
     if (state.year) parts.push(state.year);
     if (state.branch !== null && state.branch !== undefined) parts.push(state.branch);
-    return parts.length ? parts.join('|') + '|' : '';
+    if (!parts.length) return '';
+    // A division is the whole key, so it takes no trailing separator: with one
+    // it would match nothing and every chart would empty out.
+    if (state.division) return parts.join('|') + '|' + state.division;
+    return parts.join('|') + '|';
   }
 
   function attClass(pct) {
@@ -236,8 +240,18 @@ window.Charts = (function () {
   // chart: a 95% attendance figure resting on 6 of 103 classes should be
   // visible as exactly that.
   function renderCompliance(el, prefix) {
-    var series = dailySeries(prefix);
+    // Every day in the range, not just the ones with submissions: a day nobody
+    // reported is the whole point of this chart, and dropping it let a class
+    // that reported twice in a week look like perfect compliance.
+    var days = window.ATTENDANCE_DAYS || {};
     var total = classesInScope(prefix);
+    var series = Object.keys(days).sort().map(function (date) {
+      var reported = 0;
+      Object.keys(days[date]).forEach(function (key) {
+        if (key.indexOf(prefix) === 0) reported++;
+      });
+      return { date: date, reported: reported };
+    });
     if (!series.length || !total) {
       empty(el, 'No submissions in this range.');
       return;

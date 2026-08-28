@@ -85,6 +85,14 @@ window.Charts.render({ school: 'law', year: '1st Year', branch: '' },
 assert(els['chart-bars'].innerHTML.includes('Not reported'), 'unreported division should say so');
 assert(!els['chart-bars'].innerHTML.includes('>0%<'), 'unreported division drawn as a 0% reading');
 
+// One division selected: the scope is a whole class key, and a trailing
+// separator on it would match nothing and empty every chart.
+window.Charts.render({ school: 'eng', year: '1st Year', branch: 'Core', division: 'A' },
+  { present: 70, strengthReported: 100, reported: 1, classes: 1 });
+assert(els['chart-trend'].innerHTML.includes('50% (1 classes)'), 'division scope lost day 1');
+assert(els['chart-trend'].innerHTML.includes('90% (1 classes)'), 'division scope lost day 2');
+assert(els['chart-compliance'].innerHTML.includes('1 of 1 classes reported'), 'division scope wrong');
+
 // Nothing selected that has data at all.
 window.Charts.render({ school: 'eng', year: '1st Year', branch: 'Core' },
   { present: 0, strengthReported: 0, reported: 0, classes: 2 });
