@@ -3,8 +3,15 @@
   --red-secondary: #99151F;
   --red-tint: #fef2f2;
   --red-tint-strong: #fde3e6;
+  /* The red used as ink on a surface, as opposed to a red surface with white
+     on it. They are the same colour in light mode and cannot be in dark: no
+     single red clears 4.5:1 against both a dark page and white button text. */
+  --red-ink: var(--red-primary);
+  --header-from: var(--red-primary);
+  --header-to: var(--red-secondary);
   --total-bg: #fde3e6;
   --total-text: #7a1017;
+  --total-sep: rgba(122, 16, 23, 0.5);
   --surface: #f8fafc;
   --surface-raised: #ffffff;
   --hairline: #eef1f5;
@@ -20,11 +27,48 @@
      text can use them as-is. */
   --att-good: #15803d;
   --att-warn: #b45309;
-  --att-low: var(--red-primary);
+  --att-low: var(--red-ink);
   --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 1px rgba(15, 23, 42, 0.04);
   --shadow-md: 0 8px 20px -6px rgba(15, 23, 42, 0.12), 0 2px 6px rgba(15, 23, 42, 0.06);
-  --shadow-red: 0 12px 28px -8px rgba(194, 27, 39, 0.4);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  color-scheme: light;
+}
+
+/* Dark mode is nothing but these tokens: every rule below already reads them.
+   `data-theme` is always set explicitly, by the inline script in index.php,
+   which resolves prefers-color-scheme once at load — so there is one selector
+   here rather than a media query and a selector saying the same thing twice.
+
+   @media screen matters. The print block below assumes ink on paper, and a
+   dated report exported at night must not come out white-on-white, so print
+   never sees these and falls back to the light palette. */
+@media screen {
+  :root[data-theme="dark"] {
+    --red-tint: rgba(248, 113, 113, 0.14);
+    --red-tint-strong: rgba(248, 113, 113, 0.34);
+    --red-ink: #f87171;
+    /* The brand red at full strength is a floodlight across a dark page, and
+       the header is the largest block of it. Darkened here only; the chips and
+       buttons keep --red-primary, since white text needs it. */
+    --header-from: #8c1720;
+    --header-to: #6b111a;
+    --total-bg: #3b1a1f;
+    --total-text: #fecdd3;
+    --total-sep: rgba(254, 205, 211, 0.5);
+    --surface: #0f141a;
+    --surface-raised: #182029;
+    --hairline: #2b3644;
+    --ink: #e7edf4;
+    --ink-muted: #9fb0c2;
+    --ink-faint: #7d8b9c;
+    --att-good: #4ade80;
+    --att-warn: #fbbf24;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 1px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 8px 20px -6px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.45);
+    /* Native widgets follow this: without it the two date inputs stay white
+       cards with a white calendar popup in the middle of a dark control dock. */
+    color-scheme: dark;
+  }
 }
 
 * { box-sizing: border-box; }
@@ -43,7 +87,7 @@ body {
 ::selection { background: var(--red-primary); color: #fff; }
 
 :focus-visible {
-  outline: 2px solid var(--red-primary);
+  outline: 2px solid var(--red-ink);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -62,7 +106,7 @@ button {
   position: sticky;
   top: 0;
   z-index: 20;
-  background: linear-gradient(135deg, var(--red-primary), var(--red-secondary));
+  background: linear-gradient(135deg, var(--header-from), var(--header-to));
   padding: 12px 28px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.14);
 }
@@ -156,7 +200,7 @@ button {
   stroke-width: 2.5;
   align-self: center;
 }
-.range-summary:hover .range-summary-icon { stroke: var(--red-primary); }
+.range-summary:hover .range-summary-icon { stroke: var(--red-ink); }
 
 .tabs {
   display: flex;
@@ -180,6 +224,40 @@ button {
 }
 .tab:hover { color: #fff; }
 .tab.active { background: #fff; color: var(--red-primary); }
+
+/* Tabs and the theme toggle travel together, so a wrapped phone header puts
+   them on one row instead of two. */
+.header-controls { display: flex; align-items: center; gap: 10px; }
+
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.15);
+  border: none;
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  transition: background 0.15s var(--ease-out), color 0.15s var(--ease-out);
+}
+.theme-toggle:hover { background: rgba(0, 0, 0, 0.28); color: #fff; }
+.theme-toggle svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* The icon shows the destination, not the current state: a moon while the page
+   is light, a sun while it is dark. */
+.theme-icon-sun { display: none; }
+:root[data-theme="dark"] .theme-icon-sun { display: block; }
+:root[data-theme="dark"] .theme-icon-moon { display: none; }
 
 /* ---------- Layout ---------- */
 
@@ -205,8 +283,8 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
   border: 0;
   cursor: pointer;
 }
-.crumb-button:hover { color: var(--red-primary); }
-.crumb-current { color: var(--red-primary); font-weight: 700; }
+.crumb-button:hover { color: var(--red-ink); }
+.crumb-current { color: var(--red-ink); font-weight: 700; }
 .crumb-sep { width: 13px; height: 13px; fill: none; stroke: var(--ink-faint); stroke-width: 2.5; }
 
 /* ---------- Tile sections ---------- */
@@ -242,21 +320,21 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
   align-items: center;
   gap: 8px;
 }
-.tile:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: #fecdd3; }
+.tile:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: var(--red-tint-strong); }
 .tile:active { transform: translateY(0); }
 .tile.active {
   background: var(--red-tint);
-  border-color: var(--red-primary);
-  color: var(--red-primary);
+  border-color: var(--red-ink);
+  color: var(--red-ink);
   font-weight: 600;
-  box-shadow: 0 0 0 1px var(--red-primary), var(--shadow-sm);
+  box-shadow: 0 0 0 1px var(--red-ink), var(--shadow-sm);
 }
 
 .tile-icon-svg {
   width: 26px;
   height: 26px;
   fill: none;
-  stroke: var(--red-primary);
+  stroke: var(--red-ink);
   stroke-width: 1.7;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -276,7 +354,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
 .division-tile .division-bar { display: block; width: 100%; margin-top: 2px; }
 .school-tile .division-bar-fill,
 .division-tile .division-bar-fill { display: block; }
-.tile.active .tile-stat { color: var(--red-primary); }
+.tile.active .tile-stat { color: var(--red-ink); }
 .tile.active .att-pct { color: inherit; }
 .year-tile, .branch-tile { font-size: 14px; font-weight: 600; padding: 14px; }
 
@@ -322,7 +400,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
   gap: 12px;
   margin-bottom: 18px;
 }
-.modal-heading h2 { color: var(--red-primary); font-size: 17px; font-weight: 700; margin: 0 0 3px; }
+.modal-heading h2 { color: var(--red-ink); font-size: 17px; font-weight: 700; margin: 0 0 3px; }
 .modal-subtitle { color: var(--ink-muted); font-size: 12.5px; margin: 0; }
 
 .modal-actions { display: flex; gap: 8px; flex-shrink: 0; }
@@ -339,7 +417,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
   justify-content: center;
   transition: background 0.12s var(--ease-out), color 0.12s var(--ease-out);
 }
-.icon-btn:hover { background: var(--red-tint); color: var(--red-primary); }
+.icon-btn:hover { background: var(--red-tint); color: var(--red-ink); }
 .icon-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 #modal-refresh:active svg { animation: spin 0.4s var(--ease-out); }
 @keyframes spin { to { transform: rotate(180deg); } }
@@ -351,7 +429,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
 .division-count { font-family: "IBM Plex Mono", monospace; font-weight: 600; color: var(--ink); }
 .division-count-sep { color: var(--ink-muted); font-weight: 500; margin: 0 1px; }
 .division-bar { height: 5px; border-radius: 3px; background: var(--hairline); overflow: hidden; }
-.division-bar-fill { height: 100%; background: var(--red-primary); border-radius: 3px; }
+.division-bar-fill { height: 100%; background: var(--red-ink); border-radius: 3px; }
 
 .att-good .division-bar-fill, .division-bar-fill.att-good { background: var(--att-good); }
 .att-warn .division-bar-fill, .division-bar-fill.att-warn { background: var(--att-warn); }
@@ -372,7 +450,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
   border-radius: 12px;
 }
 .division-total .division-count { color: var(--total-text); font-weight: 700; }
-.division-total .division-count-sep { color: rgba(122, 16, 23, 0.5); }
+.division-total .division-count-sep { color: var(--total-sep); }
 
 @media (max-width: 640px) {
   main { padding: 20px 16px; }
@@ -442,7 +520,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
   box-shadow: var(--shadow-sm);
   transition: color 0.12s var(--ease-out), border-color 0.12s var(--ease-out);
 }
-.range-preset:hover { color: var(--red-primary); border-color: var(--red-tint-strong); }
+.range-preset:hover { color: var(--red-ink); border-color: var(--red-tint-strong); }
 .range-preset.is-active {
   color: #fff;
   background: var(--red-primary);
@@ -451,7 +529,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
 }
 .range-preset.is-active:hover { color: #fff; background: var(--red-secondary); }
 /* A custom range lights no chip, so the inputs carry the state on their own. */
-.range-bar:not(:has(.is-active)) .range-dates label { color: var(--red-primary); font-weight: 600; }
+.range-bar:not(:has(.is-active)) .range-dates label { color: var(--red-ink); font-weight: 600; }
 .range-dates {
   display: flex;
   align-items: center;
@@ -485,7 +563,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
   font: inherit;
   font-size: 13px;
   font-weight: 600;
-  color: var(--red-primary);
+  color: var(--red-ink);
   background: var(--surface-raised);
   border: 1px solid var(--red-tint-strong);
   border-radius: 10px;
@@ -574,7 +652,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
 }
 .chart-legend li { display: flex; align-items: center; gap: 6px; }
 .chart-legend b { color: var(--ink); }
-.swatch { width: 10px; height: 10px; border-radius: 3px; background: var(--red-primary); }
+.swatch { width: 10px; height: 10px; border-radius: 3px; background: var(--red-ink); }
 .swatch.att-good { background: var(--att-good); }
 .swatch.att-warn { background: var(--att-warn); }
 .swatch.att-low { background: var(--att-low); }
@@ -582,9 +660,9 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
 
 /* Trend */
 .trend { width: 100%; height: auto; display: block; }
-.trend-line { fill: none; stroke: var(--red-primary); stroke-width: 2; stroke-linejoin: round; }
+.trend-line { fill: none; stroke: var(--red-ink); stroke-width: 2; stroke-linejoin: round; }
 .trend-area { fill: var(--red-tint); stroke: none; }
-.trend-dot { fill: var(--surface-raised); stroke: var(--red-primary); stroke-width: 2; }
+.trend-dot { fill: var(--surface-raised); stroke: var(--red-ink); stroke-width: 2; }
 .trend-grid { stroke: var(--ink-faint); stroke-width: 1; stroke-dasharray: 3 4; }
 .chart-axis {
   display: flex;
@@ -621,7 +699,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
   align-items: flex-end;
   overflow: hidden;
 }
-.compliance-fill { width: 100%; background: var(--red-primary); border-radius: 4px; }
+.compliance-fill { width: 100%; background: var(--red-ink); border-radius: 4px; }
 .compliance-label { font-size: 10.5px; color: var(--ink-faint); }
 
 /* ---------- Print / Save as PDF ----------

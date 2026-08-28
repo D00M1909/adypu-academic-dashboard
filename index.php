@@ -93,6 +93,18 @@ $shortSchool = fn(string $id): string => preg_replace('/^School of /', '', SCHOO
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/dashboard.css?v=<?= filemtime(__DIR__ . '/css/dashboard.css') ?>">
+<script>
+// Inline and before the body on purpose: every range change is a full page
+// load, and resolving the theme from a deferred script would flash white each
+// time. data-theme is always set to a concrete value, so the stylesheet needs
+// one selector rather than a media query saying the same thing again.
+try {
+  document.documentElement.dataset.theme = localStorage.getItem('adypu-theme')
+    || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+} catch (e) {
+  document.documentElement.dataset.theme = 'light';
+}
+</script>
 </head>
 <body>
 
@@ -181,6 +193,20 @@ $shortSchool = fn(string $id): string => preg_replace('/^School of /', '', SCHOO
     <symbol id="icon-chevron" viewBox="0 0 24 24">
       <path d="m9 18 6-6-6-6" />
     </symbol>
+    <symbol id="icon-sun" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2" />
+      <path d="M12 20v2" />
+      <path d="m4.93 4.93 1.41 1.41" />
+      <path d="m17.66 17.66 1.41 1.41" />
+      <path d="M2 12h2" />
+      <path d="M20 12h2" />
+      <path d="m6.34 17.66-1.41 1.41" />
+      <path d="m19.07 4.93-1.41 1.41" />
+    </symbol>
+    <symbol id="icon-moon" viewBox="0 0 24 24">
+      <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+    </symbol>
   </defs>
 </svg>
 
@@ -190,10 +216,16 @@ $shortSchool = fn(string $id): string => preg_replace('/^School of /', '', SCHOO
       <div class="brand-logo"><img src="img/logo.png" alt="Ajeenkya D Y Patil University"></div>
       <h1>ADYPU: Academic Dashboard</h1>
     </div>
-    <nav class="tabs" role="tablist">
-      <button class="tab active" data-tab="adypu" role="tab" aria-selected="true">ADYPU</button>
-      <button class="tab" data-tab="partners" role="tab" aria-selected="false">Knowledge Partner</button>
-    </nav>
+    <div class="header-controls">
+      <nav class="tabs" role="tablist">
+        <button class="tab active" data-tab="adypu" role="tab" aria-selected="true">ADYPU</button>
+        <button class="tab" data-tab="partners" role="tab" aria-selected="false">Knowledge Partner</button>
+      </nav>
+      <button class="theme-toggle no-print" id="theme-toggle" type="button" aria-label="Switch to dark mode" aria-pressed="false" title="Switch theme">
+        <svg class="theme-icon-moon" aria-hidden="true"><use href="#icon-moon"/></svg>
+        <svg class="theme-icon-sun" aria-hidden="true"><use href="#icon-sun"/></svg>
+      </button>
+    </div>
   </div>
 </header>
 
