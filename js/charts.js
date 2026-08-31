@@ -130,9 +130,12 @@ window.Charts = (function () {
 
     el.innerHTML =
       '<svg class="trend" viewBox="0 0 ' + w + ' ' + h + '" role="img" aria-label="Attendance percentage by day">' +
-        '<line class="trend-grid" x1="' + pad + '" x2="' + (w - pad) + '" y1="' + (h - pad - 0.75 * (h - pad * 2)) + '" y2="' + (h - pad - 0.75 * (h - pad * 2)) + '"/>' +
         '<polygon class="trend-area" points="' + area + '"/>' +
         '<polyline class="trend-line" points="' + line + '"/>' +
+        // After the area, not before it: SVG paints in document order, so a
+        // 75% line drawn first is buried by the fill for every day at or above
+        // 75% — exactly the days you are checking the rule against.
+        '<line class="trend-grid" x1="' + pad + '" x2="' + (w - pad) + '" y1="' + (h - pad - 0.75 * (h - pad * 2)) + '" y2="' + (h - pad - 0.75 * (h - pad * 2)) + '"/>' +
         pts.map(function (p) {
           var v = pct(p.d.present, p.d.strength);
           return '<circle class="trend-dot" cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="3">' +
