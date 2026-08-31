@@ -187,6 +187,9 @@ function parse_attendance_csv(string $csv, ?array &$skipped = null): array {
         $rows[] = $class + [
             'present' => (int) ($r['present'] ?? 0),
             'date'    => $date,
+            // Who filed it. Presentational only: it never touches a count, so
+            // a missing or misspelt name costs nothing but the attribution.
+            'faculty' => first_value($header, $fields, 'faculty'),
         ];
     }
     return $rows;
@@ -214,6 +217,24 @@ function day_map(array $rows): array {
     }
     ksort($days);
     return $days;
+}
+
+// date => class key => faculty name, parallel to day_map() and keyed the same
+// way, so the later row wins there and here alike. Kept beside the day map
+// rather than inside it because every reader of that map wants a plain int:
+// making the value a pair would touch aggregate_days, class_dates and the
+// tests to carry a string none of them use.
+//
+// Rows with no name are skipped rather than stored empty — the Form only grew
+// the question in Aug 2026, so most of the history has none.
+function faculty_map(array $rows): array {
+    $names = [];
+    foreach ($rows as $r) {
+        $name = trim((string) ($r['faculty'] ?? ''));
+        if ($name !== '') $names[$r['date']][class_key($r)] = $name;
+    }
+    ksort($names);
+    return $names;
 }
 
 // Which dates a request actually covers. A missing end defaults to the newest
@@ -349,6 +370,15 @@ function get_attendance_days(): array {
     // the same story instead of one showing numbers and the other "no data".
     if ($cached !== null) return [];
     return day_map(sample_attendance_rows());
+}
+
+// The faculty names beside the day map, or nothing at all: a cache written
+// before the Form asked for a name has no such key, and neither do the sample
+// rows. Every caller must treat an absent name as "not recorded", never as an
+// error — the attendance numbers stand on their own.
+function get_attendance_faculty(): array {
+    $cached = read_attendance_cache();
+    return is_array($cached['faculty'] ?? null) ? $cached['faculty'] : [];
 }
 
 function get_attendance(?string $from = null, ?string $to = null): array {

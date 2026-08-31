@@ -33,6 +33,10 @@
  * dashboard's date range filters on; without it a row falls back to the day it
  * was submitted. See toCsv(): Date cells are formatted yyyy-MM-dd for the
  * parser, and that must not change.
+ *
+ * A question whose title starts with "Faculty" is picked up as who filed the
+ * row, and shown against the division in the drill-down modal. It is optional
+ * and purely presentational: rows without one count exactly the same.
  */
 
 const INGEST_URL = 'https://YOUR-SITE.rf.gd/api/ingest.php';

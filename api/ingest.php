@@ -58,7 +58,8 @@ $days = day_map($rows);
 if (!is_dir(dirname(ATTENDANCE_CACHE_FILE))) {
     @mkdir(dirname(ATTENDANCE_CACHE_FILE), 0775, true);
 }
-if (@file_put_contents(ATTENDANCE_CACHE_FILE, json_encode(['days' => $days])) === false) {
+$payload = ['days' => $days, 'faculty' => faculty_map($rows)];
+if (@file_put_contents(ATTENDANCE_CACHE_FILE, json_encode($payload)) === false) {
     fail(500, 'could not write the cache file — check that cache/ is writable');
 }
 

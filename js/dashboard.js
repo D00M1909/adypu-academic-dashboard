@@ -3,6 +3,15 @@
   var modal = document.getElementById('division-modal');
   var breadcrumb = document.getElementById('breadcrumb');
 
+  // Every other string built into innerHTML here comes from structure.php and
+  // is ours. Faculty names are typed by a human into a public Google Form, so
+  // they are the one untrusted value on the page and get escaped on the way in.
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+
   document.querySelectorAll('.tab').forEach(function (tab) {
     tab.addEventListener('click', function () {
       document.querySelectorAll('.tab').forEach(function (t) {
@@ -441,9 +450,17 @@
           ? '<span class="division-days" title="Reported on ' + dates.join(', ') + '">avg of ' +
               dates.length + ' days</span>'
           : '';
+        // Who filed it. Names only exist from the day the Form started asking,
+        // so an older range shows the count with no name rather than an
+        // "unknown" that would read as a fault.
+        var names = d.faculty || [];
+        var by = names.length
+          ? '<span class="division-by" title="' + esc(names.join(', ')) + '">by ' +
+              esc(names.length > 1 ? names[0] + ' +' + (names.length - 1) : names[0]) + '</span>'
+          : '';
         row.innerHTML =
           '<div class="division-row-top">' +
-            '<span class="division-name">Division ' + d.division + days + '</span>' +
+            '<span class="division-name">Division ' + d.division + days + by + '</span>' +
             '<span class="division-count">' + readout + '</span>' +
           '</div>' +
           '<div class="division-bar"><div class="division-bar-fill ' +
