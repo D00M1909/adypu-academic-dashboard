@@ -280,6 +280,70 @@ window.Charts = (function () {
       ' classes reported on ' + esc(shortDate(series[series.length - 1].date)) + '</p>';
   }
 
+  // Every class under the current selection, flattened to one row each, with
+  // the part of its path the selection does not already fix. Grouped by the
+  // (year, branch) it came from, which is what decides whether the table is
+  // worth showing at all: one group means the divisions grid above is already
+  // this table.
+  function classBreakdown(state) {
+    var school = (window.ATTENDANCE_DATA || {})[state.school] || {};
+    var branchFixed = state.branch !== null && state.branch !== undefined;
+    var rows = [];
+    var groups = {};
+
+    Object.keys(school).forEach(function (year) {
+      if (state.year && year !== state.year) return;
+      Object.keys(school[year]).forEach(function (branch) {
+        if (branchFixed && branch !== state.branch) return;
+        groups[year + '|' + branch] = true;
+        school[year][branch].forEach(function (d) {
+          var path = [];
+          if (!state.year) path.push(year);
+          if (!branchFixed && branch) path.push(branch);
+          path.push('Division ' + d.division);
+          rows.push({
+            label: path.join(' / '),
+            strength: d.strength,
+            present: d.present,
+            reported: d.reported,
+            days: d.days,
+          });
+        });
+      });
+    });
+
+    return { rows: rows, groups: Object.keys(groups).length };
+  }
+
+  // The school report. A drill-down is a thing you click; a PDF is not, so a
+  // school's export has to name its classes rather than point at a grid of
+  // tiles that only exists two clicks away.
+  function renderBreakdown(section, meta, tbody, state) {
+    var out = state.school ? classBreakdown(state) : { rows: [], groups: 0 };
+    // One group is the divisions grid, which prints already. No school
+    // selected is the whole university, where the schools grid and the ranking
+    // chart are the breakdown.
+    section.hidden = out.groups < 2 || !out.rows.length;
+    if (section.hidden) return;
+
+    var scope = [window.SCHOOLS[state.school].name.replace(/^School of /, '')];
+    if (state.year) scope.push(state.year);
+    meta.textContent = scope.join(' · ') + ' · ' + out.rows.length + ' classes';
+
+    tbody.innerHTML = out.rows.map(function (r) {
+      var p = pct(r.present, r.strength);
+      // An unreported class keeps its row: it is part of the school whether or
+      // not anyone filed for it, and its absence from a report is exactly the
+      // thing a head of school needs to see.
+      var figures = r.reported
+        ? '<td>' + r.days + '</td>' +
+          '<td>' + r.present + '<span class="report-table-sep">/</span>' + r.strength + '</td>' +
+          '<td><span class="att-pct ' + attClass(p) + '">' + p + '%</span></td>'
+        : '<td>0</td><td colspan="2"><span class="tile-unreported">Not reported</span></td>';
+      return '<tr><th scope="row">' + esc(r.label) + '</th>' + figures + '</tr>';
+    }).join('');
+  }
+
   // Every day in the range that reported inside the scope, as numbers rather
   // than as a shape. Same series as the trend chart, so the two can never
   // disagree, and same rule about a day nobody reported: absent from the table
@@ -301,7 +365,7 @@ window.Charts = (function () {
       return '<tr>' +
         '<th scope="row">' + esc(longDate(d.date)) + '</th>' +
         '<td>' + d.reported + '</td>' +
-        '<td>' + d.present + '<span class="day-table-sep">/</span>' + d.strength + '</td>' +
+        '<td>' + d.present + '<span class="report-table-sep">/</span>' + d.strength + '</td>' +
         '<td><span class="att-pct ' + attClass(p) + '">' + p + '%</span></td>' +
       '</tr>';
     }).join('');
@@ -315,6 +379,12 @@ window.Charts = (function () {
     renderTrend(document.getElementById('chart-trend'), prefix);
     renderBars(document.getElementById('chart-bars'), document.getElementById('chart-bars-caption'), state);
     renderCompliance(document.getElementById('chart-compliance'), prefix);
+    renderBreakdown(
+      document.getElementById('breakdown-section'),
+      document.getElementById('breakdown-meta'),
+      document.getElementById('breakdown-rows'),
+      state
+    );
     renderDays(
       document.getElementById('daybyday-section'),
       document.getElementById('daybyday-meta'),

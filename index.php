@@ -338,6 +338,29 @@ try {
       </div>
     </section>
 
+    <!-- Every class under the current selection, filled by js/charts.js. Shown
+         only when the selection still has more than one group under it (a
+         school, or a year of a school that has branches): drill as far as a
+         branch and the divisions grid above already is this table, so printing
+         both would say everything twice. -->
+    <section class="tile-section" id="breakdown-section" hidden>
+      <div class="section-title">
+        <h2>Class breakdown</h2>
+        <span class="section-meta" id="breakdown-meta"></span>
+      </div>
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th scope="col">Class</th>
+            <th scope="col">Days reported</th>
+            <th scope="col">Present</th>
+            <th scope="col">Attendance</th>
+          </tr>
+        </thead>
+        <tbody id="breakdown-rows"></tbody>
+      </table>
+    </section>
+
     <!-- The range, day by day. Filled by js/charts.js from the same scoped
          series the trend chart draws, so it follows the drill-down; hidden on a
          single-day range, where it would only repeat the stat tiles. Its real
@@ -348,7 +371,7 @@ try {
         <h2>Day by day</h2>
         <span class="section-meta" id="daybyday-meta"></span>
       </div>
-      <table class="day-table">
+      <table class="report-table">
         <thead>
           <tr>
             <th scope="col">Date</th>

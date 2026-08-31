@@ -93,6 +93,70 @@ assert(els['chart-trend'].innerHTML.includes('50% (1 classes)'), 'division scope
 assert(els['chart-trend'].innerHTML.includes('90% (1 classes)'), 'division scope lost day 2');
 assert(els['chart-compliance'].innerHTML.includes('1 of 1 classes reported'), 'division scope wrong');
 
+// --- Class breakdown: the export's school report ----------------------------
+// A bigger tree than the shared fixture, swapped in just for this block: the
+// table's whole point is a school with several years and branches, and growing
+// the fixture above to suit it would rewrite every count already asserted.
+const sharedData = window.ATTENDANCE_DATA;
+window.ATTENDANCE_DATA = {
+  eng: {
+    '1st Year': { Core: [
+      { division: 'A', strength: 60, present: 45, reported: true, days: 2 },
+      { division: 'B', strength: 60, present: 0, reported: false, days: 0 },
+    ] },
+    '2nd Year': {
+      CSE: [{ division: 'A', strength: 60, present: 48, reported: true, days: 2 }],
+      ECE: [{ division: 'A', strength: 60, present: 30, reported: true, days: 1 }],
+    },
+  },
+  law: { '1st Year': { '': [
+    { division: 'A', strength: 50, present: 40, reported: true, days: 2 },
+  ] } },
+};
+
+// A whole school: every class, each labelled with the year and branch the
+// selection has not already fixed.
+window.Charts.render({ school: 'eng', year: null, branch: null },
+  { present: 123, strengthReported: 180, reported: 3, classes: 4 });
+const breakdown = els['breakdown-rows'].innerHTML;
+assert(els['breakdown-section'].hidden === false, 'a school should show its class breakdown');
+assert(els['breakdown-meta'].textContent === 'Engineering · 4 classes',
+  'breakdown scope label wrong: ' + els['breakdown-meta'].textContent);
+assert(breakdown.includes('1st Year / Core / Division A'), 'row label should carry year and branch');
+assert(breakdown.includes('2nd Year / ECE / Division A'), 'later years missing from the breakdown');
+assert(breakdown.includes('75%') && breakdown.includes('80%') && breakdown.includes('50%'),
+  'per-class percentages wrong: ' + breakdown);
+// An unreported class is part of the school whether or not anyone filed for
+// it, and saying so is most of why a head of school wants this page.
+assert(breakdown.includes('Not reported'), 'unreported class dropped from the breakdown');
+assert(!breakdown.includes('>0%<'), 'unreported class drawn as a 0% reading');
+
+// One year of a school that has branches: the year is fixed, so it leaves the
+// labels, and the branches are what the table is comparing.
+window.Charts.render({ school: 'eng', year: '2nd Year', branch: null },
+  { present: 78, strengthReported: 120, reported: 2, classes: 2 });
+assert(els['breakdown-section'].hidden === false, 'a year with branches should show the breakdown');
+assert(els['breakdown-rows'].innerHTML.includes('CSE / Division A'), 'branch missing from the row label');
+assert(!els['breakdown-rows'].innerHTML.includes('2nd Year /'), 'the selected year should not repeat in every row');
+
+// Drilled to a branch, the divisions grid on the page already IS this table.
+window.Charts.render({ school: 'eng', year: '2nd Year', branch: 'CSE' },
+  { present: 48, strengthReported: 60, reported: 1, classes: 1 });
+assert(els['breakdown-section'].hidden === true, 'a branch should not print its divisions twice');
+
+// Same for a branchless school's year: selecting it lands straight on the
+// divisions grid.
+window.Charts.render({ school: 'law', year: '1st Year', branch: null },
+  { present: 40, strengthReported: 50, reported: 1, classes: 1 });
+assert(els['breakdown-section'].hidden === true, 'a branchless year should not print its divisions twice');
+
+// Root: 103 classes is not a breakdown, it is the whole database.
+window.Charts.render({ school: null, year: null, branch: null },
+  { present: 163, strengthReported: 230, reported: 4, classes: 5 });
+assert(els['breakdown-section'].hidden === true, 'no school selected should show no breakdown');
+
+window.ATTENDANCE_DATA = sharedData;
+
 // --- Day by day: the same series as the trend, stated as numbers ------------
 // Root scope, two days: 27 Aug is 140/200 (70%), 28 Aug is 230/300 (77%). The
 // table has to agree with the trend chart exactly, since a printed report is
