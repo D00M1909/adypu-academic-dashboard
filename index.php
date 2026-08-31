@@ -337,6 +337,29 @@ try {
         </figure>
       </div>
     </section>
+
+    <!-- The range, day by day. Filled by js/charts.js from the same scoped
+         series the trend chart draws, so it follows the drill-down; hidden on a
+         single-day range, where it would only repeat the stat tiles. Its real
+         job is the PDF: a chart shows the shape of a fortnight, but a report
+         has to state the numbers it was read from. -->
+    <section class="tile-section" id="daybyday-section" hidden>
+      <div class="section-title">
+        <h2>Day by day</h2>
+        <span class="section-meta" id="daybyday-meta"></span>
+      </div>
+      <table class="day-table">
+        <thead>
+          <tr>
+            <th scope="col">Date</th>
+            <th scope="col">Classes reported</th>
+            <th scope="col">Present</th>
+            <th scope="col">Attendance</th>
+          </tr>
+        </thead>
+        <tbody id="daybyday-rows"></tbody>
+      </table>
+    </section>
   </div>
 
   <div id="tab-partners" class="tab-panel" hidden>

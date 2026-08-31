@@ -583,6 +583,40 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
 
 /* An average over several days has to say so, or two days out of seven reads
    as the whole week. */
+/* The day-by-day table. Same card as a chart, so the section reads as part of
+   the same report rather than as a spreadsheet someone pasted in. */
+.day-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface-raised);
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  font-size: 13px;
+}
+.day-table th,
+.day-table td {
+  padding: 9px 14px;
+  text-align: right;
+  border-bottom: 1px solid var(--hairline);
+  white-space: nowrap;
+}
+.day-table thead th {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink-muted);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+/* The date is the row's label, so it leads; every other column is a number and
+   right-aligns, which is what makes a column of them scannable. */
+.day-table th:first-child { text-align: left; font-weight: 600; color: var(--ink); }
+.day-table tbody tr:last-child th,
+.day-table tbody tr:last-child td { border-bottom: 0; }
+.day-table td { font-variant-numeric: tabular-nums; color: var(--ink-muted); }
+.day-table-sep { color: var(--ink-faint); padding: 0 2px; }
+
 .division-days,
 .division-by {
   margin-left: 8px;
@@ -770,6 +804,14 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
   .chart-grid { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
   .chart-card { padding: 10px; }
   .no-print { display: none !important; }
+  /* A month of rows is taller than a page, and .tile-section above forbids
+     breaking, which would push the whole table off the end of the report. This
+     one section breaks between rows instead, repeating its header row on each
+     page so the second page's numbers still say what they are. */
+  #daybyday-section { break-inside: auto; page-break-inside: auto; }
+  .day-table { box-shadow: none; font-size: 11px; }
+  .day-table thead { display: table-header-group; }
+  .day-table tr { break-inside: avoid; page-break-inside: avoid; }
   /* Drilled in, the breadcrumb states the school, year and branch in one
      line, so printing three grids of tiles to say the same thing again buys
      nothing but a page. The divisions stay: they are the data, not the path. */
