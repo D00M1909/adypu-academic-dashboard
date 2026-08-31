@@ -23,13 +23,19 @@ $total = attendance_totals([$school => [$year => [$branch => $divisions]]]);
 
 // The dates behind each average. A division that reported two days of a seven
 // day range must not be able to look like it reported the week.
+$faculty = get_attendance_faculty();
 foreach ($divisions as &$d) {
-    $d['dates'] = $d['reported']
-        ? class_dates($days, class_key([
-            'school' => $school, 'year' => $year,
-            'branch' => $branch, 'division' => $d['division'],
-        ]), $from, $to)
-        : [];
+    $key = class_key([
+        'school' => $school, 'year' => $year,
+        'branch' => $branch, 'division' => $d['division'],
+    ]);
+    $d['dates'] = $d['reported'] ? class_dates($days, $key, $from, $to) : [];
+    // Who filed those days. Distinct names, in date order: a range can span
+    // two faculty covering the same class, and a substitution is worth seeing
+    // rather than flattening to whoever happened to submit last.
+    $d['faculty'] = array_values(array_unique(array_filter(
+        array_map(fn($date) => $faculty[$date][$key] ?? '', $d['dates'])
+    )));
 }
 unset($d);
 

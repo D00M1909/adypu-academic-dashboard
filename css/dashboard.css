@@ -583,7 +583,8 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
 
 /* An average over several days has to say so, or two days out of seven reads
    as the whole week. */
-.division-days {
+.division-days,
+.division-by {
   margin-left: 8px;
   font-size: 11.5px;
   font-weight: 500;

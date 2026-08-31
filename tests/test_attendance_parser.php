@@ -290,6 +290,38 @@ assert(class_dates($days, 'law|2nd Year||A', '2026-08-24', '2026-08-26') ===
     ['2026-08-24', '2026-08-25', '2026-08-26'], 'reported dates wrong');
 assert(class_dates($days, 'law|2nd Year||B', '2026-08-24', '2026-08-25') === [], 'dates outside the range leaked in');
 
+// --- Faculty names: attribution only, never a count -------------------------
+// The Form grew a name question in Aug 2026, so the sheet carries rows with a
+// name and rows without, and both must count exactly the same.
+$named = "timestamp,faculty name,class,present,date\n" .
+         '"2026-08-27","Dr. Meera Rao","School of Law / 2nd Year / A","20","2026-08-24"' . "\n" .
+         '"2026-08-27","","School of Law / 2nd Year / B","40","2026-08-24"' . "\n" .        // no name given
+         '"2026-08-27","Prof. S. Iyer","School of Law / 2nd Year / A","30","2026-08-25"' . "\n" . // cover for the same class
+         '"2026-08-27","Dr. Meera Rao","School of Law / 2nd Year / A","28","2026-08-26"' . "\n";
+
+$nRows = parse_attendance_csv($named);
+assert(count($nRows) === 4, 'a name column must not drop rows: ' . count($nRows));
+assert($nRows[0]['faculty'] === 'Dr. Meera Rao', 'faculty name not captured: ' . $nRows[0]['faculty']);
+assert($nRows[1]['faculty'] === '', 'a blank name must stay blank, not inherit the row above');
+
+// The name rides beside the day map, keyed identically, and never reaches the
+// numbers: same rows, same counts, with or without names.
+$nDays = day_map($nRows);
+$nNames = faculty_map($nRows);
+assert(array_keys($nNames) === ['2026-08-24', '2026-08-25', '2026-08-26'], 'faculty map should be keyed by day');
+assert($nNames['2026-08-24']['law|2nd Year||A'] === 'Dr. Meera Rao', 'faculty name lost its class key');
+assert(!isset($nNames['2026-08-24']['law|2nd Year||B']), 'a nameless row must not be stored empty');
+assert(find_div(aggregate_days($nDays, '2026-08-24', '2026-08-26'), 'law', '2nd Year', '', 'A')['present'] === 26,
+    'names must not disturb the average of 20/30/28');
+
+// What api/division.php hands the modal: the distinct names over the days the
+// class actually reported, in date order, so a substitution is visible.
+$aDates = class_dates($nDays, 'law|2nd Year||A', '2026-08-24', '2026-08-26');
+$aNames = array_values(array_unique(array_filter(
+    array_map(fn($date) => $nNames[$date]['law|2nd Year||A'] ?? '', $aDates)
+)));
+assert($aNames === ['Dr. Meera Rao', 'Prof. S. Iyer'], 'expected both faculty once: ' . implode(', ', $aNames));
+
 // --- Percentages divide by the classes that reported ------------------------
 // Diluting by classes that never filled the form in reads as an empty
 // university at 9am rather than as a missing form. attendance_pct pairs with
