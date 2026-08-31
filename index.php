@@ -89,6 +89,7 @@ $shortSchool = fn(string $id): string => preg_replace('/^School of /', '', SCHOO
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ADYPU Academic Dashboard</title>
+<link rel="icon" href="img/favicon.png?v=<?= filemtime(__DIR__ . '/img/favicon.png') ?>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
