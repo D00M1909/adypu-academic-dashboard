@@ -45,6 +45,14 @@ window.Charts = (function () {
     return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
   }
 
+  // The weekday earns its space: a Sunday with three classes reporting is a
+  // different story from a Tuesday with three, and only one of them is a
+  // problem.
+  function longDate(iso) {
+    var d = new Date(iso + 'T00:00:00');
+    return d.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+  }
+
   function empty(el, message) {
     el.innerHTML = '<p class="chart-empty">' + esc(message) + '</p>';
   }
@@ -272,6 +280,33 @@ window.Charts = (function () {
       ' classes reported on ' + esc(shortDate(series[series.length - 1].date)) + '</p>';
   }
 
+  // Every day in the range that reported inside the scope, as numbers rather
+  // than as a shape. Same series as the trend chart, so the two can never
+  // disagree, and same rule about a day nobody reported: absent from the table
+  // rather than a row of zeroes that reads as an empty campus.
+  //
+  // No total row on purpose. A range averages rather than sums (see
+  // aggregate_days in includes/attendance.php), so the only honest total is
+  // the one already on the stat tiles above, and a second one computed a
+  // different way here would sooner or later disagree with it in public.
+  function renderDays(section, meta, tbody, prefix) {
+    var series = dailySeries(prefix);
+    // One day is not a breakdown: the tiles above already say it, twice.
+    section.hidden = series.length < 2;
+    if (section.hidden) return;
+
+    meta.textContent = series.length + ' days with data';
+    tbody.innerHTML = series.map(function (d) {
+      var p = pct(d.present, d.strength);
+      return '<tr>' +
+        '<th scope="row">' + esc(longDate(d.date)) + '</th>' +
+        '<td>' + d.reported + '</td>' +
+        '<td>' + d.present + '<span class="day-table-sep">/</span>' + d.strength + '</td>' +
+        '<td><span class="att-pct ' + attClass(p) + '">' + p + '%</span></td>' +
+      '</tr>';
+    }).join('');
+  }
+
   // Called by dashboard.js on every selection change. totals comes from
   // scopeTotals() there rather than being recomputed here.
   function render(state, totals) {
@@ -280,6 +315,12 @@ window.Charts = (function () {
     renderTrend(document.getElementById('chart-trend'), prefix);
     renderBars(document.getElementById('chart-bars'), document.getElementById('chart-bars-caption'), state);
     renderCompliance(document.getElementById('chart-compliance'), prefix);
+    renderDays(
+      document.getElementById('daybyday-section'),
+      document.getElementById('daybyday-meta'),
+      document.getElementById('daybyday-rows'),
+      prefix
+    );
     document.getElementById('charts-scope').textContent = window.ATTENDANCE_RANGE.label;
   }
 

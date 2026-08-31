@@ -93,6 +93,31 @@ assert(els['chart-trend'].innerHTML.includes('50% (1 classes)'), 'division scope
 assert(els['chart-trend'].innerHTML.includes('90% (1 classes)'), 'division scope lost day 2');
 assert(els['chart-compliance'].innerHTML.includes('1 of 1 classes reported'), 'division scope wrong');
 
+// --- Day by day: the same series as the trend, stated as numbers ------------
+// Root scope, two days: 27 Aug is 140/200 (70%), 28 Aug is 230/300 (77%). The
+// table has to agree with the trend chart exactly, since a printed report is
+// checked against it.
+window.Charts.render({ school: null, year: null, branch: null },
+  { present: 215, strengthReported: 300, reported: 3, classes: 4 });
+const dayRows = els['daybyday-rows'].innerHTML;
+assert(els['daybyday-section'].hidden === false, 'a two-day range should show the breakdown');
+assert(els['daybyday-meta'].textContent === '2 days with data', 'day count wrong: ' + els['daybyday-meta'].textContent);
+assert(dayRows.includes('70%') && dayRows.includes('77%'), 'day percentages wrong: ' + dayRows);
+assert(dayRows.indexOf('70%') < dayRows.indexOf('77%'), 'days should be in date order');
+assert(dayRows.includes('>140<') && dayRows.includes('>200<'), 'a day should state present and strength');
+assert(dayRows.includes('Thu, 27 Aug 2026'), 'date label wrong: ' + dayRows);
+
+// Scoped to one division, the same table follows the drill-down.
+window.Charts.render({ school: 'eng', year: '1st Year', branch: 'Core', division: 'A' },
+  { present: 70, strengthReported: 100, reported: 1, classes: 1 });
+assert(els['daybyday-rows'].innerHTML.includes('50%'), 'breakdown did not rescope to the division');
+
+// A day nobody reported inside the scope is left out, not drawn as zero: eng
+// division B reported only on 28 Aug.
+window.Charts.render({ school: 'eng', year: '1st Year', branch: 'Core', division: 'B' },
+  { present: 60, strengthReported: 100, reported: 1, classes: 1 });
+assert(els['daybyday-section'].hidden === true, 'one reporting day is not a breakdown');
+
 // Nothing selected that has data at all.
 window.Charts.render({ school: 'eng', year: '1st Year', branch: 'Core' },
   { present: 0, strengthReported: 0, reported: 0, classes: 2 });
