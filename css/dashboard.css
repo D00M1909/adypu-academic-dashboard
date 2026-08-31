@@ -810,6 +810,13 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
      page so the second page's numbers still say what they are. */
   #daybyday-section,
   #breakdown-section { break-inside: auto; page-break-inside: auto; }
+  /* A heading is not content: alone at the foot of a page it promises a table
+     that is not there. These two sections are the only ones allowed to break,
+     so they are the only ones that could strand one, but the rule is on every
+     section title because the answer is the same wherever it happens. The
+     header row goes with them, for the same reason at the top of page two. */
+  .section-title { break-after: avoid; page-break-after: avoid; }
+  .report-table thead { break-after: avoid; page-break-after: avoid; }
   .report-table { box-shadow: none; font-size: 11px; }
   .report-table thead { display: table-header-group; }
   .report-table tr { break-inside: avoid; page-break-inside: avoid; }
