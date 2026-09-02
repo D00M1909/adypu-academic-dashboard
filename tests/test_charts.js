@@ -22,9 +22,19 @@ global.window = {
     'eng|1st Year|Core|A': 100, 'eng|1st Year|Core|B': 100,
     'law|1st Year||A': 100, 'law|1st Year||B': 100,
   },
+  // One entry per lecture, as the cache stores them. eng division A is reported
+  // twice a day, and the day's number is the LATEST of the two (50, then 90),
+  // never their mean — dayPresent() mirrors day_present() in PHP.
   ATTENDANCE_DAYS: {
-    '2026-08-27': { 'eng|1st Year|Core|A': 50, 'law|1st Year||A': 90 },
-    '2026-08-28': { 'eng|1st Year|Core|A': 90, 'eng|1st Year|Core|B': 60, 'law|1st Year||A': 80 },
+    '2026-08-27': {
+      'eng|1st Year|Core|A': { '09:30': 40, '11:30': 50 },
+      'law|1st Year||A': { '09:30': 90 },
+    },
+    '2026-08-28': {
+      'eng|1st Year|Core|A': { '09:30': 95, '14:15': 90 },
+      'eng|1st Year|Core|B': { '10:30': 60 },
+      'law|1st Year||A': { '09:30': 80 },
+    },
   },
   ATTENDANCE_DATA: {
     eng: { '1st Year': { Core: [
@@ -130,6 +140,15 @@ assert(breakdown.includes('75%') && breakdown.includes('80%') && breakdown.inclu
 // it, and saying so is most of why a head of school wants this page.
 assert(breakdown.includes('Not reported'), 'unreported class dropped from the breakdown');
 assert(!breakdown.includes('>0%<'), 'unreported class drawn as a 0% reading');
+
+// Every entry behind a class's number is printed under it, so the report states
+// the readings it was read from rather than only their headline.
+assert((breakdown.match(/report-subrow/g) || []).length === 4,
+  'a class reported twice a day over two days should list all four readings');
+assert(breakdown.includes('27 Aug · 09:30') && breakdown.includes('28 Aug · 14:15'),
+  'reading sub-rows should name the day and the lecture: ' + breakdown);
+// A class with a single reading would only repeat its own row.
+assert(!breakdown.includes('10:30'), 'a lone reading should not get a sub-row of its own');
 
 // One year of a school that has branches: the year is fixed, so it leaves the
 // labels, and the branches are what the table is comparing.

@@ -388,6 +388,10 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
   padding: 24px;
   width: 100%;
   max-width: 460px;
+  /* Listing every lecture under every division makes this as tall as the range
+     is long, so it scrolls rather than running off the top of the viewport. */
+  max-height: 85vh;
+  overflow-y: auto;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
   transform: translateY(10px) scale(0.97);
   opacity: 0;
@@ -622,6 +626,34 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
 .report-table tbody tr:last-child td { border-bottom: 0; }
 .report-table td { font-variant-numeric: tabular-nums; color: var(--ink-muted); }
 .report-table-sep { color: var(--ink-faint); padding: 0 2px; }
+
+/* One line per lecture, under the division it belongs to. Indented and dimmed:
+   the number above is what you read first, this is what it rests on. */
+.division-readings {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0 0 0 10px;
+  border-left: 1px solid var(--hairline);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.division-readings li {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--ink-muted);
+}
+.reading-when { font-variant-numeric: tabular-nums; }
+.reading-count { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.reading-by { color: var(--ink-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* A class's own lectures in the printed report, under its row. The indent is
+   what separates them from the class rows, which are the ones being compared. */
+.report-subrow th { font-weight: 400; padding-left: 18px; color: var(--ink-muted); }
+.report-subrow th,
+.report-subrow td { font-size: 11.5px; }
 
 .division-days,
 .division-times,
