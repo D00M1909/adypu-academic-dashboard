@@ -37,6 +37,12 @@
  * A question whose title starts with "Faculty" is picked up as who filed the
  * row, and shown against the division in the drill-down modal. It is optional
  * and purely presentational: rows without one count exactly the same.
+ *
+ * A question whose title starts with "Time" is which lecture the reading is
+ * for, so a class its faculty report after each of their own lectures keeps
+ * every reading instead of the last one replacing the rest. Also optional: with
+ * no such question the submission time stands in, rounded to the hour. It must
+ * not be titled "Timestamp", which is the sheet's own submission column.
  */
 
 const INGEST_URL = 'https://YOUR-SITE.rf.gd/api/ingest.php';
@@ -176,7 +182,9 @@ function pushStatus() {
 /**
  * The header row is what the PHP parser matches on, so it is lowercased here
  * and nowhere else. Dates become yyyy-mm-dd because that is the format the
- * parser compares when deciding which of a class's readings is the latest.
+ * parser compares when deciding which of a class's readings is the latest, and
+ * they keep their clock because that is what separates one lecture's reading
+ * from the next one's. row_date() reads the date and ignores the rest.
  */
 function toCsv(values) {
   return values
@@ -190,7 +198,7 @@ function toCsv(values) {
 
 function format(cell) {
   if (cell instanceof Date) {
-    return Utilities.formatDate(cell, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    return Utilities.formatDate(cell, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
   }
   return String(cell);
 }

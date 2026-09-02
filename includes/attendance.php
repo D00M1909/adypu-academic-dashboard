@@ -113,6 +113,46 @@ function row_date(string $value): ?string {
     return null;
 }
 
+// HH:MM out of whatever a cell holds, or ''. Three shapes reach this: a Form
+// "Time" question, which Apps Script hands over as an 1899-12-30 date with the
+// clock set; a submission timestamp, a real date and time; and a hand-typed
+// "2:15 PM". Only the clock is kept — which day it was is row_date()'s job.
+function row_time(string $value): string {
+    if (!preg_match('/\b(\d{1,2}):([0-5]\d)/', $value, $m)) return '';
+    $hour = (int) $m[1];
+    if (preg_match('/\b([ap])\.?m\.?\b/i', $value, $ap)) {
+        $hour = $hour % 12 + (strtolower($ap[1]) === 'p' ? 12 : 0);
+    }
+    // Junk hours ('99:00') give nothing rather than an invented slot, so the
+    // caller falls through to its next candidate.
+    return $hour < 24 ? sprintf('%02d:%s', $hour, $m[2]) : '';
+}
+
+// Which lecture a reading belongs to. Each faculty member takes attendance for
+// their own lecture, so one class reports several times a day; without a slot
+// they all key on the day and the last submission silently replaces the rest.
+//
+// A Form "Time" question wins, for the same reason the Date question does: the
+// 9am lecture filled in at 5pm must not file itself at 5pm. Its header must
+// start with "Time" — so does "Timestamp", which is why the submission column
+// is excluded here and used only as the fallback. Repeated per section like
+// every other question, hence the loop rather than the first match.
+//
+// The fallback rounds down to the hour on purpose: a correction filed a minute
+// after the original has to land on the same slot and overwrite it, while the
+// next lecture, an hour or more later, gets its own.
+// ponytail: hourly buckets, so two lectures inside one hour merge. Add the
+// Time question to the Form if that ever matters.
+function row_slot(array $header, array $fields): string {
+    foreach ($header as $i => $name) {
+        if (!str_starts_with($name, 'time') || str_starts_with($name, 'timestamp')) continue;
+        $time = row_time((string) ($fields[$i] ?? ''));
+        if ($time !== '') return $time;
+    }
+    $stamp = row_time(first_value($header, $fields, 'timestamp'));
+    return $stamp === '' ? '' : substr($stamp, 0, 2) . ':00';
+}
+
 // Resolves one CSV row to a real class. Two row shapes are accepted: a "class"
 // column holding a full label ("School of Engineering / 2nd Year / CSE / A"),
 // and the four separate columns a hand-maintained sheet or the DB export uses. Either
@@ -210,6 +250,9 @@ function parse_attendance_csv(string $csv, ?array &$skipped = null): array {
             // Who filed it. Presentational only: it never touches a count, so
             // a missing or misspelt name costs nothing but the attribution.
             'faculty' => first_value($header, $fields, 'faculty'),
+            // Which lecture of that day. '' means the sheet carried no clock
+            // at all, which is how every row before Aug 2026 behaves.
+            'time'    => row_slot($header, $fields),
         ];
     }
     return $rows;
@@ -221,26 +264,50 @@ function class_key(array $c): string {
     return $c['school'] . '|' . $c['year'] . '|' . $c['branch'] . '|' . $c['division'];
 }
 
-// date => class key => present. This is what the cache stores: one number per
-// class per day, so any range can be rebuilt, and small enough to json_decode
-// on every request where keeping the raw rows would not be.
+// date => class key => time => present. This is what the cache stores: one
+// number per class per LECTURE, so any range can be rebuilt and a class whose
+// faculty each file after their own lecture keeps every reading. Still small
+// enough to json_decode on every request where the raw rows would not be.
 //
-// A class submitting twice on the same day overwrites, so the later row wins —
-// rows arrive in sheet order, and a resubmission is a correction.
+// Two rows for the same class, day and slot overwrite, so the later wins — rows
+// arrive in sheet order, and a resubmission at the same slot is a correction.
+// A row with no time keys under '', which is exactly how the whole history
+// behaved before the sheet carried a clock: one reading a day, the last wins.
 //
-// ponytail: grows without bound, roughly 600KB a school year. Prune to a
+// ponytail: grows without bound, roughly 900KB a school year. Prune to a
 // rolling window, or move to db/schema.sql, when the decode starts to hurt.
 function day_map(array $rows): array {
     $days = [];
     foreach ($rows as $r) {
-        $days[$r['date']][class_key($r)] = (int) $r['present'];
+        $days[$r['date']][class_key($r)][$r['time'] ?? ''] = (int) $r['present'];
     }
     ksort($days);
+    // Chronological within the day, so "the first reading" means something and
+    // the cache file stays readable when you go looking in it.
+    foreach ($days as $date => $classes) {
+        foreach ($classes as $key => $times) {
+            ksort($times);
+            $days[$date][$key] = $times;
+        }
+    }
     return $days;
 }
 
-// date => class key => faculty name, parallel to day_map() and keyed the same
-// way, so the later row wins there and here alike. Kept beside the day map
+// A class's readings for one day, as one number: the mean, following the rule a
+// date range already follows. Three lectures are three readings of the same 30
+// students, so summing them would put the class at 250%.
+//
+// A bare int is a cache written before lecture times existed — one reading for
+// the whole day. The next push replaces it; until then it still reads.
+function day_present(array|int $readings): int {
+    if (!is_array($readings)) return $readings;
+    return $readings ? (int) round(array_sum($readings) / count($readings)) : 0;
+}
+
+// date => class key => time => faculty name, parallel to day_map() and keyed
+// the same way down to the lecture, so the later row wins there and here alike,
+// and two faculty covering the same class on the same day both keep their
+// reading instead of one taking credit for both. Kept beside the day map
 // rather than inside it because every reader of that map wants a plain int:
 // making the value a pair would touch aggregate_days, class_dates and the
 // tests to carry a string none of them use.
@@ -251,7 +318,7 @@ function faculty_map(array $rows): array {
     $names = [];
     foreach ($rows as $r) {
         $name = trim((string) ($r['faculty'] ?? ''));
-        if ($name !== '') $names[$r['date']][class_key($r)] = $name;
+        if ($name !== '') $names[$r['date']][class_key($r)][$r['time'] ?? ''] = $name;
     }
     ksort($names);
     return $names;
@@ -277,7 +344,8 @@ function resolve_range(array $days, ?string $from = null, ?string $to = null): a
 // is marked reported => false so the UI can say "not reported" instead of
 // showing a school as 0/0 — which reads as "this school has no students".
 //
-// present is the class's AVERAGE over the days it reported, never the sum: a
+// present is the class's AVERAGE over the days it reported, never the sum, and
+// each of those days is itself the mean of the lectures reported in it: a
 // range has to stay comparable to a single day, and dividing by days nobody
 // reported would punish a class for its faculty's silence rather than for
 // absence. 'days' rides along so the UI can say how much of the range the
@@ -291,8 +359,8 @@ function aggregate_days(array $days, ?string $from = null, ?string $to = null): 
     $count = [];
     foreach ($days as $date => $classes) {
         if ($date < $from || $date > $to) continue;
-        foreach ($classes as $key => $present) {
-            $sum[$key] = ($sum[$key] ?? 0) + (int) $present;
+        foreach ($classes as $key => $readings) {
+            $sum[$key] = ($sum[$key] ?? 0) + day_present($readings);
             $count[$key] = ($count[$key] ?? 0) + 1;
         }
     }
@@ -326,6 +394,23 @@ function class_dates(array $days, string $key, string $from, string $to): array 
     }
     sort($dates);
     return $dates;
+}
+
+// The distinct lecture times one class reported inside the range, sorted. Over
+// a week these read as the class's slots rather than a list of moments: a class
+// reporting at 09:00, 11:00 and 14:00 every day still shows three times, which
+// is what makes them worth putting beside the average. Rows the sheet carried
+// no clock for contribute nothing, so an old range simply shows no times.
+function class_times(array $days, string $key, string $from, string $to): array {
+    $times = [];
+    foreach ($days as $date => $classes) {
+        if ($date < $from || $date > $to || !is_array($classes[$key] ?? null)) continue;
+        foreach (array_keys($classes[$key]) as $time) {
+            if ($time !== '') $times[$time] = true;
+        }
+    }
+    ksort($times);
+    return array_keys($times);
 }
 
 // Also counts how many of the classes in scope have actually reported, and

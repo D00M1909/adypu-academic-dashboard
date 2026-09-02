@@ -453,6 +453,14 @@
         // Who filed it. Names only exist from the day the Form started asking,
         // so an older range shows the count with no name rather than an
         // "unknown" that would read as a fault.
+        // Which lectures the readings came from. Machine-generated HH:MM like
+        // the dates above, so it needs no escaping; rows filed before the sheet
+        // carried a clock have none and simply show nothing.
+        var times = d.times || [];
+        var at = times.length
+          ? '<span class="division-times" title="Reported at ' + times.join(', ') + '">at ' +
+              (times.length > 2 ? times[0] + ' +' + (times.length - 1) : times.join(', ')) + '</span>'
+          : '';
         var names = d.faculty || [];
         var by = names.length
           ? '<span class="division-by" title="' + esc(names.join(', ')) + '">by ' +
@@ -460,7 +468,7 @@
           : '';
         row.innerHTML =
           '<div class="division-row-top">' +
-            '<span class="division-name">Division ' + d.division + days + by + '</span>' +
+            '<span class="division-name">Division ' + d.division + days + at + by + '</span>' +
             '<span class="division-count">' + readout + '</span>' +
           '</div>' +
           '<div class="division-bar"><div class="division-bar-fill ' +
