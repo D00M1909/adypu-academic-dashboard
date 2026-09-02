@@ -145,10 +145,22 @@ assert(!breakdown.includes('>0%<'), 'unreported class drawn as a 0% reading');
 // the readings it was read from rather than only their headline.
 assert((breakdown.match(/report-subrow/g) || []).length === 4,
   'a class reported twice a day over two days should list all four readings');
-assert(breakdown.includes('27 Aug · 09:30') && breakdown.includes('28 Aug · 14:15'),
-  'reading sub-rows should name the day and the lecture: ' + breakdown);
+assert(breakdown.includes('27 Aug · 9:30 to 10:30 AM') && breakdown.includes('28 Aug · 2:15 to 3:15 PM'),
+  'reading sub-rows should name the day and the full slot: ' + breakdown);
 // A class with a single reading would only repeat its own row.
-assert(!breakdown.includes('10:30'), 'a lone reading should not get a sub-row of its own');
+assert(!breakdown.includes('10:30 to 11:30'), 'a lone reading should not get a sub-row of its own');
+
+// --- Slot labels: the stored start, read back as the lecture it stands for ---
+const slot = window.Charts.slotLabel;
+assert(slot('09:30') === '9:30 to 10:30 AM', 'morning slot wrong: ' + slot('09:30'));
+assert(slot('16:00') === '4:00 to 5:00 PM', 'afternoon slot wrong: ' + slot('16:00'));
+assert(slot('13:15') === '1:15 to 2:15 PM', 'after-lunch slot wrong: ' + slot('13:15'));
+// Straddling noon is the case a single trailing meridiem gets wrong.
+assert(slot('11:30') === '11:30 AM to 12:30 PM', 'noon slot wrong: ' + slot('11:30'));
+assert(slot('08:30') === '8:30 to 9:30 AM', 'early slot wrong: ' + slot('08:30'));
+assert(slot('12:30') === '12:30 to 1:30 PM', 'midday slot wrong: ' + slot('12:30'));
+// Anything that is not a stored HH:MM is passed through untouched.
+assert(slot('') === '' && slot('no time') === 'no time', 'a missing time must not be dressed up');
 
 // One year of a school that has branches: the year is fixed, so it leaves the
 // labels, and the branches are what the table is comparing.
