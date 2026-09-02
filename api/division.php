@@ -30,12 +30,20 @@ foreach ($divisions as &$d) {
         'branch' => $branch, 'division' => $d['division'],
     ]);
     $d['dates'] = $d['reported'] ? class_dates($days, $key, $from, $to) : [];
-    // Who filed those days. Distinct names, in date order: a range can span
-    // two faculty covering the same class, and a substitution is worth seeing
-    // rather than flattening to whoever happened to submit last.
-    $d['faculty'] = array_values(array_unique(array_filter(
-        array_map(fn($date) => $faculty[$date][$key] ?? '', $d['dates'])
-    )));
+    // Which lectures those readings came from. A class its faculty report after
+    // each lecture is the whole point of storing a time, so the modal has to be
+    // able to say so; a range from before the sheet carried a clock has none.
+    $d['times'] = $d['reported'] ? class_times($days, $key, $from, $to) : [];
+    // Who filed those days. Distinct names, in date order: a range can span two
+    // faculty covering the same class, and a substitution is worth seeing
+    // rather than flattening to whoever happened to submit last. A name from a
+    // cache written before lecture times is a bare string, not a per-time map,
+    // which is what the cast covers.
+    $names = [];
+    foreach ($d['dates'] as $date) {
+        foreach ((array) ($faculty[$date][$key] ?? []) as $name) $names[] = $name;
+    }
+    $d['faculty'] = array_values(array_unique(array_filter($names)));
 }
 unset($d);
 

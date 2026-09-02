@@ -257,7 +257,8 @@ $week = "date,class,present\n" .
 $weekRows = parse_attendance_csv($week);
 $days = day_map($weekRows);
 assert(count($days) === 3, 'expected 3 distinct days, got ' . count($days));
-assert($days['2026-08-26']['law|2nd Year||A'] === 28, 'same-day resubmission should overwrite');
+assert($days['2026-08-26']['law|2nd Year||A'] === ['' => 28],
+    'a sheet with no clock keys one reading a day, the last winning');
 
 $rangeTree = aggregate_days($days, '2026-08-24', '2026-08-26');
 $lawA = find_div($rangeTree, 'law', '2nd Year', '', 'A');
@@ -309,7 +310,7 @@ assert($nRows[1]['faculty'] === '', 'a blank name must stay blank, not inherit t
 $nDays = day_map($nRows);
 $nNames = faculty_map($nRows);
 assert(array_keys($nNames) === ['2026-08-24', '2026-08-25', '2026-08-26'], 'faculty map should be keyed by day');
-assert($nNames['2026-08-24']['law|2nd Year||A'] === 'Dr. Meera Rao', 'faculty name lost its class key');
+assert($nNames['2026-08-24']['law|2nd Year||A'] === ['' => 'Dr. Meera Rao'], 'faculty name lost its class key');
 assert(!isset($nNames['2026-08-24']['law|2nd Year||B']), 'a nameless row must not be stored empty');
 assert(find_div(aggregate_days($nDays, '2026-08-24', '2026-08-26'), 'law', '2nd Year', '', 'A')['present'] === 26,
     'names must not disturb the average of 20/30/28');
@@ -317,10 +318,78 @@ assert(find_div(aggregate_days($nDays, '2026-08-24', '2026-08-26'), 'law', '2nd 
 // What api/division.php hands the modal: the distinct names over the days the
 // class actually reported, in date order, so a substitution is visible.
 $aDates = class_dates($nDays, 'law|2nd Year||A', '2026-08-24', '2026-08-26');
-$aNames = array_values(array_unique(array_filter(
-    array_map(fn($date) => $nNames[$date]['law|2nd Year||A'] ?? '', $aDates)
-)));
+$aNames = [];
+foreach ($aDates as $date) {
+    foreach ((array) ($nNames[$date]['law|2nd Year||A'] ?? []) as $n) $aNames[] = $n;
+}
+$aNames = array_values(array_unique(array_filter($aNames)));
 assert($aNames === ['Dr. Meera Rao', 'Prof. S. Iyer'], 'expected both faculty once: ' . implode(', ', $aNames));
+
+// --- Lecture times: one reading per lecture, not one per day ----------------
+// Each faculty member takes attendance after their own lecture, so a class
+// reports several times a day. Keyed by day alone, the 2pm submission simply
+// replaced the 9am one and the day showed a single lecture's number.
+$lectures = "timestamp,time of class,class,present,date\n" .
+    '"2026-08-26 09:12","09:00","School of Law / 2nd Year / A","20","2026-08-26"' . "\n" .
+    '"2026-08-26 11:40","11:00","School of Law / 2nd Year / A","30","2026-08-26"' . "\n" .
+    '"2026-08-26 14:05","14:00","School of Law / 2nd Year / A","28","2026-08-26"' . "\n" .
+    '"2026-08-26 14:06","14:00","School of Law / 2nd Year / A","25","2026-08-26"' . "\n";
+$lecRows = parse_attendance_csv($lectures);
+assert($lecRows[0]['time'] === '09:00', 'the Time question should beat the timestamp: ' . $lecRows[0]['time']);
+$lecDays = day_map($lecRows);
+// Three lectures kept, and the fourth row corrects the 2pm one rather than
+// becoming a fourth lecture.
+assert($lecDays['2026-08-26']['law|2nd Year||A'] === ['09:00' => 20, '11:00' => 30, '14:00' => 25],
+    'lecture readings lost: ' . json_encode($lecDays['2026-08-26']['law|2nd Year||A']));
+
+// A day is the mean of its lectures, the rule a range already follows: summing
+// three readings of the same 30 students would put the class at 250%.
+$lecA = $lecDays['2026-08-26']['law|2nd Year||A'];
+assert(day_present($lecA) === 25, 'a day should average its lectures: ' . day_present($lecA));
+assert(find_div(aggregate_days($lecDays), 'law', '2nd Year', '', 'A')['present'] === 25,
+    'the tree lost the lecture average');
+$lecTotals = attendance_totals(['law' => ['2nd Year' => aggregate_days($lecDays)['law']['2nd Year']]]);
+assert($lecTotals['strength_reported'] === 30, 'strength counted once per lecture: ' . $lecTotals['strength_reported']);
+
+// What the modal shows beside the average: the distinct slots, sorted.
+assert(class_times($lecDays, 'law|2nd Year||A', '2026-08-26', '2026-08-26') === ['09:00', '11:00', '14:00'],
+    'lecture times wrong: ' . json_encode(class_times($lecDays, 'law|2nd Year||A', '2026-08-26', '2026-08-26')));
+assert(class_times($lecDays, 'law|2nd Year||B', '2026-08-26', '2026-08-26') === [], 'times invented for an unreported class');
+
+// No Time question: the submission timestamp stands in, rounded down to the
+// hour, so a correction filed a minute later overwrites its original while the
+// next lecture gets a slot of its own.
+$stamped = "timestamp,class,present,date\n" .
+    '"2026-08-26 09:12","School of Law / 2nd Year / A","20","2026-08-26"' . "\n" .
+    '"2026-08-26 09:13","School of Law / 2nd Year / A","22","2026-08-26"' . "\n" .
+    '"2026-08-26 11:40","School of Law / 2nd Year / A","30","2026-08-26"' . "\n";
+$stampDays = day_map(parse_attendance_csv($stamped));
+assert($stampDays['2026-08-26']['law|2nd Year||A'] === ['09:00' => 22, '11:00' => 30],
+    'timestamp fallback wrong: ' . json_encode($stampDays['2026-08-26']['law|2nd Year||A']));
+
+// Two faculty covering the same class on the same day both keep their reading,
+// for the same reason a substitution across days is worth seeing.
+$twoNames = faculty_map(parse_attendance_csv(
+    "timestamp,faculty name,time,class,present,date\n" .
+    '"2026-08-26 09:12","Dr. Meera Rao","09:00","School of Law / 2nd Year / A","20","2026-08-26"' . "\n" .
+    '"2026-08-26 14:05","Prof. S. Iyer","14:00","School of Law / 2nd Year / A","28","2026-08-26"' . "\n"
+));
+assert($twoNames['2026-08-26']['law|2nd Year||A'] === ['09:00' => 'Dr. Meera Rao', '14:00' => 'Prof. S. Iyer'],
+    'one lecture overwrote the other faculty: ' . json_encode($twoNames['2026-08-26']['law|2nd Year||A']));
+
+// A cache written before lecture times holds a bare int for the whole day. The
+// next push replaces it; until then it must still read, not fatal.
+assert(day_present(41) === 41, 'a pre-times cache entry must still read');
+assert(find_div(aggregate_days(['2026-08-26' => ['law|2nd Year||A' => 41]]), 'law', '2nd Year', '', 'A')['present'] === 41,
+    'a pre-times cache must still aggregate');
+assert(class_times(['2026-08-26' => ['law|2nd Year||A' => 41]], 'law|2nd Year||A', '2026-08-26', '2026-08-26') === [],
+    'a pre-times cache must report no times, not crash');
+
+assert(row_time('26/08/2026 14:05:02') === '14:05', 'd/m/Y timestamp time wrong: ' . row_time('26/08/2026 14:05:02'));
+assert(row_time('1899-12-30 09:30:00') === '09:30', 'a Form time cell wrong: ' . row_time('1899-12-30 09:30:00'));
+assert(row_time('2:15 PM') === '14:15', '12-hour time wrong: ' . row_time('2:15 PM'));
+assert(row_time('12:05 AM') === '00:05', 'midnight wrong: ' . row_time('12:05 AM'));
+assert(row_time('2026-08-26') === '' && row_time('99:99') === '', 'a bare date or junk must have no time');
 
 // --- Percentages divide by the classes that reported ------------------------
 // Diluting by classes that never filled the form in reads as an empty

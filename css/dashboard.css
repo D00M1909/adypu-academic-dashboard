@@ -624,6 +624,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
 .report-table-sep { color: var(--ink-faint); padding: 0 2px; }
 
 .division-days,
+.division-times,
 .division-by {
   margin-left: 8px;
   font-size: 11.5px;
