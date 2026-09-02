@@ -30,6 +30,26 @@ const SCHOOLS = [
     'film'    => ['name' => 'School of Film & Media'],
 ];
 
+// Read from the 'Partners Admission MIS' sheet of
+// ../adypuacademicreport/ADYPU_Master_Dashboard_Data_July_2026.xlsx on
+// 27 Aug 2026 - column B (Partner) with its blank rows forward-filled, and
+// column A (School) collected per partner. Admission numbers deliberately not
+// copied: they belong to the report project and would go stale here.
+// Which divisions a partner's students sit in is not known yet; that is what
+// tools/data-request.php partners asks for.
+const KNOWLEDGE_PARTNERS = [
+    ['name' => 'Aero',      'schools' => ['eng']],
+    ['name' => 'Newton',    'schools' => ['eng']],
+    ['name' => 'Sunstone',  'schools' => ['eng', 'mgmt']],
+    ['name' => 'NxtWave',   'schools' => ['eng']],
+    ['name' => 'Emversity', 'schools' => ['science']],
+    ['name' => 'Veloces',   'schools' => ['eng']],
+    ['name' => 'SeamEdu',   'schools' => ['eng', 'mgmt', 'film', 'design']],
+    ['name' => 'Upgrad',    'schools' => ['eng']],
+    ['name' => 'PixelPop',  'schools' => ['eng']],
+    ['name' => 'Flyglam',   'schools' => ['mgmt']],
+];
+
 // Used until real submissions arrive (SPEC.md §8.1). Shape matches a real row;
 // the present counts are synthetic. Strength comes from the canonical
 // structure, same as a real submission. Deliberately never written to the

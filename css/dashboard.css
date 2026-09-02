@@ -489,8 +489,9 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
   z-index: 10;
   isolation: isolate;
   /* Extra space below turns the row into a deliberate control dock. Without
-     it, cards meet the opaque edge mid-scroll and look accidentally clipped. */
-  padding: 10px 0 20px;
+     it, cards meet the opaque edge mid-scroll and look accidentally clipped,
+     and the first section heading below sits almost against the KPI card. */
+  padding: 10px 0 28px;
   margin: -10px 0 -4px;
 }
 /* The dock has to extend beyond main's max-width; otherwise a selected card

@@ -54,24 +54,6 @@ if ($requestedPreset && [$from, $to] === $presetRanges[$requestedPreset]) {
 }
 $presetClass = fn(string $p): string => 'range-preset' . ($activePreset === $p ? ' is-active' : '');
 
-// Read from the 'Partners Admission MIS' sheet of
-// ../adypuacademicreport/ADYPU_Master_Dashboard_Data_July_2026.xlsx on
-// 27 Aug 2026 — column B (Partner) with its blank rows forward-filled, and
-// column A (School) collected per partner. Admission numbers deliberately not
-// copied: they belong to the report project and would go stale here.
-$knowledgePartners = [
-    ['name' => 'Aero',      'schools' => ['eng']],
-    ['name' => 'Newton',    'schools' => ['eng']],
-    ['name' => 'Sunstone',  'schools' => ['eng', 'mgmt']],
-    ['name' => 'NxtWave',   'schools' => ['eng']],
-    ['name' => 'Emversity', 'schools' => ['science']],
-    ['name' => 'Veloces',   'schools' => ['eng']],
-    ['name' => 'SeamEdu',   'schools' => ['eng', 'mgmt', 'film', 'design']],
-    ['name' => 'Upgrad',    'schools' => ['eng']],
-    ['name' => 'PixelPop',  'schools' => ['eng']],
-    ['name' => 'Flyglam',   'schools' => ['mgmt']],
-];
-
 // Attendance status band. Mirrored by attClass() in js/dashboard.js — change
 // both together, and --att-* in dashboard.css with them.
 function att_class(int $pct): string {
@@ -389,10 +371,10 @@ try {
     <section class="tile-section">
       <div class="section-title">
         <span>Knowledge Partners</span>
-        <span class="section-meta"><?= count($knowledgePartners) ?> partners</span>
+        <span class="section-meta"><?= count(KNOWLEDGE_PARTNERS) ?> partners</span>
       </div>
       <div class="tile-grid partners-grid">
-        <?php foreach ($knowledgePartners as $p): ?>
+        <?php foreach (KNOWLEDGE_PARTNERS as $p): ?>
         <div class="tile partner-tile">
           <div class="tile-label"><?= htmlspecialchars($p['name']) ?></div>
           <div class="tile-tag"><?= htmlspecialchars(implode(', ', array_map($shortSchool, $p['schools']))) ?></div>

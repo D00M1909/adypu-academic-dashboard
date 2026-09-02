@@ -1,9 +1,10 @@
 <?php
-// Generates the two files to send to the schools. They ask for different things
-// and must not be merged:
+// Generates the three files to send out. They ask for different things, of
+// different people, and must not be merged:
 //
 //   php tools/data-request.php engineering > 01-engineering-headcounts.csv
 //   php tools/data-request.php structure     02-structure-request.xlsx
+//   php tools/data-request.php partners      03-partners-request.xlsx
 //
 // Engineering's structure is real, read from the timetable DB — it needs a
 // headcount against each known division. Every other school's structure is
@@ -11,6 +12,12 @@
 // draw), so those schools get BLANK rows and state their own reality. Sending
 // them the placeholders would invite them to fill numbers in beside divisions
 // that do not exist.
+//
+// The partners file goes to whoever owns the partnerships, not to a school. We
+// know the ten partner names and which schools they appear against; what we do
+// not know is which divisions their students actually sit in, which is the one
+// thing that would let the Knowledge Partner tab show attendance instead of
+// ten inert tiles.
 
 require_once __DIR__ . '/../includes/structure.php';
 require_once __DIR__ . '/xlsx.php';
@@ -36,8 +43,47 @@ if ($mode === 'engineering') {
     exit;
 }
 
+if ($mode === 'partners') {
+    $outFile = $argv[2] ?? '03-partners-request.xlsx';
+
+    $header = ['Partner', 'School', 'Year', 'Branch (blank if none)', 'Division',
+               'ENROLLED STUDENTS', 'Who marks attendance', 'Contact (name and email)', 'Comments'];
+
+    $rows = [
+        [['b', 'KNOWLEDGE PARTNERS - CLASSES AND STUDENT NUMBERS']],
+        [],
+        ['The partner names and schools below are what we hold today. Please correct anything wrong,'],
+        ['add a row for every partner or class we have missed, and delete any row that no longer runs.'],
+        ['A partner teaching in more than one school already has one row per school - split those'],
+        ['further so that each row is a single division.'],
+        [],
+        [['b', 'YEAR'], 'Year of study, e.g. "1st Year", "2nd Year".'],
+        [['b', 'BRANCH'], 'Specialisation or stream, e.g. "CSE". Leave blank if the school has none.'],
+        [['b', 'DIVISION'], 'The individual class or section, e.g. "A", "B".'],
+        [['b', 'ENROLLED'], 'Students enrolled in that division under this partner.'],
+        [['b', 'WHO MARKS ATTENDANCE'], 'Partner faculty, university faculty, or both.'],
+        [],
+        array_map(fn($h) => ['b', $h], $header),
+    ];
+
+    // One row per partner-school pair: a partner in four schools is four rows,
+    // because a division belongs to exactly one school and the recipient is
+    // being asked to name divisions.
+    foreach (KNOWLEDGE_PARTNERS as $p) {
+        foreach ($p['schools'] as $school) {
+            $rows[] = [$p['name'], SCHOOLS[$school]['name'] ?? $school, '', '', '', '', '', '', ''];
+        }
+    }
+    write_xlsx($outFile, ['Partners' => [
+        'cols' => [16, 26, 12, 22, 12, 20, 24, 30, 34],
+        'rows' => $rows,
+    ]]);
+    fwrite(STDERR, "wrote $outFile (" . count(KNOWLEDGE_PARTNERS) . " partners)\n");
+    exit;
+}
+
 if ($mode !== 'structure' && $mode !== 'structure-csv') {
-    fwrite(STDERR, "usage: php tools/data-request.php engineering|structure [outfile.xlsx]|structure-csv\n");
+    fwrite(STDERR, "usage: php tools/data-request.php engineering|structure|partners [outfile.xlsx]|structure-csv\n");
     exit(1);
 }
 
