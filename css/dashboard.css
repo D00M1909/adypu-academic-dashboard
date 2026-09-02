@@ -427,6 +427,9 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
 @keyframes spin { to { transform: rotate(180deg); } }
 
 .division-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px 16px; margin-bottom: 16px; }
+/* A division listing its lectures needs the full width: two columns clip the
+   slot and the faculty name. Set by dashboard.js when any division has one. */
+.division-grid.has-readings { grid-template-columns: minmax(0, 1fr); }
 .division-row { display: flex; flex-direction: column; gap: 6px; }
 .division-row-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; }
 /* min-width:0 so a long faculty name shrinks the name instead of shoving the
@@ -648,9 +651,11 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
   font-size: 11.5px;
   color: var(--ink-muted);
 }
-.reading-when { font-variant-numeric: tabular-nums; }
-.reading-count { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.reading-by { min-width: 0; color: var(--ink-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reading-when { flex-shrink: 0; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.reading-count { flex-shrink: 0; margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Last and shrinkable: if anything has to give at a narrow width it is the
+   name, which the list repeats on every line anyway. */
+.reading-by { flex: 0 1 auto; min-width: 0; color: var(--ink-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* A class's own lectures in the printed report, under its row. The indent is
    what separates them from the class rows, which are the ones being compared. */
