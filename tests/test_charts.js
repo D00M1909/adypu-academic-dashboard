@@ -158,10 +158,22 @@ assert(els['breakdown-section'].hidden === false, 'a year with branches should s
 assert(els['breakdown-rows'].innerHTML.includes('CSE / Division A'), 'branch missing from the row label');
 assert(!els['breakdown-rows'].innerHTML.includes('2nd Year /'), 'the selected year should not repeat in every row');
 
-// Drilled to a branch, the divisions grid on the page already IS this table.
+// Drilled to a branch, the divisions grid on the page already IS this table —
+// as long as it says everything. CSE division A was reported once a day, so it
+// does, and the table stays hidden.
 window.Charts.render({ school: 'eng', year: '2nd Year', branch: 'CSE' },
   { present: 48, strengthReported: 60, reported: 1, classes: 1 });
 assert(els['breakdown-section'].hidden === true, 'a branch should not print its divisions twice');
+
+// But a branch holding a class reported twice in one day must print, or those
+// lectures appear nowhere in the export: the grid shows the latest reading only
+// and Day by day is a range table. This is the single-division report.
+window.Charts.render({ school: 'eng', year: '1st Year', branch: 'Core' },
+  { present: 45, strengthReported: 60, reported: 1, classes: 2 });
+assert(els['breakdown-section'].hidden === false,
+  'a division reported twice in a day must print its lectures');
+assert((els['breakdown-rows'].innerHTML.match(/report-subrow/g) || []).length === 4,
+  'every lecture should be printed, not just the day');
 
 // Same for a branchless school's year: selecting it lands straight on the
 // divisions grid.

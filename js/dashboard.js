@@ -462,19 +462,20 @@
           ? '<span class="division-days" title="Reported on ' + dates.join(', ') + '">avg of ' +
               dates.length + ' days</span>'
           : '';
-        // Which lectures fed it. Machine-generated HH:MM like the dates above,
-        // so it needs no escaping; rows filed before the sheet carried a clock
-        // have none and simply show nothing.
-        var at = times.length
-          ? '<span class="division-times" title="Reported at ' + times.join(', ') + '">at ' +
-              (times.length > 2 ? times[0] + ' +' + (times.length - 1) : times.join(', ')) + '</span>'
+        // The lecture and the name only earn a chip when there is no list under
+        // the row to carry them. With one, they said the same thing twice and
+        // pushed the count onto a second line.
+        var lone = readings.length < 2;
+        // Machine-generated HH:MM like the dates above, so it needs no
+        // escaping; rows filed before the sheet carried a clock have none.
+        var at = lone && times.length
+          ? '<span class="division-times">at ' + times[0] + '</span>'
           : '';
-        // Who filed it. Names only exist from the day the Form started asking,
-        // so an older range shows the count with no name rather than an
-        // "unknown" that would read as a fault.
-        var by = names.length
-          ? '<span class="division-by" title="' + esc(names.join(', ')) + '">by ' +
-              esc(names.length > 1 ? names[0] + ' +' + (names.length - 1) : names[0]) + '</span>'
+        // Names only exist from the day the Form started asking, so an older
+        // range shows the count with no name rather than an "unknown" that
+        // would read as a fault.
+        var by = lone && names.length
+          ? '<span class="division-by" title="' + esc(names[0]) + '">by ' + esc(names[0]) + '</span>'
           : '';
         // The entries behind the number: one line per lecture, so a class its
         // faculty reported three times shows all three. Only worth listing when
