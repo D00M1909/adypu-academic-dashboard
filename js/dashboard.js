@@ -433,6 +433,12 @@
 
       var grid = document.getElementById('division-grid');
       grid.innerHTML = '';
+      // Two columns leaves a row about 215px, which a lecture list does not fit
+      // in: the slot wraps over two lines and the faculty name is cut to
+      // "Advait Bhat...". One column whenever any division carries such a list.
+      grid.classList.toggle('has-readings', data.divisions.some(function (d) {
+        return (d.readings || []).length > 1;
+      }));
       data.divisions.forEach(function (d) {
         var divPct = pct(d.present, d.strength);
         var row = document.createElement('div');
