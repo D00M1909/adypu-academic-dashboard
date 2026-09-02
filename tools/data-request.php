@@ -22,6 +22,15 @@
 require_once __DIR__ . '/../includes/structure.php';
 require_once __DIR__ . '/xlsx.php';
 
+// The same four fields are asked for by both workbooks, so they get the same
+// words in both. Each request adds its own title and any extra field below.
+$terms = [
+    [['b', 'YEAR'], 'Year of study, e.g. "1st Year", "2nd Year".'],
+    [['b', 'BRANCH'], 'Specialisation or stream, e.g. "CSE". Leave blank if the school has none.'],
+    [['b', 'DIVISION'], 'The individual class or section, e.g. "A", "B".'],
+    [['b', 'ENROLLED'], 'Students enrolled in the division.'],
+];
+
 $mode = $argv[1] ?? '';
 $outFile = $argv[2] ?? '02-structure-request.xlsx';
 $out = fopen('php://output', 'w');
@@ -49,22 +58,18 @@ if ($mode === 'partners') {
     $header = ['Partner', 'School', 'Year', 'Branch (blank if none)', 'Division',
                'ENROLLED STUDENTS', 'Who marks attendance', 'Contact (name and email)', 'Comments'];
 
-    $rows = [
-        [['b', 'KNOWLEDGE PARTNERS - CLASSES AND STUDENT NUMBERS']],
+    $intro = array_merge([
+        [['b', 'KNOWLEDGE PARTNERS - CLASSES AND STUDENT NUMBERS - PLEASE COMPLETE']],
         [],
-        ['The partner names and schools below are what we hold today. Please correct anything wrong,'],
-        ['add a row for every partner or class we have missed, and delete any row that no longer runs.'],
-        ['A partner teaching in more than one school already has one row per school - split those'],
-        ['further so that each row is a single division.'],
+        ['We know which partners work with which schools, but not which classes their students sit in.'],
+        ['The Partners tab lists what we hold today: please correct anything wrong, complete one row for'],
+        ['every division a partner teaches, and add a row for any partner or class we have missed.'],
         [],
-        [['b', 'YEAR'], 'Year of study, e.g. "1st Year", "2nd Year".'],
-        [['b', 'BRANCH'], 'Specialisation or stream, e.g. "CSE". Leave blank if the school has none.'],
-        [['b', 'DIVISION'], 'The individual class or section, e.g. "A", "B".'],
-        [['b', 'ENROLLED'], 'Students enrolled in that division under this partner.'],
+    ], $terms, [
         [['b', 'WHO MARKS ATTENDANCE'], 'Partner faculty, university faculty, or both.'],
-        [],
-        array_map(fn($h) => ['b', $h], $header),
-    ];
+    ]);
+
+    $rows = [array_map(fn($h) => ['b', $h], $header)];
 
     // One row per partner-school pair: a partner in four schools is four rows,
     // because a division belongs to exactly one school and the recipient is
@@ -74,10 +79,12 @@ if ($mode === 'partners') {
             $rows[] = [$p['name'], SCHOOLS[$school]['name'] ?? $school, '', '', '', '', '', '', ''];
         }
     }
-    write_xlsx($outFile, ['Partners' => [
-        'cols' => [16, 26, 12, 22, 12, 20, 24, 30, 34],
-        'rows' => $rows,
-    ]]);
+    // Instructions on their own tab, same as the structure request: the intro
+    // needs a wide second column, the table needs nine narrow ones.
+    write_xlsx($outFile, [
+        'Instructions' => ['cols' => [24, 95], 'rows' => $intro],
+        'Partners' => ['cols' => [16, 26, 12, 22, 12, 20, 24, 30, 34], 'rows' => $rows],
+    ]);
     fwrite(STDERR, "wrote $outFile (" . count(KNOWLEDGE_PARTNERS) . " partners)\n");
     exit;
 }
@@ -87,17 +94,13 @@ if ($mode !== 'structure' && $mode !== 'structure-csv') {
     exit(1);
 }
 
-$intro = [
+$intro = array_merge([
     [['b', 'CLASS STRUCTURE AND STUDENT NUMBERS - PLEASE COMPLETE']],
     [],
     ['We do not yet have the real class structure for these schools, so this form is deliberately blank.'],
     ['Please add one row for every division that exists, and delete any blank rows you do not use.'],
     [],
-    [['b', 'YEAR'], 'Year of study, e.g. "1st Year", "2nd Year".'],
-    [['b', 'BRANCH'], 'Specialisation or stream, e.g. "CSE".'],
-    [['b', 'DIVISION'], 'The individual class or section, e.g. "A", "B".'],
-    [['b', 'ENROLLED'], 'Students enrolled in the division.'],
-];
+], $terms);
 
 $header = ['Year', 'Branch (blank if none)', 'Division', 'ENROLLED STUDENTS', 'Comments'];
 $blankRows = 24;
