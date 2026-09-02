@@ -5,3 +5,4 @@ design/
 CLAUDE.md
 cache/*.json
 includes/config.local.php
+upload/
