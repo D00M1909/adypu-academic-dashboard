@@ -353,9 +353,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
 .tile-unreported { font-family: inherit; font-size: 12.5px; font-weight: 500; color: var(--ink-faint); font-style: italic; }
 .school-tile { justify-content: space-between; }
 .school-tile .division-bar,
-.division-tile .division-bar { display: block; width: 100%; margin-top: 2px; }
-.school-tile .division-bar-fill,
-.division-tile .division-bar-fill { display: block; }
+.division-tile .division-bar { width: 100%; margin-top: 2px; }
 .tile.active .tile-stat { color: var(--red-ink); }
 .tile.active .att-pct { color: inherit; }
 .year-tile, .branch-tile { font-size: 14px; font-weight: 600; padding: 14px; }
@@ -430,12 +428,17 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
 
 .division-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px 16px; margin-bottom: 16px; }
 .division-row { display: flex; flex-direction: column; gap: 6px; }
-.division-row-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; }
-.division-name { color: var(--ink-muted); font-weight: 500; }
-.division-count { font-family: "IBM Plex Mono", monospace; font-weight: 600; color: var(--ink); }
+.division-row-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; }
+/* min-width:0 so a long faculty name shrinks the name instead of shoving the
+   count onto its own line; nowrap so the count never splits from its percent. */
+.division-name { min-width: 0; color: var(--ink-muted); font-weight: 500; }
+.division-count { flex-shrink: 0; white-space: nowrap; font-family: "IBM Plex Mono", monospace; font-weight: 600; color: var(--ink); }
 .division-count-sep { color: var(--ink-muted); font-weight: 500; margin: 0 1px; }
-.division-bar { height: 5px; border-radius: 3px; background: var(--hairline); overflow: hidden; }
-.division-bar-fill { height: 100%; background: var(--red-ink); border-radius: 3px; }
+/* display:block, not inline, or `width: N%` on the fill is ignored and the bar
+   draws empty. The tiles used to patch that on themselves, which left the
+   ranking chart's bars — the same markup, no tile around it — flat at 0. */
+.division-bar { display: block; height: 5px; border-radius: 3px; background: var(--hairline); overflow: hidden; }
+.division-bar-fill { display: block; height: 100%; background: var(--red-ink); border-radius: 3px; }
 
 .att-good .division-bar-fill, .division-bar-fill.att-good { background: var(--att-good); }
 .att-warn .division-bar-fill, .division-bar-fill.att-warn { background: var(--att-warn); }
@@ -647,7 +650,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
 }
 .reading-when { font-variant-numeric: tabular-nums; }
 .reading-count { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.reading-by { color: var(--ink-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reading-by { min-width: 0; color: var(--ink-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* A class's own lectures in the printed report, under its row. The indent is
    what separates them from the class rows, which are the ones being compared. */
