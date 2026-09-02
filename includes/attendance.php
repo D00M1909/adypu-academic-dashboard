@@ -293,15 +293,22 @@ function day_map(array $rows): array {
     return $days;
 }
 
-// A class's readings for one day, as one number: the mean, following the rule a
-// date range already follows. Three lectures are three readings of the same 30
-// students, so summing them would put the class at 250%.
+// A class's number for one day: its LATEST reading. Faculty file after their own
+// lecture, so the last one in is the state of the class as of the most recent
+// lecture, which is what the tile has to say before anyone opens the breakdown.
+// day_map() sorts a day's readings by time, so the last is the latest.
+//
+// Deliberately not the mean of the day: a class that emptied out after lunch
+// averages back into looking fine, and the current state is what a head of
+// school acts on. Every earlier reading is kept and listed by class_readings().
+// The mean across DAYS in a range is a different question, and aggregate_days()
+// still answers it that way.
 //
 // A bare int is a cache written before lecture times existed — one reading for
 // the whole day. The next push replaces it; until then it still reads.
 function day_present(array|int $readings): int {
     if (!is_array($readings)) return $readings;
-    return $readings ? (int) round(array_sum($readings) / count($readings)) : 0;
+    return $readings ? (int) end($readings) : 0;
 }
 
 // date => class key => time => faculty name, parallel to day_map() and keyed
@@ -345,7 +352,7 @@ function resolve_range(array $days, ?string $from = null, ?string $to = null): a
 // showing a school as 0/0 — which reads as "this school has no students".
 //
 // present is the class's AVERAGE over the days it reported, never the sum, and
-// each of those days is itself the mean of the lectures reported in it: a
+// each of those days is itself that day's LATEST reading (day_present()): a
 // range has to stay comparable to a single day, and dividing by days nobody
 // reported would punish a class for its faculty's silence rather than for
 // absence. 'days' rides along so the UI can say how much of the range the
@@ -384,33 +391,31 @@ function aggregate_attendance(array $rows, ?string $from = null, ?string $to = n
     return aggregate_days(day_map($rows), $from, $to);
 }
 
-// The days one class actually reported inside the range. The tile shows an
-// average; this is what it rests on, so the modal can name the dates rather
-// than let a number imply the whole range was reported.
-function class_dates(array $days, string $key, string $from, string $to): array {
-    $dates = [];
+// Every reading one class filed inside the range, oldest first: the day, the
+// lecture, the count, and who filed it. The tile above shows one number, the
+// latest of a day or the mean of several; this is the list it rests on, and the
+// only place the individual lectures are visible. The modal and the printed
+// report both list it, and the dates, times and names on those come from here
+// rather than from three parallel arrays that could disagree.
+//
+// A cache written before lecture times holds a bare int for the day and a bare
+// string for the name. Both still come through, as one reading with no time:
+// (array) 41 keys on 0, and so does (array) 'Dr. Rao', which is what pairs them.
+function class_readings(array $days, array $faculty, string $key, string $from, string $to): array {
+    $out = [];
     foreach ($days as $date => $classes) {
-        if ($date >= $from && $date <= $to && isset($classes[$key])) $dates[] = $date;
-    }
-    sort($dates);
-    return $dates;
-}
-
-// The distinct lecture times one class reported inside the range, sorted. Over
-// a week these read as the class's slots rather than a list of moments: a class
-// reporting at 09:00, 11:00 and 14:00 every day still shows three times, which
-// is what makes them worth putting beside the average. Rows the sheet carried
-// no clock for contribute nothing, so an old range simply shows no times.
-function class_times(array $days, string $key, string $from, string $to): array {
-    $times = [];
-    foreach ($days as $date => $classes) {
-        if ($date < $from || $date > $to || !is_array($classes[$key] ?? null)) continue;
-        foreach (array_keys($classes[$key]) as $time) {
-            if ($time !== '') $times[$time] = true;
+        if ($date < $from || $date > $to || !isset($classes[$key])) continue;
+        $names = (array) ($faculty[$date][$key] ?? []);
+        foreach ((array) $classes[$key] as $time => $present) {
+            $out[] = [
+                'date'    => $date,
+                'time'    => is_string($time) ? $time : '',
+                'present' => (int) $present,
+                'faculty' => (string) ($names[$time] ?? ''),
+            ];
         }
     }
-    ksort($times);
-    return array_keys($times);
+    return $out;
 }
 
 // Also counts how many of the classes in scope have actually reported, and

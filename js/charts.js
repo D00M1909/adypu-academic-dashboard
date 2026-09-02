@@ -4,7 +4,7 @@
 //
 // Everything is drawn from what index.php already put on the page:
 //   ATTENDANCE_DATA  the range's tree, for the donut and the ranking
-//   ATTENDANCE_DAYS  date -> class key -> present, for the two per-day charts
+//   ATTENDANCE_DAYS  date -> class key -> time -> present, per-day and per-lecture
 //   CLASS_STRENGTH   class key -> strength, the denominator for those days
 // so a drill-down rescopes every chart without another request.
 window.Charts = (function () {
@@ -40,6 +40,35 @@ window.Charts = (function () {
     });
   }
 
+  // A class's number for one day: its latest reading, mirroring day_present()
+  // in includes/attendance.php — change both together. The cache holds one
+  // reading per lecture; a bare number is a cache written before times existed.
+  function dayPresent(readings) {
+    if (typeof readings === 'number') return readings;
+    var times = Object.keys(readings).sort();
+    return times.length ? readings[times[times.length - 1]] : 0;
+  }
+
+  // Every reading for one class in the range, oldest first. The same list the
+  // modal gets from api/division.php, built here from the days already on the
+  // page so the printed report needs no request of its own.
+  function classReadings(key) {
+    var days = window.ATTENDANCE_DAYS || {};
+    var out = [];
+    Object.keys(days).sort().forEach(function (date) {
+      var readings = days[date][key];
+      if (readings === undefined) return;
+      if (typeof readings === 'number') {
+        out.push({ date: date, time: '', present: readings });
+        return;
+      }
+      Object.keys(readings).sort().forEach(function (time) {
+        out.push({ date: date, time: time, present: readings[time] });
+      });
+    });
+    return out;
+  }
+
   function shortDate(iso) {
     var d = new Date(iso + 'T00:00:00');
     return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
@@ -68,7 +97,7 @@ window.Charts = (function () {
       var present = 0, strength = 0, reported = 0;
       Object.keys(days[date]).forEach(function (key) {
         if (key.indexOf(prefix) !== 0) return;
-        present += days[date][key];
+        present += dayPresent(days[date][key]);
         strength += strengths[key] || 0;
         reported++;
       });
@@ -303,6 +332,7 @@ window.Charts = (function () {
           path.push('Division ' + d.division);
           rows.push({
             label: path.join(' / '),
+            key: [state.school, year, branch, d.division].join('|'),
             strength: d.strength,
             present: d.present,
             reported: d.reported,
@@ -340,7 +370,21 @@ window.Charts = (function () {
           '<td>' + r.present + '<span class="report-table-sep">/</span>' + r.strength + '</td>' +
           '<td><span class="att-pct ' + attClass(p) + '">' + p + '%</span></td>'
         : '<td>0</td><td colspan="2"><span class="tile-unreported">Not reported</span></td>';
-      return '<tr><th scope="row">' + esc(r.label) + '</th>' + figures + '</tr>';
+      // Every entry behind that number, one row per lecture. Skipped when there
+      // is only one: it would just repeat the row above it. The class's own row
+      // stays the latest reading, so the report reads the same way the screen
+      // does before anyone drills in.
+      var entries = r.reported ? classReadings(r.key) : [];
+      var subs = entries.length < 2 ? '' : entries.map(function (s) {
+        var sp = pct(s.present, r.strength);
+        return '<tr class="report-subrow"><th scope="row">' +
+          esc(shortDate(s.date) + (s.time ? ' · ' + s.time : '')) + '</th>' +
+          '<td></td>' +
+          '<td>' + s.present + '<span class="report-table-sep">/</span>' + r.strength + '</td>' +
+          '<td><span class="att-pct ' + attClass(sp) + '">' + sp + '%</span></td>' +
+        '</tr>';
+      }).join('');
+      return '<tr><th scope="row">' + esc(r.label) + '</th>' + figures + '</tr>' + subs;
     }).join('');
   }
 
@@ -394,5 +438,7 @@ window.Charts = (function () {
     document.getElementById('charts-scope').textContent = window.ATTENDANCE_RANGE.label;
   }
 
-  return { render: render };
+  // shortDate rides along because the modal lists readings by date too, and a
+  // second copy of it in dashboard.js is a second thing to keep in step.
+  return { render: render, shortDate: shortDate };
 })();

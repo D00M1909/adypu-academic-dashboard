@@ -443,29 +443,57 @@
           ? d.present + '<span class="division-count-sep">/</span>' + d.strength +
             ' <span class="att-pct ' + attClass(divPct) + '">' + divPct + '%</span>'
           : '<span class="tile-unreported">Not reported</span>';
-        // Over a range the count is an average, so the days behind it have to
-        // be on screen: two days out of seven must not read as the week.
-        var dates = d.dates || [];
+        // Every chip below is derived from the one readings list, so nothing on
+        // the row can disagree with the entries listed under it.
+        var readings = d.readings || [];
+        var dates = [], times = [], names = [];
+        readings.forEach(function (r) {
+          if (dates.indexOf(r.date) === -1) dates.push(r.date);
+          if (r.time && times.indexOf(r.time) === -1) times.push(r.time);
+          if (r.faculty && names.indexOf(r.faculty) === -1) names.push(r.faculty);
+        });
+        times.sort();
+
+        // Over a range the count is an average of the days, so the days behind
+        // it have to be on screen: two days out of seven must not read as the
+        // week. Within one day the count is the latest lecture rather than an
+        // average, which is why a single-day range says nothing here.
         var days = dates.length > 1
           ? '<span class="division-days" title="Reported on ' + dates.join(', ') + '">avg of ' +
               dates.length + ' days</span>'
           : '';
-        // Who filed it. Names only exist from the day the Form started asking,
-        // so an older range shows the count with no name rather than an
-        // "unknown" that would read as a fault.
-        // Which lectures the readings came from. Machine-generated HH:MM like
-        // the dates above, so it needs no escaping; rows filed before the sheet
-        // carried a clock have none and simply show nothing.
-        var times = d.times || [];
+        // Which lectures fed it. Machine-generated HH:MM like the dates above,
+        // so it needs no escaping; rows filed before the sheet carried a clock
+        // have none and simply show nothing.
         var at = times.length
           ? '<span class="division-times" title="Reported at ' + times.join(', ') + '">at ' +
               (times.length > 2 ? times[0] + ' +' + (times.length - 1) : times.join(', ')) + '</span>'
           : '';
-        var names = d.faculty || [];
+        // Who filed it. Names only exist from the day the Form started asking,
+        // so an older range shows the count with no name rather than an
+        // "unknown" that would read as a fault.
         var by = names.length
           ? '<span class="division-by" title="' + esc(names.join(', ')) + '">by ' +
               esc(names.length > 1 ? names[0] + ' +' + (names.length - 1) : names[0]) + '</span>'
           : '';
+        // The entries behind the number: one line per lecture, so a class its
+        // faculty reported three times shows all three. Only worth listing when
+        // there are several — a single entry is the readout above, restated.
+        var multiDay = window.ATTENDANCE_RANGE.from !== window.ATTENDANCE_RANGE.to;
+        var entries = readings.length < 2 ? '' :
+          '<ul class="division-readings">' + readings.map(function (r) {
+            var rp = pct(r.present, d.strength);
+            return '<li>' +
+              '<span class="reading-when">' +
+                (multiDay ? window.Charts.shortDate(r.date) + ' · ' : '') +
+                (r.time || 'no time') +
+              '</span>' +
+              '<span class="reading-count">' + r.present +
+                '<span class="division-count-sep">/</span>' + d.strength +
+                ' <span class="att-pct ' + attClass(rp) + '">' + rp + '%</span></span>' +
+              (r.faculty ? '<span class="reading-by">' + esc(r.faculty) + '</span>' : '') +
+            '</li>';
+          }).join('') + '</ul>';
         row.innerHTML =
           '<div class="division-row-top">' +
             '<span class="division-name">Division ' + d.division + days + at + by + '</span>' +
@@ -473,7 +501,8 @@
           '</div>' +
           '<div class="division-bar"><div class="division-bar-fill ' +
             (d.reported ? attClass(divPct) : '') + '" style="width:' +
-            (d.reported ? divPct : 0) + '%"></div></div>';
+            (d.reported ? divPct : 0) + '%"></div></div>' +
+          entries;
         grid.appendChild(row);
       });
 

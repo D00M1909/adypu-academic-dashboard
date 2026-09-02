@@ -19,13 +19,10 @@ $overallPct = attendance_pct($totals);
 // Only the days on screen go to the client, for the charts. A month is about
 // 60KB of JSON inline; a year would be 600KB, which is the ceiling on picking
 // a very long range (see the ponytail note on day_map()).
-// The charts want one number per class per day; the cache holds one per
-// lecture. Collapsed with the same mean the tiles use, so a class reported
-// after three lectures is not three points of 100% on the trend line.
-$rangeDays = [];
-foreach ($days as $date => $classes) {
-    if ($date >= $from && $date <= $to) $rangeDays[$date] = array_map('day_present', $classes);
-}
+// Sent whole, one entry per lecture, because the printed report lists them.
+// charts.js collapses a day to its latest reading with the same rule
+// day_present() uses, so the trend line and the tiles cannot drift apart.
+$rangeDays = array_filter($days, fn($d) => $d >= $from && $d <= $to, ARRAY_FILTER_USE_KEY);
 $classStrength = [];
 foreach (class_rows() as $c) $classStrength[class_key($c)] = $c['strength'];
 $dataDates = $days ? [min(array_keys($days)), max(array_keys($days))] : [$from, $to];

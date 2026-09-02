@@ -286,10 +286,12 @@ assert(resolve_range($days, '2026-08-26', '2026-08-24') === ['2026-08-24', '2026
 assert(find_div(aggregate_days($days), 'law', '2nd Year', '', 'A')['present'] === 28,
     'the default view should be the latest day, not an average of everything');
 
-// The dates behind an average, so the modal can name them.
-assert(class_dates($days, 'law|2nd Year||A', '2026-08-24', '2026-08-26') ===
-    ['2026-08-24', '2026-08-25', '2026-08-26'], 'reported dates wrong');
-assert(class_dates($days, 'law|2nd Year||B', '2026-08-24', '2026-08-25') === [], 'dates outside the range leaked in');
+// The readings behind an average, so the modal can name the days it rests on.
+$aReadings = class_readings($days, [], 'law|2nd Year||A', '2026-08-24', '2026-08-26');
+assert(array_column($aReadings, 'date') === ['2026-08-24', '2026-08-25', '2026-08-26'], 'reported dates wrong');
+assert(array_column($aReadings, 'present') === [20, 30, 28], 'reading counts wrong: ' . json_encode($aReadings));
+assert(class_readings($days, [], 'law|2nd Year||B', '2026-08-24', '2026-08-25') === [],
+    'readings outside the range leaked in');
 
 // --- Faculty names: attribution only, never a count -------------------------
 // The Form grew a name question in Aug 2026, so the sheet carries rows with a
@@ -317,12 +319,8 @@ assert(find_div(aggregate_days($nDays, '2026-08-24', '2026-08-26'), 'law', '2nd 
 
 // What api/division.php hands the modal: the distinct names over the days the
 // class actually reported, in date order, so a substitution is visible.
-$aDates = class_dates($nDays, 'law|2nd Year||A', '2026-08-24', '2026-08-26');
-$aNames = [];
-foreach ($aDates as $date) {
-    foreach ((array) ($nNames[$date]['law|2nd Year||A'] ?? []) as $n) $aNames[] = $n;
-}
-$aNames = array_values(array_unique(array_filter($aNames)));
+$aEntries = class_readings($nDays, $nNames, 'law|2nd Year||A', '2026-08-24', '2026-08-26');
+$aNames = array_values(array_unique(array_filter(array_column($aEntries, 'faculty'))));
 assert($aNames === ['Dr. Meera Rao', 'Prof. S. Iyer'], 'expected both faculty once: ' . implode(', ', $aNames));
 
 // --- Lecture times: one reading per lecture, not one per day ----------------
@@ -333,28 +331,33 @@ $lectures = "timestamp,time of class,class,present,date\n" .
     '"2026-08-26 09:12","09:00","School of Law / 2nd Year / A","20","2026-08-26"' . "\n" .
     '"2026-08-26 11:40","11:00","School of Law / 2nd Year / A","30","2026-08-26"' . "\n" .
     '"2026-08-26 14:05","14:00","School of Law / 2nd Year / A","28","2026-08-26"' . "\n" .
-    '"2026-08-26 14:06","14:00","School of Law / 2nd Year / A","25","2026-08-26"' . "\n";
+    '"2026-08-26 14:06","14:00","School of Law / 2nd Year / A","26","2026-08-26"' . "\n";
 $lecRows = parse_attendance_csv($lectures);
 assert($lecRows[0]['time'] === '09:00', 'the Time question should beat the timestamp: ' . $lecRows[0]['time']);
 $lecDays = day_map($lecRows);
 // Three lectures kept, and the fourth row corrects the 2pm one rather than
 // becoming a fourth lecture.
-assert($lecDays['2026-08-26']['law|2nd Year||A'] === ['09:00' => 20, '11:00' => 30, '14:00' => 25],
+assert($lecDays['2026-08-26']['law|2nd Year||A'] === ['09:00' => 20, '11:00' => 30, '14:00' => 26],
     'lecture readings lost: ' . json_encode($lecDays['2026-08-26']['law|2nd Year||A']));
 
-// A day is the mean of its lectures, the rule a range already follows: summing
-// three readings of the same 30 students would put the class at 250%.
+// The day's headline number is its LATEST lecture, not the mean of the three:
+// what the tile has to say is the state of the class as of the most recent
+// lecture, before anyone opens the breakdown. Mean would give 25 here.
 $lecA = $lecDays['2026-08-26']['law|2nd Year||A'];
-assert(day_present($lecA) === 25, 'a day should average its lectures: ' . day_present($lecA));
-assert(find_div(aggregate_days($lecDays), 'law', '2nd Year', '', 'A')['present'] === 25,
-    'the tree lost the lecture average');
+assert(day_present($lecA) === 26, 'a day should show its latest lecture: ' . day_present($lecA));
+assert(find_div(aggregate_days($lecDays), 'law', '2nd Year', '', 'A')['present'] === 26,
+    'the tree lost the latest lecture');
 $lecTotals = attendance_totals(['law' => ['2nd Year' => aggregate_days($lecDays)['law']['2nd Year']]]);
 assert($lecTotals['strength_reported'] === 30, 'strength counted once per lecture: ' . $lecTotals['strength_reported']);
 
-// What the modal shows beside the average: the distinct slots, sorted.
-assert(class_times($lecDays, 'law|2nd Year||A', '2026-08-26', '2026-08-26') === ['09:00', '11:00', '14:00'],
-    'lecture times wrong: ' . json_encode(class_times($lecDays, 'law|2nd Year||A', '2026-08-26', '2026-08-26')));
-assert(class_times($lecDays, 'law|2nd Year||B', '2026-08-26', '2026-08-26') === [], 'times invented for an unreported class');
+// Every entry, which is what the modal lists under the division and the report
+// prints under the class. The chips on screen are derived from exactly this.
+$lecEntries = class_readings($lecDays, faculty_map($lecRows), 'law|2nd Year||A', '2026-08-26', '2026-08-26');
+assert(array_column($lecEntries, 'time') === ['09:00', '11:00', '14:00'],
+    'lecture times wrong: ' . json_encode($lecEntries));
+assert(array_column($lecEntries, 'present') === [20, 30, 26], 'the earlier lectures were lost, not just hidden');
+assert(class_readings($lecDays, [], 'law|2nd Year||B', '2026-08-26', '2026-08-26') === [],
+    'readings invented for an unreported class');
 
 // No Time question: the submission timestamp stands in, rounded down to the
 // hour, so a correction filed a minute later overwrites its original while the
@@ -382,8 +385,14 @@ assert($twoNames['2026-08-26']['law|2nd Year||A'] === ['09:00' => 'Dr. Meera Rao
 assert(day_present(41) === 41, 'a pre-times cache entry must still read');
 assert(find_div(aggregate_days(['2026-08-26' => ['law|2nd Year||A' => 41]]), 'law', '2nd Year', '', 'A')['present'] === 41,
     'a pre-times cache must still aggregate');
-assert(class_times(['2026-08-26' => ['law|2nd Year||A' => 41]], 'law|2nd Year||A', '2026-08-26', '2026-08-26') === [],
-    'a pre-times cache must report no times, not crash');
+// A bare int and a bare name both cast to a one-element array keyed on 0, which
+// is what still pairs the reading with whoever filed it.
+assert(class_readings(
+    ['2026-08-26' => ['law|2nd Year||A' => 41]],
+    ['2026-08-26' => ['law|2nd Year||A' => 'Dr. Meera Rao']],
+    'law|2nd Year||A', '2026-08-26', '2026-08-26'
+) === [['date' => '2026-08-26', 'time' => '', 'present' => 41, 'faculty' => 'Dr. Meera Rao']],
+    'a pre-times cache must read back as one nameless-slot reading');
 
 assert(row_time('26/08/2026 14:05:02') === '14:05', 'd/m/Y timestamp time wrong: ' . row_time('26/08/2026 14:05:02'));
 assert(row_time('1899-12-30 09:30:00') === '09:30', 'a Form time cell wrong: ' . row_time('1899-12-30 09:30:00'));
