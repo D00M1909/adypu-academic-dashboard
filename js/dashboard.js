@@ -469,7 +469,7 @@
         // Machine-generated HH:MM like the dates above, so it needs no
         // escaping; rows filed before the sheet carried a clock have none.
         var at = lone && times.length
-          ? '<span class="division-times">at ' + times[0] + '</span>'
+          ? '<span class="division-times">at ' + window.Charts.slotLabel(times[0]) + '</span>'
           : '';
         // Names only exist from the day the Form started asking, so an older
         // range shows the count with no name rather than an "unknown" that
@@ -487,7 +487,7 @@
             return '<li>' +
               '<span class="reading-when">' +
                 (multiDay ? window.Charts.shortDate(r.date) + ' · ' : '') +
-                (r.time || 'no time') +
+                (r.time ? window.Charts.slotLabel(r.time) : 'no time') +
               '</span>' +
               '<span class="reading-count">' + r.present +
                 '<span class="division-count-sep">/</span>' + d.strength +

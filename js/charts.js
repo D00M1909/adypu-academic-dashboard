@@ -69,6 +69,27 @@ window.Charts = (function () {
     return out;
   }
 
+  // "16:00" -> "4:00 to 5:00 PM". The cache keys a reading by the lecture's
+  // START, in 24-hour time, because that is what sorts; this is the only place
+  // it turns into something to read. Every teaching slot in the timetable is
+  // exactly one hour, in the 1st Year grid and the 2nd/3rd/4th Year one alike,
+  // so the end is derived instead of stored.
+  //
+  // The meridiem is printed once when both ends share it ("9:30 to 10:30 AM")
+  // and twice when they don't, or the 11:30 lecture would read as 11:30 PM.
+  //
+  // ponytail: one-hour slots assumed. Store the end beside the start in
+  // day_map() if a two-hour lab ever has to read correctly.
+  function slotLabel(time) {
+    var bits = /^(\d{1,2}):(\d{2})$/.exec(time);
+    if (!bits) return time;
+    var start = Number(bits[1]), end = (start + 1) % 24;
+    function clock(h) { return (h % 12 || 12) + ':' + bits[2]; }
+    function half(h) { return h < 12 ? 'AM' : 'PM'; }
+    return clock(start) + (half(start) === half(end) ? '' : ' ' + half(start)) +
+      ' to ' + clock(end) + ' ' + half(end);
+  }
+
   function shortDate(iso) {
     var d = new Date(iso + 'T00:00:00');
     return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
@@ -391,7 +412,7 @@ window.Charts = (function () {
       var subs = r.entries.length < 2 ? '' : r.entries.map(function (s) {
         var sp = pct(s.present, r.strength);
         return '<tr class="report-subrow"><th scope="row">' +
-          esc(shortDate(s.date) + (s.time ? ' · ' + s.time : '')) + '</th>' +
+          esc(shortDate(s.date) + (s.time ? ' · ' + slotLabel(s.time) : '')) + '</th>' +
           '<td></td>' +
           '<td>' + s.present + '<span class="report-table-sep">/</span>' + r.strength + '</td>' +
           '<td><span class="att-pct ' + attClass(sp) + '">' + sp + '%</span></td>' +
@@ -453,5 +474,5 @@ window.Charts = (function () {
 
   // shortDate rides along because the modal lists readings by date too, and a
   // second copy of it in dashboard.js is a second thing to keep in step.
-  return { render: render, shortDate: shortDate };
+  return { render: render, shortDate: shortDate, slotLabel: slotLabel };
 })();
