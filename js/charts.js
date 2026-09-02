@@ -350,10 +350,24 @@ window.Charts = (function () {
   // tiles that only exists two clicks away.
   function renderBreakdown(section, meta, tbody, state) {
     var out = state.school ? classBreakdown(state) : { rows: [], groups: 0 };
-    // One group is the divisions grid, which prints already. No school
+    out.rows.forEach(function (r) {
+      r.entries = r.reported ? classReadings(r.key) : [];
+    });
+
+    // One group is the divisions grid, which prints already — UNLESS a class in
+    // it was reported more than once IN A DAY. The grid shows a division one
+    // number, the latest reading, and those lectures then exist nowhere else on
+    // the page; a report of a single division is exactly that case. More
+    // entries than days is the test, because a class reported once a day across
+    // a range is already spelled out by the Day by day table below. No school
     // selected is the whole university, where the schools grid and the ranking
     // chart are the breakdown.
-    section.hidden = out.groups < 2 || !out.rows.length;
+    var hasLectures = out.rows.some(function (r) {
+      var dates = {};
+      r.entries.forEach(function (e) { dates[e.date] = true; });
+      return r.entries.length > Object.keys(dates).length;
+    });
+    section.hidden = !out.rows.length || (out.groups < 2 && !hasLectures);
     if (section.hidden) return;
 
     var scope = [window.SCHOOLS[state.school].name.replace(/^School of /, '')];
@@ -374,8 +388,7 @@ window.Charts = (function () {
       // is only one: it would just repeat the row above it. The class's own row
       // stays the latest reading, so the report reads the same way the screen
       // does before anyone drills in.
-      var entries = r.reported ? classReadings(r.key) : [];
-      var subs = entries.length < 2 ? '' : entries.map(function (s) {
+      var subs = r.entries.length < 2 ? '' : r.entries.map(function (s) {
         var sp = pct(s.present, r.strength);
         return '<tr class="report-subrow"><th scope="row">' +
           esc(shortDate(s.date) + (s.time ? ' · ' + s.time : '')) + '</th>' +
