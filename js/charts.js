@@ -126,7 +126,10 @@ window.Charts = (function () {
       var present = 0, strength = 0, reported = 0;
       Object.keys(days[date]).forEach(function (key) {
         if (key.indexOf(prefix) !== 0) return;
-        present += dayPresent(days[date][key]);
+        // Capped at the class's strength, exactly as aggregate_days() caps it:
+        // more present than enrolled is a wrong enrolment, and uncapped it drew
+        // a 211% day and a negative absent count. Change both together.
+        present += Math.min(dayPresent(days[date][key]), strengths[key] || Infinity);
         strength += strengths[key] || 0;
         reported++;
       });
