@@ -162,6 +162,15 @@ function placeholder_schools(): array {
     return $out;
 }
 
+// Whether a school's strengths are invented rather than counted. Nothing may
+// state those as fact: "450 students" on Law's tile reads as a roll count when
+// it is five years of the A=30/B=60 default. Derived from placeholder_schools()
+// so the two can never drift apart, and a school stops being one the moment its
+// real structure lands in class_structure().
+function is_placeholder_school(string $school): bool {
+    return isset(placeholder_schools()[$school]);
+}
+
 // Flattens class_structure() to one row per division.
 function class_rows(): array {
     $rows = [];

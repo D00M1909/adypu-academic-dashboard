@@ -15,6 +15,16 @@ function divisionLabel(name) {
   return String(name).length > 2 ? String(name) : 'Division ' + name;
 }
 
+// Whether a school's strengths are invented rather than counted. Such a school
+// may not state an enrolment as fact, so its unreported tiles and rows say only
+// that nobody reported. Mirrors is_placeholder_school() in structure.php, whose
+// answer index.php ships on window.SCHOOLS. Global on purpose: dashboard.js
+// draws the division tiles and modal rows the same way.
+function placeholderSchool(id) {
+  var s = window.SCHOOLS && window.SCHOOLS[id];
+  return !!(s && s.placeholder);
+}
+
 window.Charts = (function () {
   // A class key is "school|year|branch|division", so the current selection is
   // a prefix of every key inside it. Branchless schools key on an empty branch
@@ -272,6 +282,7 @@ window.Charts = (function () {
       node.forEach(function (d) {
         out.push({
           name: divisionLabel(d.division),
+          school: state.school,
           totals: totalsOf([d])
         });
       });
@@ -279,6 +290,7 @@ window.Charts = (function () {
       Object.keys(node).forEach(function (k) {
         out.push({
           name: label === 'school' ? (window.SCHOOLS[k] ? window.SCHOOLS[k].name.replace(/^School of /, '') : k) : (k || 'General'),
+          school: label === 'school' ? k : state.school,
           totals: sum(node[k])
         });
       });
@@ -303,7 +315,8 @@ window.Charts = (function () {
       var v = pct(r.totals.present, r.totals.strengthReported);
       var readout = r.totals.reported
         ? '<span class="att-pct ' + attClass(v) + '">' + v + '%</span>'
-        : '<span class="tile-unreported">' + r.totals.strength + ' students</span>';
+        : '<span class="tile-unreported">' + (placeholderSchool(r.school)
+            ? 'Not reported' : r.totals.strength + ' students') + '</span>';
       return '<div class="bar-row">' +
         '<span class="bar-name">' + esc(r.name) + '</span>' +
         '<span class="division-bar"><span class="division-bar-fill ' +
@@ -420,8 +433,10 @@ window.Charts = (function () {
         ? '<td>' + r.days + '</td>' +
           '<td>' + r.present + '<span class="report-table-sep">/</span>' + r.strength + '</td>' +
           '<td><span class="att-pct ' + attClass(p) + '">' + p + '%</span></td>'
-        : '<td>0</td><td><span class="tile-unreported">' + r.strength + '</span></td>' +
-          '<td><span class="tile-unreported">Not reported</span></td>';
+        : placeholderSchool(state.school)
+          ? '<td>0</td><td colspan="2"><span class="tile-unreported">Not reported</span></td>'
+          : '<td>0</td><td><span class="tile-unreported">' + r.strength + '</span></td>' +
+            '<td><span class="tile-unreported">Not reported</span></td>';
       // Every entry behind that number, one row per lecture. Skipped when there
       // is only one: it would just repeat the row above it. The class's own row
       // stays the latest reading, so the report reads the same way the screen

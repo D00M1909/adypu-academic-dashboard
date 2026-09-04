@@ -261,7 +261,10 @@ try {
         <button class="tile school-tile" type="button" data-school="<?= htmlspecialchars($id) ?>">
           <svg class="tile-icon-svg"><use href="#icon-<?= htmlspecialchars($id) ?>"/></svg>
           <span class="tile-label"><?= htmlspecialchars($school['name']) ?></span>
-          <?php if ($st['reported'] === 0): ?>
+          <?php if ($st['reported'] === 0 && is_placeholder_school($id)): ?>
+          <span class="tile-stat tile-unreported">Not reported</span>
+          <span class="division-bar"><span class="division-bar-fill" style="width:0"></span></span>
+          <?php elseif ($st['reported'] === 0): ?>
           <span class="tile-stat tile-unreported"><?= $st['strength'] ?> students</span>
           <span class="division-bar"><span class="division-bar-fill" style="width:0"></span></span>
           <span class="tile-meta">Not reported</span>
@@ -408,7 +411,13 @@ try {
 
 <script>
   window.ATTENDANCE_DATA = <?= json_encode($tree) ?>;
-  window.SCHOOLS = <?= json_encode(SCHOOLS) ?>;
+  <?php
+  // The placeholder flag rides along with the name so every tile, bar and table
+  // in JS can tell an invented strength from a counted one off one lookup.
+  $schoolsJs = [];
+  foreach (SCHOOLS as $sid => $s) $schoolsJs[$sid] = $s + ['placeholder' => is_placeholder_school($sid)];
+  ?>
+  window.SCHOOLS = <?= json_encode($schoolsJs) ?>;
   window.ATTENDANCE_RANGE = <?= json_encode([
       'from' => $from, 'to' => $to, 'label' => $rangeLabel,
       'latest' => $dataDates[1], 'earliest' => $dataDates[0],
