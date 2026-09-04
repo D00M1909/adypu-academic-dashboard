@@ -54,7 +54,7 @@ assert($totals['reported'] === 4, 'four distinct classes were submitted, got ' .
 // was built from submitted rows alone: unreported schools showed 0/0 and their
 // years and branches vanished from the drill-down entirely.
 $partial = "timestamp,class (school of engineering — 4th year),present today\n" .
-           '"2026-08-27","School of Engineering / 4th Year / CS / A","47"' . "\n" .
+           '"2026-08-27","School of Engineering / 4th Year / CS / A","27"' . "\n" .
            '"2026-08-27","School of Engineering / 1st Year / CS / M","48"' . "\n";
 $pTree = aggregate_attendance(parse_attendance_csv($partial));
 assert(count($pTree) === 9, 'all 9 schools must exist, got ' . count($pTree));
@@ -64,7 +64,7 @@ assert(isset($pTree['law']['5th Year']), 'unreported school must keep its years'
 
 $pt = attendance_totals($pTree);
 assert($pt['strength'] === 4874, 'denominator must be the whole university: ' . $pt['strength']);
-assert($pt['present'] === 95, 'present should count only submissions: ' . $pt['present']);
+assert($pt['present'] === 75, 'present should count only submissions: ' . $pt['present']);
 assert($pt['reported'] === 2 && $pt['classes'] === 136,
     "reported count wrong: {$pt['reported']}/{$pt['classes']}");
 
@@ -77,7 +77,7 @@ assert($law['strength'] === 450 && $law['present'] === 0 && $law['reported'] ===
 // "nobody submitted".
 $reportedDiv = null;
 foreach ($pTree['eng']['4th Year']['CS'] as $d) if ($d['division'] === 'A') $reportedDiv = $d;
-assert($reportedDiv['reported'] === true && $reportedDiv['present'] === 47, 'submitted division wrong');
+assert($reportedDiv['reported'] === true && $reportedDiv['present'] === 27, 'submitted division wrong');
 foreach ($pTree['eng']['3rd Year']['CS'] as $d) {
     assert($d['reported'] === false && $d['present'] === 0, 'unreported division should be flagged');
 }
@@ -387,16 +387,16 @@ assert($twoNames['2026-08-26']['law|2nd Year||A'] === ['09:00' => 'Dr. Meera Rao
 
 // A cache written before lecture times holds a bare int for the whole day. The
 // next push replaces it; until then it must still read, not fatal.
-assert(day_present(41) === 41, 'a pre-times cache entry must still read');
-assert(find_div(aggregate_days(['2026-08-26' => ['law|2nd Year||A' => 41]]), 'law', '2nd Year', '', 'A')['present'] === 41,
+assert(day_present(21) === 21, 'a pre-times cache entry must still read');
+assert(find_div(aggregate_days(['2026-08-26' => ['law|2nd Year||A' => 21]]), 'law', '2nd Year', '', 'A')['present'] === 21,
     'a pre-times cache must still aggregate');
 // A bare int and a bare name both cast to a one-element array keyed on 0, which
 // is what still pairs the reading with whoever filed it.
 assert(class_readings(
-    ['2026-08-26' => ['law|2nd Year||A' => 41]],
+    ['2026-08-26' => ['law|2nd Year||A' => 21]],
     ['2026-08-26' => ['law|2nd Year||A' => 'Dr. Meera Rao']],
     'law|2nd Year||A', '2026-08-26', '2026-08-26'
-) === [['date' => '2026-08-26', 'time' => '', 'present' => 41, 'faculty' => 'Dr. Meera Rao']],
+) === [['date' => '2026-08-26', 'time' => '', 'present' => 21, 'faculty' => 'Dr. Meera Rao']],
     'a pre-times cache must read back as one nameless-slot reading');
 
 assert(row_time('26/08/2026 14:05:02') === '14:05', 'd/m/Y timestamp time wrong: ' . row_time('26/08/2026 14:05:02'));
@@ -417,6 +417,19 @@ assert($pd['strength'] === 4874, 'full strength should still be reported: ' . $p
 assert($pd['strength_reported'] === 30, 'reported strength wrong: ' . $pd['strength_reported']);
 assert(attendance_pct($pd) === 50, 'percentage should be over reported classes only: ' . attendance_pct($pd));
 assert(attendance_pct(attendance_totals(aggregate_days([]))) === 0, 'no data must not divide by zero');
+
+// --- More present than enrolled is a wrong enrolment, not a full class -------
+// Real case, 3 Sep 2026: 59 filed against 4th Year CS division A, which the
+// school says holds 28. Uncapped it drew 211% present and "Absent -31" on every
+// chart. The day is capped at the strength; class_readings() still shows the 59.
+$over = aggregate_days(day_map(parse_attendance_csv(
+    "date,class,present\n2026-09-03,School of Engineering / 4th Year / CS / A,59\n"
+)));
+assert(find_div($over, 'eng', '4th Year', 'CS', 'A')['present'] === 28,
+    'an over-count should cap at the strength: ' . find_div($over, 'eng', '4th Year', 'CS', 'A')['present']);
+$ot = attendance_totals($over);
+assert(attendance_pct($ot) === 100, 'a percentage must not exceed 100: ' . attendance_pct($ot));
+assert($ot['strength_reported'] - $ot['present'] === 0, 'absent must not go negative');
 
 // --- Range labels -----------------------------------------------------------
 assert(range_label('2026-08-26', '2026-08-26') === '26 Aug 2026', range_label('2026-08-26', '2026-08-26'));

@@ -366,12 +366,24 @@ function aggregate_days(array $days, ?string $from = null, ?string $to = null): 
     require_once __DIR__ . '/structure.php';
     [$from, $to] = resolve_range($days, $from, $to);
 
+    // A class cannot have more students present than it has enrolled, so a day
+    // that says otherwise is the structure's strength being wrong, not a real
+    // reading, and it is capped to the strength. Uncapped, one row of 59 against
+    // a class of 28 drew 211% present and "Absent -31" across every chart on the
+    // page. The raw count is not lost: class_readings() still lists it, which is
+    // where you go to see that the enrolment needs correcting. Capped per day
+    // rather than after the mean, because charts.js caps dailySeries() the same
+    // way and the trend line must not drift from the tiles.
+    $strength = [];
+    foreach (class_rows() as $c) $strength[class_key($c)] = $c['strength'];
+
     $sum = [];
     $count = [];
     foreach ($days as $date => $classes) {
         if ($date < $from || $date > $to) continue;
         foreach ($classes as $key => $readings) {
-            $sum[$key] = ($sum[$key] ?? 0) + day_present($readings);
+            $cap = $strength[$key] ?? PHP_INT_MAX;
+            $sum[$key] = ($sum[$key] ?? 0) + min($cap, day_present($readings));
             $count[$key] = ($count[$key] ?? 0) + 1;
         }
     }

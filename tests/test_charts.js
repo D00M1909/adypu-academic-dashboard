@@ -230,4 +230,18 @@ window.Charts.render({ school: 'eng', year: '1st Year', branch: 'Core' },
   { present: 0, strengthReported: 0, reported: 0, classes: 2 });
 assert(els['chart-donut'].innerHTML.includes('has reported'), 'empty donut should explain itself');
 
+// --- A count above the class's strength is capped -------------------------
+// Real case, 3 Sep 2026: 59 present filed against 4th Year CS division A, which
+// the school says holds 28. Uncapped, the day drew 211% and "Absent -31". The
+// cap mirrors aggregate_days() in PHP, so the trend cannot drift from the tiles.
+window.ATTENDANCE_DAYS = {
+  '2026-08-27': { 'eng|1st Year|Core|A': { '09:30': 180 } },
+};
+window.Charts.render({ school: 'eng', year: '1st Year', branch: 'Core', division: 'A' },
+  { present: 100, strengthReported: 100, reported: 1, classes: 1 });
+const capped = els['daybyday-rows'].innerHTML;
+assert(capped.includes('>100<'), 'a day over strength should cap at it: ' + capped);
+assert(!capped.includes('180'), 'the raw over-count reached the chart: ' + capped);
+assert(!/\b(1[0-9][0-9]|[2-9][0-9][0-9])%/.test(capped), 'a day percentage exceeded 100: ' + capped);
+
 console.log('OK');
