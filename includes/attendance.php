@@ -64,19 +64,23 @@ function sample_attendance_rows(): array {
 
     foreach (class_rows() as $c) {
         // Two placeholder formulas, kept only so the numbers match what the
-        // dashboard showed before the structure was extracted. Both die with
+        // dashboard showed before the structure was extracted. Both were
+        // written as a flat count of absentees against the 60 every class then
+        // had, so they are scaled by strength/60 here: a class of 60 keeps its
+        // old number exactly, and Design's class of four no longer reads 20%
+        // because five people it does not have failed to turn up. Both die with
         // the sample data.
         if ($c['school'] === 'eng') {
             $i++;
-            $present = $c['strength'] - (8 + ($i % 6) * 4);
+            $absent = 8 + ($i % 6) * 4;
         } else {
-            $key = $c['school'] . '|' . $c['year'];
             $yearIndex[$c['school']] ??= [];
             $yearIndex[$c['school']][$c['year']] ??= count($yearIndex[$c['school']]);
             $y = $yearIndex[$c['school']][$c['year']];
             $j = $c['division'] === 'A' ? 0 : 1;
-            $present = $c['strength'] - (5 + $y * 3 + $j * 2);
+            $absent = 5 + $y * 3 + $j * 2;
         }
+        $present = $c['strength'] - (int) round($c['strength'] * $absent / 60);
         $rows[] = $c + ['present' => $present, 'date' => $today];
     }
 
