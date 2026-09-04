@@ -114,7 +114,7 @@
     if (state.school) parts.push(window.SCHOOLS[state.school].name.replace(/^School of /, ''));
     if (state.year) parts.push(state.year);
     if (state.branch) parts.push(state.branch);
-    if (state.division) parts.push('Division ' + state.division);
+    if (state.division) parts.push(divisionLabel(state.division));
     // Drilled in, the path is the useful label; the range stays visible in the
     // date bar. At root there is no path, so the range takes its place.
     document.getElementById('stat-scope').textContent = parts.length
@@ -147,7 +147,7 @@
       crumbs.push({ key: 'branch', label: state.branch });
     }
     if (state.division) {
-      crumbs.push({ key: 'division', label: 'Division ' + state.division });
+      crumbs.push({ key: 'division', label: divisionLabel(state.division) });
     }
     breadcrumb.innerHTML = crumbs.map(function (crumb, index) {
       var current = index === crumbs.length - 1;
@@ -229,7 +229,7 @@
       tile.className = 'tile division-tile';
       tile.dataset.division = d.division;
       tile.innerHTML =
-        '<span class="tile-label">Division ' + d.division + '</span>' +
+        '<span class="tile-label">' + divisionLabel(d.division) + '</span>' +
         (d.reported
           ? '<span class="tile-stat">' + d.present + '<span class="tile-stat-sep">/</span>' +
             d.strength + ' \u00b7 <span class="att-pct ' + attClass(divPct) + '">' + divPct + '%</span></span>' +
@@ -503,7 +503,7 @@
           }).join('') + '</ul>';
         row.innerHTML =
           '<div class="division-row-top">' +
-            '<span class="division-name">Division ' + d.division + days + at + by + '</span>' +
+            '<span class="division-name">' + divisionLabel(d.division) + days + at + by + '</span>' +
             '<span class="division-count">' + readout + '</span>' +
           '</div>' +
           '<div class="division-bar"><div class="division-bar-fill ' +

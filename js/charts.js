@@ -7,6 +7,14 @@
 //   ATTENDANCE_DAYS  date -> class key -> time -> present, per-day and per-lecture
 //   CLASS_STRENGTH   class key -> strength, the denominator for those days
 // so a drill-down rescopes every chart without another request.
+// A division is normally a letter, and reads best as "Division A". Some schools
+// name theirs after the stream instead ("Medical Biotechnology"), where the
+// prefix is noise. Global on purpose: dashboard.js loads after this and labels
+// divisions in four more places.
+function divisionLabel(name) {
+  return String(name).length > 2 ? String(name) : 'Division ' + name;
+}
+
 window.Charts = (function () {
   // A class key is "school|year|branch|division", so the current selection is
   // a prefix of every key inside it. Branchless schools key on an empty branch
@@ -255,7 +263,7 @@ window.Charts = (function () {
     if (Array.isArray(node)) {
       node.forEach(function (d) {
         out.push({
-          name: 'Division ' + d.division,
+          name: divisionLabel(d.division),
           totals: totalsOf([d])
         });
       });
@@ -298,7 +306,7 @@ window.Charts = (function () {
   }
 
   // How many of the scope's classes filled the form in, per day. The honesty
-  // chart: a 95% attendance figure resting on 6 of 103 classes should be
+  // chart: a 95% attendance figure resting on 6 of 136 classes should be
   // visible as exactly that.
   function renderCompliance(el, prefix) {
     // Every day in the range, not just the ones with submissions: a day nobody
@@ -350,7 +358,7 @@ window.Charts = (function () {
           var path = [];
           if (!state.year) path.push(year);
           if (!branchFixed && branch) path.push(branch);
-          path.push('Division ' + d.division);
+          path.push(divisionLabel(d.division));
           rows.push({
             label: path.join(' / '),
             key: [state.school, year, branch, d.division].join('|'),
