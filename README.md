@@ -1,6 +1,6 @@
 # ADYPU Academic Dashboard
 
-Daily attendance for Ajeenkya D Y Patil University: nine schools, 103 classes,
+Daily attendance for Ajeenkya D Y Patil University: nine schools, 136 classes,
 drilled from School to Year to Branch to Division over any date range.
 
 Live: <https://adypu-academic-dashboard.fast-page.org/>
@@ -12,7 +12,7 @@ Live: <https://adypu-academic-dashboard.fast-page.org/>
 ## What it does
 
 - **A number that means something.** Present against the strength of the classes
-  that reported, beside a count of how many of the 103 those were. Neither can
+  that reported, beside a count of how many of the 136 those were. Neither can
   mislead on its own.
 - **Any date range.** Presets, or two date inputs. A range averages each class
   over the days it reported, so a week stays comparable to a day, and the

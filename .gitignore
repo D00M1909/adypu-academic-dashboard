@@ -6,3 +6,4 @@ CLAUDE.md
 cache/*.json
 includes/config.local.php
 upload/
+class-options.txt

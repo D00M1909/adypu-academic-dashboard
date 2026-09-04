@@ -193,7 +193,7 @@ window.Charts.render({ school: 'law', year: '1st Year', branch: null },
   { present: 40, strengthReported: 50, reported: 1, classes: 1 });
 assert(els['breakdown-section'].hidden === true, 'a branchless year should not print its divisions twice');
 
-// Root: 103 classes is not a breakdown, it is the whole database.
+// Root: 136 classes is not a breakdown, it is the whole database.
 window.Charts.render({ school: null, year: null, branch: null },
   { present: 163, strengthReported: 230, reported: 4, classes: 5 });
 assert(els['breakdown-section'].hidden === true, 'no school selected should show no breakdown');

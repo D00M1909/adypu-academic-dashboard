@@ -10,20 +10,20 @@ $csv = "school,year,branch,division,strength,present,date\n" .
        "eng,2nd Year,CSE,A,7,25,2026-08-26\n" .
        "eng,2nd Year,CSE,B,7,50,2026-08-26\n" .
        "eng,2nd Year,CSE,A,7,28,2026-08-26\n" . // resubmission for CSE div A, should win
-       "eng,2nd Year,ECE,A,7,20,2026-08-26\n" . // same division letter, different branch
+       "eng,2nd Year,AIDS,A,7,20,2026-08-26\n" . // same division letter, different branch
        "mgmt,1st Year,,A,7,25,2026-08-26\n" .   // no branch structure -> branch key ''
        "eng,2nd Year,CSE,ZZ,7,99,2026-08-26\n"; // division that doesn't exist -> dropped
 
 $rows = parse_attendance_csv($csv);
 assert(count($rows) === 5, 'expected 5 parsed rows, got ' . count($rows));
-assert($rows[0]['strength'] === 60, 'strength must come from structure, not the row');
+assert($rows[0]['strength'] === 70, 'strength must come from structure, not the row');
 
 $tree = aggregate_attendance($rows);
 
 // The tree always holds every class in the structure, reported or not, so these
 // counts come from structure.php rather than from what was submitted.
 assert(count($tree['eng']['2nd Year']['CSE']) === 5, 'CSE should list all 5 divisions');
-assert(count($tree['eng']['2nd Year']['ECE']) === 1, 'ECE div A should not merge with CSE div A');
+assert(count($tree['eng']['2nd Year']['AIDS']) === 4, 'AIDS div A should not merge with CSE div A');
 assert(count($tree['mgmt']['1st Year']['']) === 2, 'branchless school should key under empty branch');
 
 function find_div(array $tree, string $school, string $year, string $branch, string $division): ?array {
@@ -37,20 +37,20 @@ $divA = find_div($tree, 'eng', '2nd Year', 'CSE', 'A');
 assert($divA !== null, 'CSE division A missing');
 assert($divA['present'] === 28, 'latest submission should win, got ' . $divA['present']);
 assert($divA['reported'] === true, 'submitted division should be flagged reported');
-assert(find_div($tree, 'eng', '2nd Year', 'ECE', 'A')['present'] === 20, 'ECE div A took CSE div A value');
+assert(find_div($tree, 'eng', '2nd Year', 'AIDS', 'A')['present'] === 20, 'AIDS div A took CSE div A value');
 
 // A CSE division nobody submitted still exists, at zero and unreported.
 $divC = find_div($tree, 'eng', '2nd Year', 'CSE', 'C');
 assert($divC['reported'] === false && $divC['present'] === 0, 'unsubmitted division should be zero/unreported');
 
 $totals = attendance_totals($tree);
-assert($totals['strength'] === 5190, 'denominator is the whole university: ' . $totals['strength']);
+assert($totals['strength'] === 4874, 'denominator is the whole university: ' . $totals['strength']);
 assert($totals['present'] === 123, 'total present wrong: ' . $totals['present']);
 assert($totals['reported'] === 4, 'four distinct classes were submitted, got ' . $totals['reported']);
 
 // --- The structure leads, submissions only fill it in -----------------------
 // Two Engineering submissions and nothing else must still yield all 9 schools,
-// every year and branch, and the full 5190 denominator. Before this, the tree
+// every year and branch, and the full 4874 denominator. Before this, the tree
 // was built from submitted rows alone: unreported schools showed 0/0 and their
 // years and branches vanished from the drill-down entirely.
 $partial = "timestamp,class (school of engineering — 4th year),present today\n" .
@@ -59,13 +59,13 @@ $partial = "timestamp,class (school of engineering — 4th year),present today\n
 $pTree = aggregate_attendance(parse_attendance_csv($partial));
 assert(count($pTree) === 9, 'all 9 schools must exist, got ' . count($pTree));
 assert(count($pTree['eng']) === 4, 'all 4 Engineering years must exist');
-assert(count($pTree['eng']['2nd Year']) === 3, 'unreported year must keep its branches');
+assert(count($pTree['eng']['2nd Year']) === 8, 'unreported year must keep its branches');
 assert(isset($pTree['law']['5th Year']), 'unreported school must keep its years');
 
 $pt = attendance_totals($pTree);
-assert($pt['strength'] === 5190, 'denominator must be the whole university: ' . $pt['strength']);
+assert($pt['strength'] === 4874, 'denominator must be the whole university: ' . $pt['strength']);
 assert($pt['present'] === 95, 'present should count only submissions: ' . $pt['present']);
-assert($pt['reported'] === 2 && $pt['classes'] === 103,
+assert($pt['reported'] === 2 && $pt['classes'] === 136,
     "reported count wrong: {$pt['reported']}/{$pt['classes']}");
 
 // A school nobody reported has a real denominator, not 0/0.
@@ -119,7 +119,7 @@ $formRows = parse_attendance_csv($formCsv);
 assert(count($formRows) === 2, 'expected 2 valid form rows, got ' . count($formRows));
 assert($formRows[0]['school'] === 'eng', 'display name should resolve to school id');
 assert($formRows[0]['branch'] === 'CSE', 'branch segment lost');
-assert($formRows[0]['strength'] === 60, 'form row strength should come from structure');
+assert($formRows[0]['strength'] === 70, 'form row strength should come from structure');
 assert($formRows[1]['school'] === 'law' && $formRows[1]['branch'] === '', 'branchless label mis-parsed');
 assert($formRows[1]['strength'] === 60, 'law 1st Year div B strength wrong: ' . $formRows[1]['strength']);
 assert($formRows[0]['date'] !== '', 'missing date column should default to today');
@@ -221,6 +221,11 @@ foreach (class_rows() as $c) {
         "label round-tripped to the wrong class: $label");
 }
 
+// A branch name with a slash in it must not be read as the label's separator:
+// CLASS_SEP has spaces around its slash, "B Des UI/UX" does not.
+assert(parse_class_label('School of Design / 1st Year / B Des UI/UX / B') !== null,
+    'a branch containing a slash broke its label');
+
 // Every class the Form can offer must be unique, or two divisions collide on
 // one dropdown entry and one of them can never be submitted.
 $labels = array_map(fn($c) => class_label($c['school'], $c['year'], $c['branch'], $c['division']), class_rows());
@@ -244,7 +249,7 @@ assert(row_date('not a date') === null, 'junk must not parse as a date');
 // A Date question sitting inside each section repeats the column, exactly like
 // Class and Present. The blank copies must not win.
 $dupDate = "timestamp,date (law),date (design),class,present\n" .
-    '"2026-08-27","","2026-08-23","School of Design / 1st Year / A","19"' . "\n";
+    '"2026-08-27","","2026-08-23","School of Design / 1st Year / PGDM / A","19"' . "\n";
 assert(parse_attendance_csv($dupDate)[0]['date'] === '2026-08-23', 'duplicate date column collapsed');
 
 // --- Ranges: an average over the days reported, never a sum -----------------
@@ -408,7 +413,7 @@ $partialDay = aggregate_days(day_map(parse_attendance_csv(
     "date,class,present\n2026-08-26,School of Law / 2nd Year / A,15\n"
 )));
 $pd = attendance_totals($partialDay);
-assert($pd['strength'] === 5190, 'full strength should still be reported: ' . $pd['strength']);
+assert($pd['strength'] === 4874, 'full strength should still be reported: ' . $pd['strength']);
 assert($pd['strength_reported'] === 30, 'reported strength wrong: ' . $pd['strength_reported']);
 assert(attendance_pct($pd) === 50, 'percentage should be over reported classes only: ' . attendance_pct($pd));
 assert(attendance_pct(attendance_totals(aggregate_days([]))) === 0, 'no data must not divide by zero');
