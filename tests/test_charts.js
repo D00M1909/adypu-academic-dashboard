@@ -89,10 +89,11 @@ assert(els['chart-trend'].innerHTML.includes('90% (1 classes)'), 'branchless sco
 assert(els['chart-compliance'].innerHTML.includes('1 of 2 classes reported'), 'law scope wrong');
 
 // A class nobody reported must not be drawn as a zero, which reads as total
-// absence rather than a missing form.
+// absence rather than a missing form. It states the enrolment it does have
+// instead, which is the one number that is known without a submission.
 window.Charts.render({ school: 'law', year: '1st Year', branch: '' },
   { present: 85, strengthReported: 100, reported: 1, classes: 2 });
-assert(els['chart-bars'].innerHTML.includes('Not reported'), 'unreported division should say so');
+assert(els['chart-bars'].innerHTML.includes('100 students'), 'unreported division should state its enrolment');
 assert(!els['chart-bars'].innerHTML.includes('>0%<'), 'unreported division drawn as a 0% reading');
 
 // One division selected: the scope is a whole class key, and a trailing
@@ -137,8 +138,12 @@ assert(breakdown.includes('2nd Year / ECE / Division A'), 'later years missing f
 assert(breakdown.includes('75%') && breakdown.includes('80%') && breakdown.includes('50%'),
   'per-class percentages wrong: ' + breakdown);
 // An unreported class is part of the school whether or not anyone filed for
-// it, and saying so is most of why a head of school wants this page.
+// it, and saying so is most of why a head of school wants this page. It states
+// its enrolment in the figures column so the columns still line up beside a
+// reported row's "48/60".
 assert(breakdown.includes('Not reported'), 'unreported class dropped from the breakdown');
+assert(breakdown.includes('<td>0</td><td><span class="tile-unreported">60</span></td>'),
+  'unreported row should state its strength in the figures column: ' + breakdown);
 assert(!breakdown.includes('>0%<'), 'unreported class drawn as a 0% reading');
 
 // Every entry behind a class's number is printed under it, so the report states

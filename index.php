@@ -262,8 +262,9 @@ try {
           <svg class="tile-icon-svg"><use href="#icon-<?= htmlspecialchars($id) ?>"/></svg>
           <span class="tile-label"><?= htmlspecialchars($school['name']) ?></span>
           <?php if ($st['reported'] === 0): ?>
-          <span class="tile-stat tile-unreported">Not reported</span>
+          <span class="tile-stat tile-unreported"><?= $st['strength'] ?> students</span>
           <span class="division-bar"><span class="division-bar-fill" style="width:0"></span></span>
+          <span class="tile-meta">Not reported</span>
           <?php else: ?>
           <span class="tile-stat"><?= $st['present'] ?><span class="tile-stat-sep">/</span><?= $st['strength_reported'] ?> &middot; <span class="att-pct <?= att_class($stPct) ?>"><?= $stPct ?>%</span></span>
           <span class="division-bar"><span class="division-bar-fill <?= att_class($stPct) ?>" style="width:<?= $stPct ?>%"></span></span>

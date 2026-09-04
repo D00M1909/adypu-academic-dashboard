@@ -235,8 +235,9 @@
             d.strength + ' \u00b7 <span class="att-pct ' + attClass(divPct) + '">' + divPct + '%</span></span>' +
             '<span class="division-bar"><span class="division-bar-fill ' + attClass(divPct) +
               '" style="width:' + divPct + '%"></span></span>'
-          : '<span class="tile-stat tile-unreported">Not reported</span>' +
-            '<span class="division-bar"><span class="division-bar-fill" style="width:0"></span></span>');
+          : '<span class="tile-stat tile-unreported">' + d.strength + ' students</span>' +
+            '<span class="division-bar"><span class="division-bar-fill" style="width:0"></span></span>' +
+            '<span class="tile-meta">Not reported</span>');
       tile.addEventListener('click', function () {
         var selecting = state.division !== d.division;
         state.division = selecting ? d.division : null;
@@ -448,7 +449,7 @@
         var readout = d.reported
           ? d.present + '<span class="division-count-sep">/</span>' + d.strength +
             ' <span class="att-pct ' + attClass(divPct) + '">' + divPct + '%</span>'
-          : '<span class="tile-unreported">Not reported</span>';
+          : '<span class="tile-unreported">' + d.strength + ' students, not reported</span>';
         // Every chip below is derived from the one readings list, so nothing on
         // the row can disagree with the entries listed under it.
         var readings = d.readings || [];

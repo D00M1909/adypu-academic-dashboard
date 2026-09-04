@@ -223,10 +223,14 @@ window.Charts = (function () {
     var data = window.ATTENDANCE_DATA || {};
     var out = [];
 
+    // strength is every division's, reported or not; strengthReported is only
+     // the ones that filed. The first is what an unreported tile states instead
+     // of nothing, the second is the only honest denominator for a percentage.
     function totalsOf(divisions) {
-      var t = { present: 0, strengthReported: 0, reported: 0, classes: 0 };
+      var t = { present: 0, strength: 0, strengthReported: 0, reported: 0, classes: 0 };
       divisions.forEach(function (d) {
         t.classes++;
+        t.strength += d.strength;
         if (d.reported) {
           t.reported++;
           t.present += d.present;
@@ -244,10 +248,11 @@ window.Charts = (function () {
 
     function sum(node) {
       if (Array.isArray(node)) return totalsOf(node);
-      var t = { present: 0, strengthReported: 0, reported: 0, classes: 0 };
+      var t = { present: 0, strength: 0, strengthReported: 0, reported: 0, classes: 0 };
       Object.keys(node).forEach(function (k) {
         var s = sum(node[k]);
         t.present += s.present;
+        t.strength += s.strength;
         t.strengthReported += s.strengthReported;
         t.reported += s.reported;
         t.classes += s.classes;
@@ -298,7 +303,7 @@ window.Charts = (function () {
       var v = pct(r.totals.present, r.totals.strengthReported);
       var readout = r.totals.reported
         ? '<span class="att-pct ' + attClass(v) + '">' + v + '%</span>'
-        : '<span class="tile-unreported">Not reported</span>';
+        : '<span class="tile-unreported">' + r.totals.strength + ' students</span>';
       return '<div class="bar-row">' +
         '<span class="bar-name">' + esc(r.name) + '</span>' +
         '<span class="division-bar"><span class="division-bar-fill ' +
@@ -415,7 +420,8 @@ window.Charts = (function () {
         ? '<td>' + r.days + '</td>' +
           '<td>' + r.present + '<span class="report-table-sep">/</span>' + r.strength + '</td>' +
           '<td><span class="att-pct ' + attClass(p) + '">' + p + '%</span></td>'
-        : '<td>0</td><td colspan="2"><span class="tile-unreported">Not reported</span></td>';
+        : '<td>0</td><td><span class="tile-unreported">' + r.strength + '</span></td>' +
+          '<td><span class="tile-unreported">Not reported</span></td>';
       // Every entry behind that number, one row per lecture. Skipped when there
       // is only one: it would just repeat the row above it. The class's own row
       // stays the latest reading, so the report reads the same way the screen
