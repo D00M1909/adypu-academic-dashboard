@@ -235,6 +235,17 @@ window.Charts.render({ school: 'eng', year: '1st Year', branch: 'Core' },
   { present: 0, strengthReported: 0, reported: 0, classes: 2 });
 assert(els['chart-donut'].innerHTML.includes('has reported'), 'empty donut should explain itself');
 
+// --- A school whose strengths are invented states no enrolment -------------
+// Law's divisions are the A=30/B=60 scheduling default, not a roll count, so an
+// unreported row there must not print "100 students" as though someone counted.
+window.SCHOOLS.law.placeholder = true;
+window.Charts.render({ school: 'law', year: '1st Year', branch: '' },
+  { present: 85, strengthReported: 100, reported: 1, classes: 2 });
+const placeheld = els['chart-bars'].innerHTML;
+assert(placeheld.includes('Not reported'), 'a placeholder school should say only that: ' + placeheld);
+assert(!placeheld.includes('students'), 'a placeholder school stated an invented enrolment: ' + placeheld);
+delete window.SCHOOLS.law.placeholder;
+
 // --- A count above the class's strength is capped -------------------------
 // Real case, 3 Sep 2026: 59 present filed against 4th Year CS division A, which
 // the school says holds 28. Uncapped, the day drew 211% and "Absent -31". The
