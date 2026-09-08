@@ -5,6 +5,7 @@
 //   php tools/data-request.php engineering > 01-engineering-headcounts.csv
 //   php tools/data-request.php structure     02-structure-request.xlsx
 //   php tools/data-request.php partners      03-partners-request.xlsx
+//   php tools/data-request.php roster        04-roster-request.xlsx
 //
 // Engineering's structure is real, read from the timetable DB — it needs a
 // headcount against each known division. Every other school's structure is
@@ -12,6 +13,11 @@
 // draw), so those schools get BLANK rows and state their own reality. Sending
 // them the placeholders would invite them to fill numbers in beside divisions
 // that do not exist.
+//
+// The roster file asks for the students themselves, one row each, and is the
+// only request that pre-fills a row per enrolled student rather than a blank
+// form: a school correcting our count by adding or deleting rows is exactly how
+// we learn the real enrolment, which no other request has managed to extract.
 //
 // The partners file goes to whoever owns the partnerships, not to a school. We
 // know the ten partner names and which schools they appear against; what we do
@@ -89,8 +95,75 @@ if ($mode === 'partners') {
     exit;
 }
 
+if ($mode === 'roster') {
+    $outFile = $argv[2] ?? '04-roster-request.xlsx';
+
+    $header = ['Year', 'Branch (blank if none)', 'Division', 'ROLL NUMBER', 'STUDENT NAME'];
+
+    $intro = array_merge([
+        [['b', 'STUDENT LISTS - PLEASE COMPLETE']],
+        [],
+        ['Faculty currently type in a present count. We want to give them their actual class list on'],
+        ['their phone, with a tick box against each student, so attendance takes one tap per absentee'],
+        ['and the count can never be mistyped. To do that we need the students.'],
+        [],
+        ['Your tab already has one blank row for every student we believe is enrolled, with the Year,'],
+        ['Branch and Division filled in. Please put a roll number and a name on each row.'],
+        [],
+        [['b', 'IF THE ROW COUNT IS WRONG'], 'Add or delete rows. That is the most useful thing in this file:'],
+        ['', 'our enrolment figures come from an earlier request and we know some are still estimates.'],
+        [],
+        [['b', 'PLEASE DO NOT SORT'], 'the sheet, and please do not clear the Year, Branch or Division cells.'],
+        ['', 'Every row must keep its own three values, or we cannot tell which class a student is in.'],
+        [],
+    ], $terms, [
+        [['b', 'ROLL NUMBER'], 'Whatever your office uses as the unique student id: roll number, PRN, enrolment number.'],
+        [['b', 'STUDENT NAME'], 'As it should appear to the faculty member marking attendance.'],
+    ]);
+
+    $sheets = ['Instructions' => ['cols' => [22, 95], 'rows' => $intro]];
+    foreach (SCHOOLS as $id => $school) {
+        $rows = [
+            [['b', strtoupper($school['name'])]],
+            [],
+            array_map(fn($h) => ['b', $h], $header),
+        ];
+
+        // A placeholder school has no confirmed structure, so pre-filling its
+        // divisions would ask it to list students against classes we invented.
+        // Same reasoning as the structure request: those schools get a blank
+        // form and state their own reality.
+        if (is_placeholder_school($id)) {
+            $rows[1] = ['We do not have your class structure yet, so this tab is deliberately blank.'];
+            for ($i = 0; $i < 200; $i++) $rows[] = [];
+        } else {
+            foreach (class_rows() as $c) {
+                if ($c['school'] !== $id) continue;
+                // Repeated on every row rather than only the first of a block:
+                // a sheet that comes back sorted still says which class each
+                // student is in, where a forward-filled one would silently
+                // reassign most of the university.
+                for ($i = 0; $i < $c['strength']; $i++) {
+                    $rows[] = [$c['year'], $c['branch'], $c['division'], '', ''];
+                }
+            }
+        }
+
+        $tab = preg_replace('/^School of /', '', $school['name']);
+        $sheets[$tab] = ['cols' => [16, 30, 22, 18, 34], 'rows' => $rows];
+    }
+
+    write_xlsx($outFile, $sheets);
+    $students = array_sum(array_map(
+        fn($c) => is_placeholder_school($c['school']) ? 0 : $c['strength'],
+        class_rows()
+    ));
+    fwrite(STDERR, "wrote $outFile (" . count($sheets) . " tabs, $students student rows)\n");
+    exit;
+}
+
 if ($mode !== 'structure' && $mode !== 'structure-csv') {
-    fwrite(STDERR, "usage: php tools/data-request.php engineering|structure|partners [outfile.xlsx]|structure-csv\n");
+    fwrite(STDERR, "usage: php tools/data-request.php engineering|structure|partners|roster [outfile.xlsx]|structure-csv\n");
     exit(1);
 }
 
