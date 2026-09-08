@@ -1,0 +1,112 @@
+<?php
+// Run: php tests/test_marking.php
+//
+// The store, and the merge that lets an app submission and a Form row describe
+// the same university without either erasing the other. Every bug this suite
+// exists to catch is a reading that silently stops counting.
+
+// Before store.php is loaded, so nothing here touches the live data directory.
+define('STORE_DIR', sys_get_temp_dir() . '/adypu-test-' . getmypid());
+require_once __DIR__ . '/../includes/store.php';
+require_once __DIR__ . '/../includes/attendance.php';
+require_once __DIR__ . '/../includes/structure.php';
+
+register_shutdown_function(function () {
+    foreach (glob(STORE_DIR . '/*/*.php') ?: [] as $f) unlink($f);
+    foreach (glob(STORE_DIR . '/*') ?: [] as $f) is_dir($f) ? rmdir($f) : unlink($f);
+    @rmdir(STORE_DIR);
+});
+
+// --- The guard line ---------------------------------------------------------
+// The whole reason these files are .php and not .json. If this assert ever
+// fails, student names and password hashes are one URL away from the public.
+store_update('faculty', fn($d) => ['users' => ['a@b.c' => ['hash' => 'secret-hash']]]);
+$raw = file_get_contents(store_path('faculty'));
+assert(str_starts_with($raw, '<?php exit; ?>'), 'a store file must open with the PHP guard');
+assert(store_read('faculty')['users']['a@b.c']['hash'] === 'secret-hash', 'guarded file must read back');
+
+// What a browser actually gets: the host runs the file as a script. In a
+// subprocess, because the guard's exit would take this test down with it —
+// which is the point of the guard, and the reason it cannot be include()d.
+exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(store_path('faculty')) . ' 2>&1', $out);
+assert(implode('', $out) === '', 'requesting a store file over HTTP must output nothing, got: ' . implode('', $out));
+
+// A file with no guard still reads, so a hand-edited one is not silently empty.
+file_put_contents(store_path('faculty'), '{"users":{}}');
+assert(store_read('faculty') === ['users' => []], 'an unguarded file must still decode');
+assert(store_read('nothing-here') === [], 'a missing file is empty, not an error');
+
+// --- merge_readings ---------------------------------------------------------
+$pushed = ['2026-09-08' => ['eng|2nd Year|CSE|A' => ['09:00' => 40, '14:00' => 55]]];
+
+// Same class, same day, same lecture: the app counted students, the Form row is
+// a typed total, so the app wins.
+$app = ['2026-09-08' => ['eng|2nd Year|CSE|A' => ['09:00' => 61]]];
+$m = merge_readings($pushed, $app);
+assert($m['2026-09-08']['eng|2nd Year|CSE|A'] === ['09:00' => 61, '14:00' => 55], 'app must win its own slot');
+
+// The re-sort. day_present() takes the LAST reading, trusting the times to be
+// in order; an unsorted merge makes a morning submission outrank the afternoon.
+$late = ['2026-09-08' => ['eng|2nd Year|CSE|A' => ['08:00' => 12]]];
+$m = merge_readings($pushed, $late);
+assert(array_keys($m['2026-09-08']['eng|2nd Year|CSE|A']) === ['08:00', '09:00', '14:00'], 'slots must re-sort');
+assert(day_present($m['2026-09-08']['eng|2nd Year|CSE|A']) === 55, 'the latest lecture is still the day');
+
+// A class or a day the app never touched must come through untouched.
+$m = merge_readings($pushed, ['2026-09-09' => ['eng|3rd Year|CS|A' => ['10:00' => 20]]]);
+assert($m['2026-09-08']['eng|2nd Year|CSE|A'] === ['09:00' => 40, '14:00' => 55], 'pushed days must survive');
+assert(count($m) === 2 && array_keys($m) === ['2026-09-08', '2026-09-09'], 'days must merge and sort');
+
+// A cache written before lecture times holds a bare int for the whole day, and
+// the faculty map a bare string. Both must survive being merged into.
+$legacy = ['2026-09-08' => ['eng|2nd Year|CSE|A' => 41]];
+$m = merge_readings($legacy, ['2026-09-08' => ['eng|2nd Year|CSE|A' => ['14:00' => 50]]]);
+assert(day_present($m['2026-09-08']['eng|2nd Year|CSE|A']) === 50, 'a pre-times day must accept a new lecture');
+$mf = merge_readings(['2026-09-08' => ['eng|2nd Year|CSE|A' => 'Dr Rao']],
+                     ['2026-09-08' => ['eng|2nd Year|CSE|A' => ['14:00' => 'Dr Iyer']]]);
+assert($mf['2026-09-08']['eng|2nd Year|CSE|A'][0] === 'Dr Rao', 'a pre-times name must survive');
+
+// --- record_attendance ------------------------------------------------------
+$cse = parse_class_label('School of Engineering / 2nd Year / CSE / A');
+assert($cse['strength'] === 70, 'fixture class strength');
+
+record_attendance($cse, '2026-09-08', '09:00', 61, 'Dr Rao', ['21BCE1001', '21BCE1002']);
+$store = store_read('submissions');
+assert($store['days']['2026-09-08']['eng|2nd Year|CSE|A']['09:00'] === 61, 'the count must land');
+assert($store['faculty']['2026-09-08']['eng|2nd Year|CSE|A']['09:00'] === 'Dr Rao', 'the name must land beside it');
+
+// Absentees go to their own per-day file, never into the one the dashboard
+// reads on every request.
+assert(!isset($store['absent']), 'roll numbers must stay off the hot path');
+assert(store_read('absent/2026-09-08')['eng|2nd Year|CSE|A']['09:00'] === ['21BCE1001', '21BCE1002'],
+    'absentees must be kept per day');
+
+// Resubmitting the same slot is a correction, and overwrites.
+record_attendance($cse, '2026-09-08', '09:00', 58, 'Dr Rao');
+assert(store_read('submissions')['days']['2026-09-08']['eng|2nd Year|CSE|A']['09:00'] === 58, 'a correction overwrites');
+
+// The trust boundary: the no-roster path takes a number a phone posted.
+record_attendance($cse, '2026-09-08', '11:00', 999, 'Dr Rao');
+record_attendance($cse, '2026-09-08', '12:00', -5, 'Dr Rao');
+$d = store_read('submissions')['days']['2026-09-08']['eng|2nd Year|CSE|A'];
+assert($d['11:00'] === 70, 'present must clamp to the class strength: ' . $d['11:00']);
+assert($d['12:00'] === 0, 'present must not go negative: ' . $d['12:00']);
+
+// An anonymous submission stores no name rather than an empty one, matching how
+// every row from before the Form asked for one behaves.
+record_attendance($cse, '2026-09-07', '09:00', 60, '');
+assert(!isset(store_read('submissions')['faculty']['2026-09-07']), 'a missing name is absent, not empty');
+
+// --- The whole way through --------------------------------------------------
+// No cache file in a test checkout, so get_attendance_days() must serve the
+// submissions rather than fall back to the sample rows.
+$days = get_attendance_days();
+assert(isset($days['2026-09-08']['eng|2nd Year|CSE|A']), 'submissions must reach the dashboard');
+$tree = aggregate_days($days, '2026-09-08', '2026-09-08');
+$cseA = null;
+foreach ($tree['eng']['2nd Year']['CSE'] as $div) if ($div['division'] === 'A') $cseA = $div;
+// 12:00 is the day's latest reading, and it clamped to 0.
+assert($cseA['reported'] === true, 'the class must count as reported');
+assert($cseA['present'] === 0, 'the tile takes the latest lecture: ' . $cseA['present']);
+
+echo "OK\n";
