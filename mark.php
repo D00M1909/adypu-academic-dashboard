@@ -94,7 +94,7 @@ foreach (class_rows() as $c) {
     if ($c['school'] === $school) $classesHere[] = class_label($c['school'], $c['year'], $c['branch'], $c['division']);
 }
 
-page_head('Mark attendance', 'page-narrow');
+page_head('Mark attendance', 'page-narrow page-marking');
 
 if (($me['status'] ?? '') !== 'active') {
     ?>
@@ -153,14 +153,6 @@ if (($me['status'] ?? '') !== 'active') {
   <input type="hidden" name="date" value="<?= htmlspecialchars($date) ?>">
   <input type="hidden" name="time" value="<?= htmlspecialchars($time) ?>">
 
-  <div class="mark-bar" id="mark-bar">
-    <div class="mark-count">
-      <strong><span id="mark-present"><?= $roster ? count($roster) : '' ?></span><?= $roster ? ' / ' . count($roster) : '' ?></strong>
-      <span>present</span>
-    </div>
-    <button class="btn-primary" type="submit">Submit</button>
-  </div>
-
   <?php if (!$roster): ?>
     <div class="card">
       <h2>No student list yet</h2>
@@ -191,6 +183,18 @@ if (($me['status'] ?? '') !== 'active') {
       <?php endforeach; ?>
     </ol>
   <?php endif; ?>
+
+  <?php /* Last in the form on purpose. `position: sticky; bottom: 0` holds an
+           element up at the viewport bottom as content scrolls past it; it does
+           not drag one down from the top. Placed above the list, the bar simply
+           scrolled away with everything else. */ ?>
+  <div class="mark-bar" id="mark-bar">
+    <div class="mark-count">
+      <strong><span id="mark-present"><?= $roster ? count($roster) : '' ?></span><?= $roster ? ' / ' . count($roster) : '' ?></strong>
+      <span><?= $roster ? 'present' : 'ready' ?></span>
+    </div>
+    <button class="btn-primary" type="submit">Submit</button>
+  </div>
 </form>
 <?php endif; ?>
 

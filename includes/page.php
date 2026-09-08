@@ -47,12 +47,12 @@ try {
     </div>
     <div class="header-controls">
       <?php $u = function_exists('auth_user') ? auth_user() : null; ?>
-      <a class="header-link" href="index.php"><svg aria-hidden="true"><use href="#icon-back"/></svg><span>Dashboard</span></a>
+      <a class="header-link is-compact" href="index.php"><svg aria-hidden="true"><use href="#icon-back"/></svg><span>Dashboard</span></a>
       <?php if ($u): ?>
         <?php if (!empty($u['admin'])): ?>
           <a class="header-link" href="admin.php"><span>Admin</span></a>
         <?php endif; ?>
-        <a class="header-link" href="login.php?logout=1" title="Signed in as <?= htmlspecialchars($u['name']) ?>">
+        <a class="header-link is-compact" href="login.php?logout=1" title="Signed in as <?= htmlspecialchars($u['name']) ?>">
           <svg aria-hidden="true"><use href="#icon-out"/></svg><span>Sign out</span>
         </a>
       <?php endif; ?>
