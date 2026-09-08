@@ -487,15 +487,57 @@ function read_attendance_cache(): ?array {
 // Push mode (SPEC.md §7.1): InfinityFree blocks outbound HTTP from PHP, so
 // Google pushes to api/ingest.php and this file IS the record. Nothing here
 // expires or refetches — there is nothing to refetch from.
+// What mark.php wrote, in exactly the shape day_map() produces, so nothing
+// downstream can tell an app submission from a Form row.
+//
+// Its own file, not cache/attendance.json, because api/ingest.php REPLACES that
+// file wholesale on every push. Sharing one file would mean the hourly push
+// deleting every submission a faculty member had made since the last one.
+function submitted(string $which): array {
+    static $data = null;
+    if ($data === null) {
+        require_once __DIR__ . '/store.php';
+        $data = store_read('submissions');
+    }
+    return is_array($data[$which] ?? null) ? $data[$which] : [];
+}
+
+// Overlay wins per lecture slot: an app submission counts individual students,
+// a Form row is a total somebody typed, so where both name the same class, day
+// and time, the app is the better number.
+//
+// The re-sort is load-bearing. day_present() takes the LAST reading of a day and
+// trusts day_map()'s ksort; without this a merged-in 09:00 would sit after a
+// pushed 14:00 and the morning would outrank the afternoon on every tile.
+function merge_readings(array $base, array $overlay): array {
+    foreach ($overlay as $date => $classes) {
+        foreach ($classes as $key => $readings) {
+            // A cache written before lecture times holds a bare int for the day
+            // (and a bare string in the faculty map); (array) turns either into
+            // the one-reading-at-key-0 shape everything else already assumes.
+            $merged = (array) $readings + (array) ($base[$date][$key] ?? []);
+            ksort($merged);
+            $base[$date][$key] = $merged;
+        }
+    }
+    ksort($base);
+    return $base;
+}
+
 function get_attendance_days(): array {
+    $app = submitted('days');
     $cached = read_attendance_cache();
-    if (isset($cached['days']) && is_array($cached['days'])) return $cached['days'];
+    if (isset($cached['days']) && is_array($cached['days'])) {
+        return merge_readings($cached['days'], $app);
+    }
     // A cache from before the day map holds a bare tree with no dates in it;
-    // get_attendance() serves that one as-is. Nothing at all means a fresh
-    // checkout, where the sample rows keep the charts and the tiles telling
-    // the same story instead of one showing numbers and the other "no data".
-    if ($cached !== null) return [];
-    return day_map(sample_attendance_rows());
+    // get_attendance() serves that one as-is, so handing back only the app's own
+    // days leaves that path intact until the next push replaces the file.
+    if ($cached !== null) return $app;
+    // Nothing pushed at all: real submissions if any exist, and only if none do,
+    // the sample rows that keep the charts and the tiles telling the same story
+    // on a fresh checkout instead of one showing numbers and the other "no data".
+    return $app ?: day_map(sample_attendance_rows());
 }
 
 // The faculty names beside the day map, or nothing at all: a cache written
@@ -504,7 +546,8 @@ function get_attendance_days(): array {
 // error — the attendance numbers stand on their own.
 function get_attendance_faculty(): array {
     $cached = read_attendance_cache();
-    return is_array($cached['faculty'] ?? null) ? $cached['faculty'] : [];
+    $pushed = is_array($cached['faculty'] ?? null) ? $cached['faculty'] : [];
+    return merge_readings($pushed, submitted('faculty'));
 }
 
 function get_attendance(?string $from = null, ?string $to = null): array {
@@ -518,6 +561,41 @@ function get_attendance(?string $from = null, ?string $to = null): array {
     if ($cached !== null) return $cached;
 
     return aggregate_attendance(sample_attendance_rows(), $from, $to);
+}
+
+// One class, one day, one lecture: the present count, who filed it, and which
+// roll numbers were ticked absent. Writing the same slot twice overwrites, which
+// is how a correction filed a minute later replaces its original — the same rule
+// a resubmitted Form row already follows.
+//
+// Clamped to the class strength here rather than at the caller, because this is
+// the trust boundary: the no-roster path takes a number a phone posted. The
+// dashboard caps for display anyway (aggregate_days), so an uncapped record
+// would only ever differ from what is shown.
+//
+// The absentee roll numbers go to their own per-day file. They are not needed to
+// draw a percentage, and this file is read on every single dashboard request.
+function record_attendance(array $class, string $date, string $time, int $present, string $faculty, array $absent = []): bool {
+    require_once __DIR__ . '/store.php';
+    $key = class_key($class);
+    $present = max(0, min((int) $class['strength'], $present));
+
+    $ok = store_update('submissions', function (array $d) use ($date, $key, $time, $present, $faculty) {
+        $d['days'][$date][$key][$time] = $present;
+        if ($faculty !== '') $d['faculty'][$date][$key][$time] = $faculty;
+        return $d;
+    });
+    if (!$ok) return false;
+
+    // ponytail: written, never read. Three lines that mean "which students are
+    // missing classes" is answerable later; delete them if that never comes up.
+    if ($absent) {
+        store_update('absent/' . $date, function (array $d) use ($key, $time, $absent) {
+            $d[$key][$time] = array_values($absent);
+            return $d;
+        });
+    }
+    return true;
 }
 
 // How a range reads on screen. One day is just that day; a real range names
