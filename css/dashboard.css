@@ -227,7 +227,11 @@ button {
 
 /* Tabs and the theme toggle travel together, so a wrapped phone header puts
    them on one row instead of two. */
-.header-controls { display: flex; align-items: center; gap: 10px; }
+/* Wraps, because the row grew a "Mark attendance" link and a phone's header is
+   the one place on this page with no room to spare. Without it the tabs, the
+   link and the theme toggle push each other off the right edge and the whole
+   page gains a horizontal scroll. */
+.header-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
 .theme-toggle {
   display: flex;
@@ -262,6 +266,7 @@ button {
 /* ---------- Layout ---------- */
 
 main { max-width: 1280px; margin: 0 auto; padding: 28px; }
+
 
 /* ---------- Breadcrumb ---------- */
 
@@ -471,6 +476,10 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
   .schools-grid, .partners-grid, .years-grid, .branches-grid, .divisions-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .division-grid { grid-template-columns: minmax(0, 1fr); }
   .header-inner { flex-direction: column; align-items: flex-start; }
+  /* A column flex item sizes to its content, and its content here is a heading
+     long enough to push past the phone it is being read on. */
+  .header-inner > * { max-width: 100%; }
+  .brand, .app-header h1 { min-width: 0; }
   .brand-logo img { height: 40px; }
   .range-bar { align-items: stretch; }
   .range-presets { order: 1; }
@@ -508,19 +517,23 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
      against the rule, which is what "too close to the header" was. */
   padding: 10px 0 16px;
   margin: -10px 0 24px;
-}
-/* The dock has to extend beyond main's max-width; otherwise a selected card
-   can peek out along the edge while it scrolls underneath. */
-.range-bar::before {
-  content: '';
-  position: absolute;
-  z-index: -1;
-  top: 0;
-  bottom: 0;
-  left: calc(50% - 50vw);
-  right: calc(50% - 50vw);
+  /* The dock has to extend beyond main's max-width, or a selected card peeks
+     out along the edge while it scrolls underneath.
+
+     Painted as a spread shadow rather than the 100vw pseudo-element this used
+     to be. vw counts the scrollbar's width, so that pseudo-element overhung the
+     page by half a scrollbar and gave EVERY screen a horizontal scrollbar — on
+     a phone that reads as a broken layout, because the whole page rubber-bands
+     sideways. A shadow paints outside the box without adding to the scroll
+     width at all, which no amount of overflow clipping on an ancestor achieved.
+
+     Two shadows, back to front: the surface fills the bleed, and the hairline
+     behind it shows only in the 1px the first one is offset off. clip-path then
+     keeps the bleed horizontal, letting that 1px through at the bottom and
+     giving the summary card's hover lift 2px of room at the top. */
   background: var(--surface);
-  border-bottom: 1px solid var(--hairline);
+  box-shadow: 0 0 0 100vmax var(--surface), 0 1px 0 100vmax var(--hairline);
+  clip-path: inset(-2px -100vmax -1px -100vmax);
 }
 .range-presets { display: flex; flex-wrap: wrap; gap: 8px; }
 .range-preset {
@@ -802,9 +815,11 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
 }
 .header-link:hover { background: rgba(255, 255, 255, 0.24); }
 .header-link svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-/* The label goes on the narrowest screens, the icon carries it. "Admin" has no
-   icon, so it keeps its word rather than becoming a blank chip. */
-@media (max-width: 420px) { .header-link svg + span { display: none; } }
+/* Secondary links drop their label on the narrowest screens and let the icon
+   carry them. "Mark attendance" never does: it is the whole reason a faculty
+   member opens this on a phone, and a bare tick-box icon in a red bar is not a
+   call to action anyone would find. */
+@media (max-width: 420px) { .header-link.is-compact svg + span { display: none; } }
 
 .card {
   background: var(--surface-raised);
@@ -900,6 +915,9 @@ input:focus-visible, select:focus-visible {
   border-top: 1px solid var(--hairline);
   box-shadow: 0 -6px 18px -8px rgba(15, 23, 42, 0.18);
 }
+/* The bar is the last thing in the form, so the page's usual bottom padding
+   would strand it that far above the screen edge at full scroll. */
+.page-marking .page-main { padding-bottom: 0; }
 .mark-count { line-height: 1.15; }
 .mark-count strong { display: block; font-family: 'IBM Plex Mono', monospace; font-size: 20px; font-weight: 700; }
 .mark-count span { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-muted); }
@@ -1000,8 +1018,10 @@ input:focus-visible, select:focus-visible {
     background: #fff;
     border-bottom: 1px solid var(--hairline);
     box-shadow: none;
+    /* The screen rule bleeds the dock sideways with a shadow; on paper the bar
+       is a plain row and the clip would cut the page's own margin. */
+    clip-path: none;
   }
-  .range-bar::before { display: none; }
   .range-presets, .range-dates { display: none; }
   .range-summary {
     box-shadow: none;
