@@ -18,7 +18,7 @@ OUT=upload
 rm -rf "$OUT"
 
 if [ "${1:-}" = "--all" ]; then
-  files=$(find index.php api includes css js img -type f)
+  files=$(find index.php login.php mark.php admin.php api includes css js img -type f)
 else
   # One ref, not a range: this diffs the ref against the WORKING TREE, so a file
   # edited but not yet committed still gets staged. Uploading a file the repo
@@ -28,11 +28,15 @@ fi
 
 n=0
 while IFS= read -r f; do
-  # An allowlist, not a blocklist: these six paths are exactly what the server
+  # An allowlist, not a blocklist: these paths are exactly what the server
   # serves, so a new README, dotfile or generator can never ride along by
   # accident. Add a path here if the server ever needs one (an .htaccess, say).
+  #
+  # data/ is deliberately absent. It holds the accounts, the rosters and the
+  # submissions the live site itself wrote; copying a local one up would
+  # overwrite real faculty accounts with whatever a dev machine had.
   case "$f" in
-    index.php|api/*|includes/*|css/*|js/*|img/*) ;;
+    index.php|login.php|mark.php|admin.php|api/*|includes/*|css/*|js/*|img/*) ;;
     *) continue ;;
   esac
   # Server-only, and gitignored, so this should never match — but staging it

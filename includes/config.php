@@ -24,6 +24,13 @@ defined('DB_NAME') || define('DB_NAME', getenv('DB_NAME') ?: 'adypu_dashboard');
 // set it in config.local.php, never here (this file is committed).
 defined('INGEST_SECRET') || define('INGEST_SECRET', getenv('INGEST_SECRET') ?: '');
 
+// The first admin account for login.php, set only in config.local.php on the
+// server. Empty means no config admin exists and the only way in is an account
+// in data/faculty.php — which is the right state once a real admin has signed
+// up and been promoted.
+defined('ADMIN_EMAIL') || define('ADMIN_EMAIL', getenv('ADMIN_EMAIL') ?: '');
+defined('ADMIN_HASH') || define('ADMIN_HASH', getenv('ADMIN_HASH') ?: '');
+
 function get_db(): mysqli {
     static $conn = null;
     if ($conn === null) {

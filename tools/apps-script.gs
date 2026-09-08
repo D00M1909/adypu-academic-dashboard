@@ -16,8 +16,9 @@
  * Setup (once):
  *   1. Open the Form's response Sheet -> Extensions -> Apps Script.
  *   2. Paste this file in, replacing whatever is there.
- *   3. Set INGEST_URL and INGEST_SECRET below. The secret must match the
- *      INGEST_SECRET in includes/config.local.php on the server.
+ *   3. Set TARGETS below: one entry per site, each with the INGEST_SECRET from
+ *      that site's own includes/config.local.php. The first entry is production
+ *      and is the only one whose failures raise an alert.
  *   4. Run pushNow() once and approve the permissions prompt.
  *   5. Triggers (clock icon) -> Add Trigger:
  *        - pushNow / From spreadsheet / On form submit
@@ -45,8 +46,19 @@
  * not be titled "Timestamp", which is the sheet's own submission column.
  */
 
-const INGEST_URL = 'https://YOUR-SITE.rf.gd/api/ingest.php';
-const INGEST_SECRET = 'paste-the-same-secret-as-config.local.php';
+// Every site to push the sheet to. The FIRST one is production and is the only
+// one whose outcome counts: it drives the success and failure record, and so
+// the alert. The rest are pushed best-effort and only logged, because a broken
+// staging site must never be able to email you that attendance is down.
+//
+// Each entry needs the secret from that site's own includes/config.local.php.
+// They are different sites and must have different secrets: reusing production's
+// on a staging box means anyone who can read the staging config can write to
+// production.
+const TARGETS = [
+  { name: 'live', url: 'https://YOUR-SITE.rf.gd/api/ingest.php', secret: 'paste-the-live-secret' },
+  // { name: 'dev', url: 'https://YOUR-DEV-SITE.rf.gd/api/ingest.php', secret: 'paste-the-dev-secret' },
+];
 
 // Attempts within a single run. Measured on 27 Aug 2026 across ~20 runs: when
 // the first attempt was blocked, attempts 2 and 3 were blocked every single
@@ -64,12 +76,15 @@ const RETRY_PAUSE_MS = 3000;
 const FAILURES_BEFORE_ALERT = 24;
 
 function pushNow() {
-  if (!/\/api\/ingest\.php$/.test(INGEST_URL)) {
-    throw new Error('INGEST_URL must end in /api/ingest.php — got: ' + INGEST_URL);
-  }
-  if (!INGEST_SECRET || INGEST_SECRET.indexOf('paste-the-same') === 0) {
-    throw new Error('INGEST_SECRET is still the placeholder');
-  }
+  if (!TARGETS.length) throw new Error('TARGETS is empty — nothing to push to');
+  TARGETS.forEach(function (target) {
+    if (!/\/api\/ingest\.php$/.test(target.url)) {
+      throw new Error(target.name + ': url must end in /api/ingest.php — got: ' + target.url);
+    }
+    if (!target.secret || target.secret.indexOf('paste-the-') === 0) {
+      throw new Error(target.name + ': secret is still the placeholder');
+    }
+  });
 
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
   const values = sheet.getDataRange().getValues();
@@ -79,9 +94,21 @@ function pushNow() {
   }
   const payload = toCsv(values);
 
+  // Everything after production is best-effort: pushed first so a slow or dead
+  // staging box cannot delay the one push that matters, and never allowed to
+  // throw. Its failures are a log line, nothing more.
+  TARGETS.slice(1).forEach(function (target) {
+    try {
+      const extra = attemptPush(payload, target);
+      Logger.log(target.name + ': ' + (extra.ok ? 'pushed ' + extra.result.rows + ' rows' : extra.problem));
+    } catch (e) {
+      Logger.log(target.name + ': ' + e.message);
+    }
+  });
+
   let lastProblem = '';
   for (let attempt = 1; attempt <= ATTEMPTS_PER_RUN; attempt++) {
-    const outcome = attemptPush(payload);
+    const outcome = attemptPush(payload, TARGETS[0]);
     if (outcome.ok) {
       recordSuccess(outcome.result);
       return;
@@ -94,12 +121,12 @@ function pushNow() {
   recordFailure(lastProblem);
 }
 
-function attemptPush(payload) {
-  const response = UrlFetchApp.fetch(INGEST_URL, {
+function attemptPush(payload, target) {
+  const response = UrlFetchApp.fetch(target.url, {
     method: 'post',
     contentType: 'text/csv',
     payload: payload,
-    headers: { 'X-Ingest-Secret': INGEST_SECRET },
+    headers: { 'X-Ingest-Secret': target.secret },
     muteHttpExceptions: true,
     followRedirects: true,
   });
@@ -122,7 +149,7 @@ function attemptPush(payload) {
       ok: false,
       problem: blocked
         ? "blocked by the host's bot check (not our endpoint) — will retry"
-        : 'expected JSON, got HTML — is INGEST_URL pointing at api/ingest.php? ' + body.slice(0, 120),
+        : 'expected JSON, got HTML — is the url pointing at api/ingest.php? ' + body.slice(0, 120),
     };
   }
 
