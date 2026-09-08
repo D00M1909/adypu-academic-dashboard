@@ -1,9 +1,10 @@
 <?php
 // Run: php tests/test_marking.php
 //
-// The store, and the merge that lets an app submission and a Form row describe
-// the same university without either erasing the other. Every bug this suite
-// exists to catch is a reading that silently stops counting.
+// The store, the accounts, and the merge that lets an app submission and a Form
+// row describe the same university without either erasing the other. Every bug
+// this suite exists to catch is a reading that silently stops counting, or an
+// account that can write attendance when it should not.
 
 // Before store.php is loaded, so nothing here touches the live data directory.
 define('STORE_DIR', sys_get_temp_dir() . '/adypu-test-' . getmypid());
@@ -108,5 +109,106 @@ foreach ($tree['eng']['2nd Year']['CSE'] as $div) if ($div['division'] === 'A') 
 // 12:00 is the day's latest reading, and it clamped to 0.
 assert($cseA['reported'] === true, 'the class must count as reported');
 assert($cseA['present'] === 0, 'the tile takes the latest lecture: ' . $cseA['present']);
+
+// --- Accounts ---------------------------------------------------------------
+// The config-admin path (ADMIN_EMAIL / ADMIN_HASH) is deliberately not exercised
+// here: it comes from includes/config.local.php, which exists only on a real
+// server, and a test that passes or fails on whether a machine has one is worse
+// than no test.
+require_once __DIR__ . '/../includes/auth.php';
+session_start();
+
+store_update('faculty', fn() => ['codes' => ['eng' => 'ABCD-2345'], 'users' => []]);
+
+// No code and a wrong code both queue rather than refuse: a teacher who missed
+// the memo must end up somewhere an admin can see them, not at a dead end.
+assert(auth_signup('No Code', 'a@adypu.edu.in', 'hunter2hunter2', 'eng', '') === '', 'signup with no code must succeed');
+assert(auth_find('a@adypu.edu.in')['status'] === 'pending', 'no code means pending');
+assert(auth_signup('Bad Code', 'b@adypu.edu.in', 'hunter2hunter2', 'eng', 'ZZZZ-9999') === '', 'a wrong code must not refuse');
+assert(auth_find('b@adypu.edu.in')['status'] === 'pending', 'a wrong code means pending');
+
+// The right code, however it was copied off a whiteboard.
+assert(auth_signup('Good Code', 'c@adypu.edu.in', 'hunter2hunter2', 'eng', 'abcd2345') === '', 'signup with the code');
+assert(auth_find('c@adypu.edu.in')['status'] === 'active', 'the right code activates on the spot');
+
+assert(auth_signup('Dupe', 'C@ADYPU.edu.in', 'hunter2hunter2', 'eng', '') !== '', 'emails are case-insensitively unique');
+assert(auth_signup('Short', 'd@adypu.edu.in', 'short', 'eng', '') !== '', 'a short password must be refused');
+assert(auth_signup('No School', 'e@adypu.edu.in', 'hunter2hunter2', 'nope', '') !== '', 'the school must be a real one');
+assert(!password_verify('hunter2hunter2', 'hunter2hunter2'), 'sanity: passwords are not stored in the clear');
+assert(str_starts_with(auth_find('c@adypu.edu.in')['hash'], '$2y$'), 'passwords must be bcrypt hashed');
+
+// Signing in. The same message for a wrong password and an unknown email, so
+// the form cannot be used to enumerate who works here.
+assert(auth_login('c@adypu.edu.in', 'hunter2hunter2') === '', 'the right password signs in');
+assert(auth_user()['name'] === 'Good Code', 'the session must resolve to the account');
+$wrongPassword = auth_login('c@adypu.edu.in', 'nope-nope-nope');
+$noSuchUser = auth_login('nobody@adypu.edu.in', 'nope-nope-nope');
+assert($wrongPassword !== '' && $wrongPassword === $noSuchUser, 'a wrong password and an unknown email must read the same');
+
+// Lockout, so the password is not simply enumerable.
+for ($i = 0; $i < AUTH_MAX_FAILS; $i++) auth_login('c@adypu.edu.in', 'wrong-guess-' . $i);
+assert(str_contains(auth_login('c@adypu.edu.in', 'hunter2hunter2'), 'Too many attempts'),
+    'the right password must be refused while locked out');
+
+// Disabling takes effect on the account's next click, not its next sign-in:
+// auth_user() re-reads the record every request rather than trusting the session.
+auth_login('a@adypu.edu.in', 'hunter2hunter2');
+assert(auth_user() !== null, 'a pending account may sign in, to be told it is pending');
+auth_put('a@adypu.edu.in', ['status' => 'disabled']);
+assert(auth_user() === null, 'a disabled account must lose an already-open session');
+
+// A pending account has an account but no permission to write attendance, which
+// is a distinction mark.php makes before it records anything.
+auth_login('b@adypu.edu.in', 'hunter2hunter2');
+assert((auth_user()['status'] ?? '') === 'pending', 'pending is visible to the page that gates on it');
+
+// CSRF.
+$_POST['csrf'] = csrf_token();
+assert(csrf_ok(), 'the real token must pass');
+$_POST['csrf'] = 'not-the-token';
+assert(!csrf_ok(), 'a wrong token must fail');
+$_POST['csrf'] = '';
+assert(!csrf_ok(), 'an empty token must fail');
+
+// --- Importing a returned student list --------------------------------------
+// Run as a subprocess against the test data directory, because that is how the
+// tool is actually used, and because its exit code and its warnings are half of
+// what it is for: a row that names no real class must be reported, never
+// silently dropped, which is the single failure mode this project keeps hitting.
+$csv = STORE_DIR . '/import-fixture.csv';
+file_put_contents($csv, implode("\n", [
+    'SCHOOL OF HOSPITALITY',
+    '',
+    'Year,Branch (blank if none),Division,ROLL NUMBER,STUDENT NAME',
+    '1st Year,MSc Hospitality and Hotel Administration,A,24MHM1001,Priya N',
+    '1st Year,MSc Hospitality and Hotel Administration,A,24MHM1002,Rahul K',
+    '1st Year,MSc Hospitality and Hotel Administration,A,24MHM1002,Duplicate Roll',
+    '1st Year,Nonexistent Branch,Z,24XXX0001,Wrong Class',
+    '2nd Year,MSc Hospitality and Hotel Administration,A,,',
+]) . "\n");
+
+// putenv rather than a VAR=value shell prefix: the child inherits it either
+// way, and cmd.exe does not understand the prefix.
+putenv('ADYPU_DATA_DIR=' . STORE_DIR);
+$cmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__DIR__ . '/../tools/roster-import.php')
+     . ' hosp ' . escapeshellarg($csv) . ' 2>&1';
+exec($cmd, $lines, $status);
+$report = implode("\n", $lines);
+assert($status === 0, "the import must succeed:\n$report");
+assert(str_contains($report, 'IGNORED'), "a row naming no real class must be reported:\n$report");
+assert(str_contains($report, 'DUPLICATE'), "a repeated roll number must be reported:\n$report");
+
+$class = parse_class_label('School of Hospitality / 1st Year / MSc Hospitality and Hotel Administration / A');
+$imported = store_read('roster/hosp')[class_key($class)];
+assert(count($imported) === 2, 'the duplicate and the bad row must not be stored: ' . count($imported));
+assert($imported[0] === ['roll' => '24MHM1001', 'name' => 'Priya N'], 'roll and name must round-trip');
+// An unfilled pre-printed row is not an error: the request ships more rows than
+// some divisions need, and every one of them comes back blank.
+assert(!isset(store_read('roster/hosp')['hosp|2nd Year|MSc Hospitality and Hotel Administration|A']),
+    'a row with no student on it must not become a student');
+
+// The marking screen reads exactly what the import wrote.
+require_once __DIR__ . '/../includes/roster.php';
+assert(count(roster_for($class)) === 2, 'the roster must reach the marking screen');
 
 echo "OK\n";

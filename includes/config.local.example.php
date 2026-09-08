@@ -10,3 +10,10 @@ define('DB_NAME', 'if0_XXXXXXXX_adypu_dashboard');
 // on the Form's response Sheet. Generate one with:
 //   php -r "echo bin2hex(random_bytes(24)), PHP_EOL;"
 define('INGEST_SECRET', 'generate-a-long-random-string');
+
+// The first admin for login.php / admin.php. No account is ever committed to
+// git, so this pair is how the very first person gets in; everyone else signs
+// up and is approved from admin.php. Generate the hash with:
+//   php -r "echo password_hash('your-password', PASSWORD_DEFAULT), PHP_EOL;"
+define('ADMIN_EMAIL', 'you@example.com');
+define('ADMIN_HASH', '$2y$10$replace-this-with-the-output-above');

@@ -14,8 +14,10 @@
 
 const STORE_GUARD = "<?php exit; ?>\n";
 
-// Overridable so tests can write somewhere that isn't the live data directory.
-defined('STORE_DIR') || define('STORE_DIR', __DIR__ . '/../data');
+// Overridable two ways, both so a test or a one-off import can write somewhere
+// that is not the live data directory: define it before this file loads, or set
+// ADYPU_DATA_DIR in the environment for a command-line tool.
+defined('STORE_DIR') || define('STORE_DIR', getenv('ADYPU_DATA_DIR') ?: __DIR__ . '/../data');
 
 function store_path(string $name): string {
     // Every name is a literal in our own source, never a request parameter, but

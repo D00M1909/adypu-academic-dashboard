@@ -112,6 +112,10 @@ try {
       <circle cx="12" cy="12" r="2" />
       <circle cx="12" cy="12" r="8" />
     </symbol>
+    <symbol id="icon-mark" viewBox="0 0 24 24">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="m9 11 3 3L22 4" />
+    </symbol>
     <symbol id="icon-mgmt" viewBox="0 0 24 24">
       <path d="M3 3v16a2 2 0 0 0 2 2h16" />
       <path d="M18 17V9" />
@@ -207,6 +211,9 @@ try {
         <button class="tab active" data-tab="adypu" role="tab" aria-selected="true">ADYPU</button>
         <button class="tab" data-tab="partners" role="tab" aria-selected="false">Knowledge Partner</button>
       </nav>
+      <a class="header-link no-print" href="mark.php">
+        <svg aria-hidden="true"><use href="#icon-mark"/></svg><span>Mark attendance</span>
+      </a>
       <button class="theme-toggle no-print" id="theme-toggle" type="button" aria-label="Switch to dark mode" aria-pressed="false" title="Switch theme">
         <svg class="theme-icon-moon" aria-hidden="true"><use href="#icon-moon"/></svg>
         <svg class="theme-icon-sun" aria-hidden="true"><use href="#icon-sun"/></svg>
