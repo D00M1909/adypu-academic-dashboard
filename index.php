@@ -1,10 +1,16 @@
 <?php
 require_once __DIR__ . '/includes/attendance.php';
 require_once __DIR__ . '/includes/structure.php';
+require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/includes/page.php';
 
 // The numbers change whenever Google pushes, which is any time. Without this
 // the host's edge serves a page rendered before the last push.
 header('Cache-Control: no-store');
+
+// The dashboard stays open to everyone; this only reads an existing session so
+// the header can show whose it is. Nothing here requires a login.
+auth_boot();
 
 // The range the page is showing. Both ends missing means the newest day that
 // has data (resolve_range), so the landing view is one real, labelled day and
@@ -191,6 +197,15 @@ try {
       <path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
       <path d="m6.18 5.276 3.1 3.899" />
     </symbol>
+    <symbol id="icon-user" viewBox="0 0 24 24">
+      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </symbol>
+    <symbol id="icon-out" viewBox="0 0 24 24">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <path d="m16 17 5-5-5-5" />
+      <path d="M21 12H9" />
+    </symbol>
     <symbol id="icon-user-check" viewBox="0 0 24 24">
       <path d="m16 11 2 2 4-4" />
       <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
@@ -208,6 +223,9 @@ try {
     </symbol>
     <symbol id="icon-chevron" viewBox="0 0 24 24">
       <path d="m9 18 6-6-6-6" />
+    </symbol>
+    <symbol id="icon-caret" viewBox="0 0 24 24">
+      <path d="m6 9 6 6 6-6" />
     </symbol>
     <symbol id="icon-sun" viewBox="0 0 24 24">
       <circle cx="12" cy="12" r="4" />
@@ -244,6 +262,7 @@ try {
         <svg class="theme-icon-moon" aria-hidden="true"><use href="#icon-moon"/></svg>
         <svg class="theme-icon-sun" aria-hidden="true"><use href="#icon-sun"/></svg>
       </button>
+      <?= account_menu() ?>
     </div>
   </div>
 </header>

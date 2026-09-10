@@ -1079,6 +1079,63 @@ input:focus-visible, select:focus-visible {
 .student:has(input:checked) { background: var(--red-tint); }
 .student:has(input:checked) .student-name { text-decoration: line-through; color: var(--red-ink); }
 
+/* ---------- The account menu ----------
+   A <details>, not a scripted dropdown: it opens and closes on its own in every
+   browser, keyboard included, and the dashboard would otherwise need a menu's
+   worth of JavaScript for one button. */
+
+.account-menu { position: relative; }
+.account-trigger {
+  display: flex; align-items: center; gap: 7px;
+  padding: 7px 10px; border-radius: 999px;
+  font-size: 13px; font-weight: 600; color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+  cursor: pointer; list-style: none;
+  user-select: none; -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+/* Safari draws its own triangle on a summary and ignores list-style. */
+.account-trigger::-webkit-details-marker { display: none; }
+.account-trigger:hover { background: rgba(255, 255, 255, 0.26); }
+.account-trigger svg { width: 15px; height: 15px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.account-trigger-name { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-caret { width: 13px; height: 13px; opacity: 0.75; transition: transform 0.15s var(--ease-out); }
+.account-menu[open] .account-caret { transform: rotate(180deg); }
+
+.account-panel {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 40;
+  min-width: 216px;
+  display: flex; flex-direction: column;
+  padding: 6px;
+  background: var(--surface-raised);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+}
+.account-panel-who {
+  display: flex; flex-direction: column; gap: 2px;
+  margin: 0; padding: 8px 10px 10px;
+  border-bottom: 1px solid var(--hairline); margin-bottom: 6px;
+  font-size: 12px; color: var(--ink-muted);
+}
+.account-panel-who strong { font-size: 14px; color: var(--ink); }
+.account-panel-who span { overflow-wrap: anywhere; }
+.account-panel a {
+  display: flex; align-items: center; min-height: 42px;
+  padding: 8px 10px; border-radius: 8px;
+  font-size: 14px; font-weight: 500; color: var(--ink); text-decoration: none;
+}
+.account-panel a:hover { background: var(--red-tint); color: var(--red-ink); }
+.account-panel-out { color: var(--red-ink); }
+
+/* On a phone the trigger is the icon alone; the panel still names whoever it
+   belongs to, so nothing is lost. */
+@media (max-width: 480px) {
+  .account-trigger-name, .account-caret { display: none; }
+  .account-trigger { padding: 8px; }
+  .account-panel { min-width: 200px; }
+}
+
 /* ---------- Accounts ---------- */
 
 /* Name, email, school, role. A two-column grid on anything but the narrowest
