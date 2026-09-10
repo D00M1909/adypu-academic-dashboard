@@ -228,13 +228,20 @@ try {
   <form class="range-bar" method="get" id="range-form">
     <input type="hidden" name="preset" id="range-preset" value="<?= htmlspecialchars($activePreset) ?>">
     <div class="range-presets">
-      <button class="<?= $presetClass('latest') ?>" type="button" data-preset="latest" aria-pressed="<?= $activePreset === 'latest' ? 'true' : 'false' ?>">Latest day</button>
+      <button class="<?= $presetClass('latest') ?>" type="button" data-preset="latest" aria-pressed="<?= $activePreset === 'latest' ? 'true' : 'false' ?>"><?php /* Five chips have to fit one row on a 375px phone, or the dock grows a
+             whole line. Only this label is long enough to matter. */ ?><span class="chip-wide">Latest day</span><span class="chip-narrow">Latest</span></button>
       <button class="<?= $presetClass('today') ?>" type="button" data-preset="today" aria-pressed="<?= $activePreset === 'today' ? 'true' : 'false' ?>">Today</button>
       <button class="<?= $presetClass('7') ?>" type="button" data-preset="7" aria-pressed="<?= $activePreset === '7' ? 'true' : 'false' ?>">7 days</button>
       <button class="<?= $presetClass('30') ?>" type="button" data-preset="30" aria-pressed="<?= $activePreset === '30' ? 'true' : 'false' ?>">30 days</button>
+      <?php /* A fifth chip on a phone, and nothing at all on a desktop that has
+               room for the inputs themselves. */ ?>
+      <button class="range-preset range-more no-print" id="range-more" type="button" aria-expanded="false" aria-controls="range-dates">Dates</button>
     </div>
     <button class="range-summary" id="stat-summary" type="button">
-      <span class="range-summary-scope" id="stat-scope">Present &middot; <?= htmlspecialchars($rangeLabel) ?></span>
+      <span class="range-summary-top">
+        <span class="range-summary-scope" id="stat-scope">Present &middot; <?= htmlspecialchars($rangeLabel) ?></span>
+        <span class="range-updated" title="When the data behind this page was last written"><?= htmlspecialchars($freshness) ?></span>
+      </span>
       <span class="range-summary-figures">
         <span class="range-summary-count"><span id="stat-present"><?= $totals['present'] ?></span><span class="range-summary-sep">/</span><span id="stat-strength"><?= $totals['strength_reported'] ?></span></span>
         <span class="att-pct <?= att_class($overallPct) ?>" id="stat-pct"><?= $overallPct ?>%</span>
@@ -250,7 +257,7 @@ try {
       <button class="range-apply" type="submit">Apply</button>
       <button class="range-export no-print" id="range-export" type="button" title="In the print dialog, choose Save as PDF: the Windows Print to PDF driver ignores the page orientation and the file name.">Export PDF</button>
     </div>
-    <span class="print-range">Date range: <?= htmlspecialchars($rangeLabel) ?></span>
+    <span class="print-range">Date range: <?= htmlspecialchars($rangeLabel) ?> &middot; <?= htmlspecialchars($freshness) ?></span>
   </form>
 
   <div id="tab-adypu" class="tab-panel">
