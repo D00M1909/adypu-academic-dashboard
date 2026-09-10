@@ -97,6 +97,14 @@ button {
   color: inherit;
 }
 
+/* Present to assistive technology, invisible on screen. Never display:none —
+   that removes the element from the accessibility tree as well. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+
 /* ---------- Header ---------- */
 
 /* Sticky, so the headline number and the reporting coverage stay on screen
@@ -819,7 +827,16 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
    carry them. "Mark attendance" never does: it is the whole reason a faculty
    member opens this on a phone, and a bare tick-box icon in a red bar is not a
    call to action anyone would find. */
-@media (max-width: 420px) { .header-link.is-compact svg + span { display: none; } }
+/* Visually hidden, NOT display:none. The icon beside it is aria-hidden, so
+   removing this span from the accessibility tree too left the link with no
+   accessible name on exactly the screen size the app is built for. */
+@media (max-width: 420px) {
+  .header-link.is-compact svg + span {
+    position: absolute; width: 1px; height: 1px;
+    padding: 0; margin: -1px; overflow: hidden;
+    clip-path: inset(50%); white-space: nowrap; border: 0;
+  }
+}
 
 .card {
   background: var(--surface-raised);
