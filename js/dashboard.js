@@ -26,21 +26,21 @@
     });
   });
 
-  // The theme itself is applied by the inline script in index.php's head, so
-  // this only has to flip and remember it. Nothing else reads the value: every
-  // colour on the page comes from a token in dashboard.css.
-  var themeToggle = document.getElementById('theme-toggle');
-  function paintToggle(theme) {
-    themeToggle.setAttribute('aria-pressed', theme === 'dark' ? 'true' : 'false');
-    themeToggle.setAttribute('aria-label', theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+  // The theme toggle lives in js/theme.js, shared with the faculty pages.
+
+  // On a phone the range dock pinned a quarter of the viewport. The date inputs
+  // are the part nobody reaches for there, so they fold away behind this and
+  // the preset chips — which are what a phone actually uses — stay put.
+  var rangeMore = document.getElementById('range-more');
+  if (rangeMore) {
+    rangeMore.addEventListener('click', function () {
+      var bar = document.getElementById('range-form');
+      var open = bar.classList.toggle('is-open');
+      rangeMore.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (open) document.getElementById('range-from').focus();
+      else rangeMore.focus();
+    });
   }
-  paintToggle(document.documentElement.dataset.theme);
-  themeToggle.addEventListener('click', function () {
-    var theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
-    document.documentElement.dataset.theme = theme;
-    paintToggle(theme);
-    try { localStorage.setItem('adypu-theme', theme); } catch (e) {}
-  });
 
   // Mirrors att_class() in index.php and --att-* in dashboard.css.
   function attClass(pct) {

@@ -79,6 +79,7 @@ $shortSchool = fn(string $id): string => preg_replace('/^School of /', '', SCHOO
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/dashboard.css?v=<?= filemtime(__DIR__ . '/css/dashboard.css') ?>">
+<meta name="theme-color" content="#7f1420">
 <script>
 // Inline and before the body on purpose: every range change is a full page
 // load, and resolving the theme from a deferred script would flash white each
@@ -435,6 +436,7 @@ try {
   window.ATTENDANCE_DAYS = <?= json_encode((object) $rangeDays) ?>;
   window.CLASS_STRENGTH = <?= json_encode($classStrength) ?>;
 </script>
+<script src="js/theme.js?v=<?= filemtime(__DIR__ . '/js/theme.js') ?>"></script>
 <script src="js/charts.js?v=<?= filemtime(__DIR__ . '/js/charts.js') ?>"></script>
 <script src="js/dashboard.js?v=<?= filemtime(__DIR__ . '/js/dashboard.js') ?>"></script>
 </body>

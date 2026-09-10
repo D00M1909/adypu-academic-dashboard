@@ -21,6 +21,7 @@ function page_head(string $title, string $bodyClass = ''): void {
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/dashboard.css?v=<?= filemtime("$root/css/dashboard.css") ?>">
+<meta name="theme-color" content="#7f1420">
 <script>
 // Same inline theme resolve as index.php, and inline for the same reason: these
 // are full page loads, and a deferred script would flash white on every one.
@@ -38,6 +39,10 @@ try {
   <symbol id="icon-out" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></symbol>
   <symbol id="icon-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
   <symbol id="icon-warn" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></symbol>
+  <symbol id="icon-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+  <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol>
+  <symbol id="icon-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
 </defs></svg>
 <header class="app-header">
   <div class="header-inner">
@@ -56,6 +61,10 @@ try {
           <svg aria-hidden="true"><use href="#icon-out"/></svg><span>Sign out</span>
         </a>
       <?php endif; ?>
+      <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch theme" aria-pressed="false" title="Switch theme">
+        <svg class="theme-icon-moon" aria-hidden="true"><use href="#icon-moon"/></svg>
+        <svg class="theme-icon-sun" aria-hidden="true"><use href="#icon-sun"/></svg>
+      </button>
     </div>
   </div>
 </header>
@@ -64,7 +73,8 @@ try {
 }
 
 function page_foot(): void {
-    echo "</main>\n</body>\n</html>\n";
+    $v = filemtime(__DIR__ . '/../js/theme.js');
+    echo "</main>\n<script src=\"js/theme.js?v=$v\"></script>\n</body>\n</html>\n";
 }
 
 // One place that decides how a message looks, so a success and a failure can
