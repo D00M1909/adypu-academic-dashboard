@@ -74,8 +74,18 @@ $pending = array_filter($users, fn($u) => ($u['status'] ?? '') === 'pending');
 page_head('Faculty accounts', 'page-narrow');
 ?>
 <?php page_notice('warn', $error); page_notice('ok', $ok); ?>
+<?php /* Spoken confirmation for the copy buttons, which otherwise only
+         change colour for a second and a half. */ ?>
+<p class="sr-only" id="copy-status" role="status"></p>
 <?php if ($temp !== ''): ?>
-  <p class="temp-password">Temporary password: <code><?= htmlspecialchars($temp) ?></code></p>
+  <div class="temp-password">
+    <p class="temp-password-label">Temporary password &mdash; read it out now. It is not shown again.</p>
+    <div class="temp-password-value">
+      <code><?= htmlspecialchars($temp) ?></code>
+      <button class="copy-btn" type="button" data-copy="<?= htmlspecialchars($temp) ?>"
+              aria-label="Copy the temporary password"><svg aria-hidden="true"><use href="#icon-copy"/></svg></button>
+    </div>
+  </div>
 <?php endif; ?>
 
 <section class="card">
@@ -103,6 +113,11 @@ page_head('Faculty accounts', 'page-narrow');
   <?php endif; ?>
 </section>
 
+<?php
+// "School of " on every one of nine rows, on a phone, costs the width that was
+// making the code wrap and the name ellipsize. The heading says school already.
+$shortSchool = fn(string $id): string => preg_replace('/^School of /', '', SCHOOLS[$id]['name'] ?? $id);
+?>
 <section class="card">
   <h2>School join codes</h2>
   <p class="field-help">
@@ -110,12 +125,20 @@ page_head('Faculty accounts', 'page-narrow');
     Rotating a code takes the old one out of use at once; accounts already created keep working.
   </p>
   <ul class="code-list">
-    <?php foreach (SCHOOLS as $id => $s): ?>
+    <?php foreach (SCHOOLS as $id => $s): $code = (string) ($data['codes'][$id] ?? ''); ?>
       <li class="code-row">
-        <span><?= htmlspecialchars($s['name']) ?></span>
-        <code><?= htmlspecialchars($data['codes'][$id] ?? 'none yet') ?></code>
+        <span class="code-school"><?= htmlspecialchars($shortSchool($id)) ?></span>
+        <?php /* An absence must not be dressed as a value: "none yet" set in the
+                 same monospace box as a real code read like one. */ ?>
+        <?php if ($code === ''): ?>
+          <span class="code-none">Not created</span>
+        <?php else: ?>
+          <code><?= htmlspecialchars($code) ?></code>
+          <button class="copy-btn" type="button" data-copy="<?= htmlspecialchars($code) ?>"
+                  aria-label="Copy the join code for <?= htmlspecialchars($s['name']) ?>"><svg aria-hidden="true"><use href="#icon-copy"/></svg></button>
+        <?php endif; ?>
         <form method="post"><?= csrf_field() ?><input type="hidden" name="school" value="<?= htmlspecialchars($id) ?>">
-          <button class="btn-quiet" name="action" value="rotate" type="submit"><?= isset($data['codes'][$id]) ? 'Rotate' : 'Create' ?></button></form>
+          <button class="btn-quiet" name="action" value="rotate" type="submit"><?= $code !== '' ? 'Rotate' : 'Create' ?></button></form>
       </li>
     <?php endforeach; ?>
   </ul>
@@ -156,4 +179,5 @@ page_head('Faculty accounts', 'page-narrow');
     <?php endforeach; ?>
   </ul>
 </section>
+<script src="js/admin.js?v=<?= filemtime(__DIR__ . '/js/admin.js') ?>"></script>
 <?php page_foot(); ?>
