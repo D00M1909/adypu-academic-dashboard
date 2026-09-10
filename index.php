@@ -65,6 +65,22 @@ function att_class(int $pct): string {
     return 'att-low';
 }
 
+// When the numbers on screen were last written. The edge caches pages and the
+// push can silently stop (see the debugging order in CLAUDE.md), so "is this
+// stale?" is the first question anyone asks of this page and it had no answer
+// on it. Both writers count: the hourly Google push replaces the cache file,
+// and mark.php appends to its own store.
+$writeTimes = [];
+foreach ([ATTENDANCE_CACHE_FILE, function_exists('store_path') ? store_path('submissions') : null] as $f) {
+    if ($f !== null && is_file($f)) $writeTimes[] = filemtime($f);
+}
+$lastWrite = $writeTimes ? max($writeTimes) : null;
+$freshness = $lastWrite === null
+    ? 'No data yet'
+    : 'Updated ' . (date('Y-m-d', $lastWrite) === date('Y-m-d')
+        ? date('H:i', $lastWrite)
+        : date('j M, H:i', $lastWrite));
+
 // "School of Engineering" -> "Engineering"; the tile has no room for the prefix.
 $shortSchool = fn(string $id): string => preg_replace('/^School of /', '', SCHOOLS[$id]['name'] ?? $id);
 ?>
@@ -249,7 +265,7 @@ try {
         <svg class="range-summary-icon" aria-hidden="true"><use href="#icon-chevron"/></svg>
       </span>
     </button>
-    <div class="range-dates">
+    <div class="range-dates" id="range-dates">
       <label for="range-from">From</label>
       <input type="date" id="range-from" name="from" value="<?= htmlspecialchars($from) ?>" min="<?= htmlspecialchars($dataDates[0]) ?>" max="<?= htmlspecialchars(date('Y-m-d')) ?>">
       <label for="range-to">To</label>
@@ -266,14 +282,17 @@ try {
     <section class="tile-section" id="schools-section">
       <div class="section-title">
         <h2>Schools</h2>
-        <span class="section-meta" id="schools-meta"><?= count(SCHOOLS) ?> schools</span>
+        <?php /* How many schools filed anything, not just how many exist. Eight
+                 "Not reported" tiles beside one real number made the page read
+                 as empty when it was not; the heading now says which it is. */ ?>
+        <span class="section-meta" id="schools-meta"><?= $reportingSchools ?> of <?= count(SCHOOLS) ?> reporting</span>
       </div>
-      <div class="tile-grid schools-grid" id="schools-grid">
+      <div class="tile-grid schools-grid" id="schools-grid" data-reporting="<?= $reportingSchools ?>">
         <?php foreach (SCHOOLS as $id => $school):
-          $st = attendance_totals([$id => $tree[$id] ?? []]);
+          $st = $schoolTotals[$id];
           $stPct = attendance_pct($st);
         ?>
-        <button class="tile school-tile" type="button" data-school="<?= htmlspecialchars($id) ?>">
+        <button class="tile school-tile<?= $st['reported'] === 0 ? ' tile-quiet' : '' ?>" type="button" data-school="<?= htmlspecialchars($id) ?>">
           <svg class="tile-icon-svg"><use href="#icon-<?= htmlspecialchars($id) ?>"/></svg>
           <span class="tile-label"><?= htmlspecialchars($school['name']) ?></span>
           <?php if ($st['reported'] === 0 && is_placeholder_school($id)): ?>
