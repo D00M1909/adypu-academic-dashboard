@@ -1081,6 +1081,17 @@ input:focus-visible, select:focus-visible {
 
 /* ---------- Accounts ---------- */
 
+/* Name, email, school, role. A two-column grid on anything but the narrowest
+   phone, where the label sitting above its value reads better than a cramped
+   pair of columns. */
+.account-facts { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; font-size: 14px; }
+.account-facts dt { color: var(--ink-muted); }
+.account-facts dd { margin: 0; color: var(--ink); overflow-wrap: anywhere; }
+@media (max-width: 380px) {
+  .account-facts { grid-template-columns: 1fr; gap: 2px; }
+  .account-facts dd { margin-bottom: 8px; }
+}
+
 .count-pill { font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 999px; background: var(--surface); color: var(--ink-muted); }
 .account-list { list-style: none; margin: 0; padding: 0; }
 .account { padding: 14px 0; border-top: 1px solid var(--hairline); }
