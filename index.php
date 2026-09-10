@@ -255,13 +255,13 @@ try {
         <button class="tab active" data-tab="adypu" role="tab" aria-selected="true">ADYPU</button>
         <button class="tab" data-tab="partners" role="tab" aria-selected="false">Knowledge Partner</button>
       </nav>
-      <a class="header-link no-print" href="mark.php">
-        <svg aria-hidden="true"><use href="#icon-mark"/></svg><span>Mark attendance</span>
-      </a>
       <button class="theme-toggle no-print" id="theme-toggle" type="button" aria-label="Switch to dark mode" aria-pressed="false" title="Switch theme">
         <svg class="theme-icon-moon" aria-hidden="true"><use href="#icon-moon"/></svg>
         <svg class="theme-icon-sun" aria-hidden="true"><use href="#icon-sun"/></svg>
       </button>
+      <a class="header-link no-print" href="mark.php">
+        <svg aria-hidden="true"><use href="#icon-mark"/></svg><span>Mark attendance</span>
+      </a>
       <?= account_menu() ?>
     </div>
   </div>
