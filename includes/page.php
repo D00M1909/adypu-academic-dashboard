@@ -8,6 +8,38 @@
 
 require_once __DIR__ . '/attendance.php';
 
+// The account control both headers carry in their top right. One function, so
+// the dashboard and the faculty pages cannot drift apart — the dashboard is
+// where everyone lands, and it had no way to reach an account at all.
+function account_menu(): string {
+    $u = function_exists('auth_user') ? auth_user() : null;
+
+    if ($u === null) {
+        return '<a class="header-link is-compact no-print" href="login.php">'
+             . '<svg aria-hidden="true"><use href="#icon-user"/></svg><span>Sign in</span></a>';
+    }
+
+    $name = trim((string) ($u['name'] ?? '')) ?: 'Account';
+    $email = (string) ($u['email'] ?? '');
+    $e = fn(string $v): string => htmlspecialchars($v);
+
+    $links = '<a href="mark.php">Mark attendance</a>';
+    if (!empty($u['admin'])) $links .= '<a href="admin.php">Faculty accounts</a>';
+    $links .= '<a href="account.php">Your account</a>'
+            . '<a class="account-panel-out" href="login.php?logout=1">Sign out</a>';
+
+    return '<details class="account-menu no-print">'
+         . '<summary class="account-trigger">'
+         . '<svg aria-hidden="true"><use href="#icon-user"/></svg>'
+         . '<span class="account-trigger-name">' . $e($name) . '</span>'
+         . '<svg class="account-caret" aria-hidden="true"><use href="#icon-caret"/></svg>'
+         . '</summary>'
+         . '<div class="account-panel">'
+         . '<p class="account-panel-who"><strong>' . $e($name) . '</strong><span>' . $e($email) . '</span></p>'
+         . $links
+         . '</div></details>';
+}
+
 function page_head(string $title, string $bodyClass = ''): void {
     $root = __DIR__ . '/..';
     ?><!DOCTYPE html>
@@ -39,6 +71,7 @@ try {
   <symbol id="icon-out" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></symbol>
   <symbol id="icon-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
   <symbol id="icon-warn" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></symbol>
+  <symbol id="icon-caret" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
   <symbol id="icon-user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
   <symbol id="icon-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
   <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
@@ -52,21 +85,12 @@ try {
       <h1><?= htmlspecialchars($title) ?></h1>
     </div>
     <div class="header-controls">
-      <?php $u = function_exists('auth_user') ? auth_user() : null; ?>
       <a class="header-link is-compact" href="index.php"><svg aria-hidden="true"><use href="#icon-back"/></svg><span>Dashboard</span></a>
-      <?php if ($u): ?>
-        <?php if (!empty($u['admin'])): ?>
-          <a class="header-link" href="admin.php"><span>Admin</span></a>
-        <?php endif; ?>
-        <a class="header-link is-compact" href="account.php"><svg aria-hidden="true"><use href="#icon-user"/></svg><span>Account</span></a>
-        <a class="header-link is-compact" href="login.php?logout=1" title="Signed in as <?= htmlspecialchars($u['name']) ?>">
-          <svg aria-hidden="true"><use href="#icon-out"/></svg><span>Sign out</span>
-        </a>
-      <?php endif; ?>
       <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch theme" aria-pressed="false" title="Switch theme">
         <svg class="theme-icon-moon" aria-hidden="true"><use href="#icon-moon"/></svg>
         <svg class="theme-icon-sun" aria-hidden="true"><use href="#icon-sun"/></svg>
       </button>
+      <?= account_menu() ?>
     </div>
   </div>
 </header>
