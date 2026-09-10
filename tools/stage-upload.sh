@@ -23,7 +23,13 @@ else
   # One ref, not a range: this diffs the ref against the WORKING TREE, so a file
   # edited but not yet committed still gets staged. Uploading a file the repo
   # has not seen is the normal case here, not a mistake.
-  files=$(git diff --name-only --diff-filter=d "${1:-HEAD~1}")
+  #
+  # ls-files --others is the second half of that promise and was missing: git
+  # diff never lists an UNTRACKED file, so a brand new one was silently left out
+  # of the upload. A new js/ file that never reaches the server is a 404 on a
+  # <script> tag — the page still renders, so nothing looks wrong until the
+  # feature it carried quietly does nothing.
+  files=$( { git diff --name-only --diff-filter=d "${1:-HEAD~1}";              git ls-files --others --exclude-standard; } | sort -u )
 fi
 
 n=0
