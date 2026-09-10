@@ -28,6 +28,13 @@
   --att-good: #15803d;
   --att-warn: #b45309;
   --att-low: var(--red-ink);
+  /* Green text on a green tint, which is a different job from green on white.
+     Three rules used to mix their own tint at three alphas (0.10, 0.12, 0.14)
+     and put --att-good on it; all three came out between 4.15 and 4.39:1, so
+     the "Saved." notice every faculty member sees has been under AA the whole
+     time. One tint, and an ink dark enough to sit on it. */
+  --good-tint: rgba(21, 128, 61, 0.12);
+  --good-ink: #166534;
   --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 1px rgba(15, 23, 42, 0.04);
   --shadow-md: 0 8px 20px -6px rgba(15, 23, 42, 0.12), 0 2px 6px rgba(15, 23, 42, 0.06);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -63,6 +70,7 @@
     --ink-faint: #7d8b9c;
     --att-good: #4ade80;
     --att-warn: #fbbf24;
+    --good-ink: #4ade80;
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 1px rgba(0, 0, 0, 0.4);
     --shadow-md: 0 8px 20px -6px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.45);
     /* Native widgets follow this: without it the two date inputs stay white
@@ -336,6 +344,11 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
   gap: 8px;
 }
 .tile:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: var(--red-tint-strong); }
+/* Still a full tile and still clickable — it is how you find out a school is
+   silent — but it stops competing with the schools that have a number. */
+.tile-quiet { opacity: 0.72; }
+.tile-quiet .tile-icon-svg { opacity: 0.55; }
+.tile-quiet:hover, .tile-quiet:focus-visible { opacity: 1; }
 .tile:active { transform: translateY(0); }
 .tile.active {
   background: var(--red-tint);
@@ -888,11 +901,15 @@ input:focus-visible, select:focus-visible {
 .field-help { font-size: 13px; line-height: 1.5; color: var(--ink-muted); margin: 10px 0 0; }
 .field-help a { color: var(--red-ink); }
 
-.btn-primary, .btn-quiet {
+.btn-primary, .btn-quiet, .btn-danger {
   font: inherit; font-size: 15px; font-weight: 600;
   min-height: 48px; padding: 12px 18px;
   border-radius: 10px; border: 1px solid transparent;
   cursor: pointer; transition: filter 0.15s var(--ease-out);
+  /* A tap that lingers selects the label instead of pressing the button, and
+     leaves the word highlighted afterwards. Thumbs linger. */
+  user-select: none; -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 .btn-primary { background: var(--red-primary); color: #fff; width: 100%; margin-top: 18px; }
 .btn-primary:hover { filter: brightness(1.08); }
@@ -980,10 +997,33 @@ input:focus-visible, select:focus-visible {
 .code-list { list-style: none; margin: 0; padding: 0; }
 .code-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 11px 0; border-top: 1px solid var(--hairline); font-size: 14px; }
 .code-list li:first-child { border-top: 0; }
-.code-row span { flex: 1 1 auto; min-width: 140px; }
-.code-row code, .temp-password code { font-family: 'IBM Plex Mono', monospace; font-weight: 700; letter-spacing: 0.06em; background: var(--surface); padding: 5px 10px; border-radius: 7px; }
-.code-row .btn-quiet { min-height: 40px; padding: 8px 14px; font-size: 13px; }
-.temp-password { background: var(--red-tint); color: var(--red-ink); padding: 14px; border-radius: 12px; font-size: 14px; font-weight: 600; }
+.code-school { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A nine-character code must never wrap: it took the row to two lines and
+   ellipsized the school name beside it. */
+.code-row code, .temp-password code { font-family: 'IBM Plex Mono', monospace; font-weight: 700; letter-spacing: 0.06em; background: var(--surface); padding: 5px 10px; border-radius: 7px; white-space: nowrap; }
+.code-row .btn-quiet { min-height: 40px; padding: 8px 12px; font-size: 13px; flex: none; }
+/* Not a <code>: a school with no join code has no value to show, and setting
+   the words in the same box as a real code made "none yet" read as one. */
+.code-none { font-size: 13px; font-style: italic; color: var(--ink-muted); flex: none; }
+
+/* 44px, not the 32px .icon-btn, because this one is tapped with a thumb. */
+.copy-btn {
+  flex: none; width: 44px; height: 44px;
+  display: flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 10px; cursor: pointer;
+  background: transparent; color: var(--ink-muted);
+  transition: background 0.12s var(--ease-out), color 0.12s var(--ease-out);
+}
+.copy-btn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.copy-btn:hover { background: var(--red-tint); color: var(--red-ink); }
+.copy-btn.is-copied { background: var(--good-tint); color: var(--good-ink); }
+
+/* Shown once, with no email on this host to send it by, so it gets the space
+   and the copy button that importance deserves. */
+.temp-password { background: var(--red-tint); border: 1px solid var(--red-tint-strong); color: var(--red-ink); padding: 14px; border-radius: 12px; }
+.temp-password-label { margin: 0 0 8px; font-size: 13px; font-weight: 600; }
+.temp-password-value { display: flex; align-items: center; gap: 6px; }
+.temp-password-value code { font-size: 16px; }
 
 @media (min-width: 640px) {
   .page-main { padding: 24px 20px 40px; }

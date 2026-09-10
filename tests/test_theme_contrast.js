@@ -72,6 +72,9 @@ const pairs = [
   ['--red-ink', '--surface', null, 4.5],
   ['--red-ink', '--surface-raised', null, 4.5],
   ['--red-ink', '--red-tint', '--surface-raised', 4.5],   // .tile.active
+  ['--red-ink', '--red-tint', '--surface', 4.5],          // .mark-lead, on the page not a card
+  ['--good-ink', '--good-tint', '--surface-raised', 4.5], // .status-active, .copy-btn.is-copied
+  ['--good-ink', '--good-tint', '--surface', 4.5],        // .notice-ok, which sits on the page
   ['--att-good', '--surface-raised', null, 4.5],
   ['--att-warn', '--surface-raised', null, 4.5],
   ['--total-text', '--total-bg', null, 4.5],
