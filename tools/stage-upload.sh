@@ -18,7 +18,7 @@ OUT=upload
 rm -rf "$OUT"
 
 if [ "${1:-}" = "--all" ]; then
-  files=$(find index.php login.php mark.php admin.php api includes css js img -type f)
+  files=$(find index.php login.php mark.php admin.php account.php api includes css js img -type f)
 else
   # One ref, not a range: this diffs the ref against the WORKING TREE, so a file
   # edited but not yet committed still gets staged. Uploading a file the repo
@@ -42,7 +42,7 @@ while IFS= read -r f; do
   # submissions the live site itself wrote; copying a local one up would
   # overwrite real faculty accounts with whatever a dev machine had.
   case "$f" in
-    index.php|login.php|mark.php|admin.php|api/*|includes/*|css/*|js/*|img/*) ;;
+    index.php|login.php|mark.php|admin.php|account.php|api/*|includes/*|css/*|js/*|img/*) ;;
     *) continue ;;
   esac
   # Server-only, and gitignored, so this should never match — but staging it
