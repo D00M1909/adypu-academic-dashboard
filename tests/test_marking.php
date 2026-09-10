@@ -170,6 +170,82 @@ assert(!csrf_ok(), 'a wrong token must fail');
 $_POST['csrf'] = '';
 assert(!csrf_ok(), 'an empty token must fail');
 
+// --- The bootstrap admin, and changing your own password --------------------
+// A subprocess with ADMIN_EMAIL / ADMIN_HASH of its own. Those come from
+// includes/config.local.php on a real server, and a test that passes or fails
+// on whether this machine happens to have one is worse than no test. Defining
+// them before config.php loads makes ours win: define() keeps the first value.
+//
+// What is actually under test is the promotion. The bootstrap admin is virtual
+// and has no stored record, so it could never change its own password; letting
+// it write one has to ALSO retire the config hash, or that hash stays live as a
+// second door into an admin account that nobody can close without FTP.
+$root = strtr(dirname(__DIR__), DIRECTORY_SEPARATOR, '/');
+$bootstrapScript = STORE_DIR . '/bootstrap-admin-test.php';
+file_put_contents($bootstrapScript, <<<PHP
+<?php
+// config.local.php defines these too on a machine that has one. Ours are set by
+// the time it loads, so its define() is a duplicate-constant warning and
+// nothing more — and not one worth printing.
+error_reporting(E_ALL & ~E_WARNING);
+define('ADMIN_EMAIL', 'boss@adypu.edu.in');
+define('ADMIN_HASH', password_hash('first-password', PASSWORD_DEFAULT));
+define('STORE_DIR', '{$root}/../adypu-bootstrap-' . getmypid());
+@mkdir(STORE_DIR, 0775, true);
+require '{$root}/includes/auth.php';
+session_start();
+
+\$fail = function (\$why) { fwrite(STDERR, \$why . PHP_EOL); exit(1); };
+
+// Signs in from the config file alone, with nothing in the store.
+if (auth_login('boss@adypu.edu.in', 'first-password') !== '') \$fail('bootstrap admin cannot sign in');
+\$me = auth_user();
+if (empty(\$me['admin'])) \$fail('bootstrap admin is not an admin');
+if (auth_find('boss@adypu.edu.in') !== null) \$fail('bootstrap admin must not be stored yet');
+
+// Rejections come before anything is written.
+if (auth_change_password('boss@adypu.edu.in', 'wrong', 'a-good-password') === '') \$fail('a wrong current password was accepted');
+if (auth_change_password('boss@adypu.edu.in', 'first-password', 'short') === '') \$fail('a too-short password was accepted');
+if (auth_change_password('boss@adypu.edu.in', 'first-password', 'first-password') === '') \$fail('the unchanged password was accepted');
+if (auth_find('boss@adypu.edu.in') !== null) \$fail('a rejected change still wrote a record');
+
+// The change itself promotes it into the store.
+if (auth_change_password('boss@adypu.edu.in', 'first-password', 'second-password') !== '') \$fail('the change was refused');
+\$stored = auth_find('boss@adypu.edu.in');
+if (\$stored === null) \$fail('the change did not create a stored record');
+if (empty(\$stored['admin'])) \$fail('the promoted record lost its admin rights');
+if ((\$stored['status'] ?? '') !== 'active') \$fail('the promoted record is not active');
+
+// And the config hash is retired: the stored record wins from here on, or the
+// old password would remain a way in that no one could take away.
+auth_logout();
+session_start();
+if (auth_login('boss@adypu.edu.in', 'first-password') === '') \$fail('the old config password still signs in');
+if (auth_login('boss@adypu.edu.in', 'second-password') !== '') \$fail('the new password does not sign in');
+if (!empty(\$_SESSION['is_config_admin'])) \$fail('still signing in by the config path after promotion');
+if (empty(auth_user()['admin'])) \$fail('the promoted admin lost its rights on sign-in');
+
+// An ordinary account changes its password by the same call.
+auth_put('teacher@adypu.edu.in', ['name' => 'T', 'school' => 'eng', 'status' => 'active',
+    'hash' => password_hash('old-password', PASSWORD_DEFAULT), 'admin' => false]);
+if (auth_change_password('teacher@adypu.edu.in', 'old-password', 'new-password') !== '') \$fail('a faculty change was refused');
+auth_logout();
+session_start();
+if (auth_login('teacher@adypu.edu.in', 'old-password') === '') \$fail('a faculty old password still works');
+if (auth_login('teacher@adypu.edu.in', 'new-password') !== '') \$fail('a faculty new password does not work');
+if (!empty(auth_find('teacher@adypu.edu.in')['admin'])) \$fail('a faculty change granted admin');
+
+foreach (glob(STORE_DIR . '/*.php') ?: [] as \$f) unlink(\$f);
+@rmdir(STORE_DIR);
+echo 'bootstrap-ok';
+PHP);
+
+$bootstrapOut = [];
+$bootstrapCode = 0;
+exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($bootstrapScript) . ' 2>&1', $bootstrapOut, $bootstrapCode);
+assert($bootstrapCode === 0 && in_array('bootstrap-ok', $bootstrapOut, true),
+    "the bootstrap admin / change-password path failed:\n  " . implode("\n  ", $bootstrapOut));
+
 // --- Importing a returned student list --------------------------------------
 // Run as a subprocess against the test data directory, because that is how the
 // tool is actually used, and because its exit code and its warnings are half of

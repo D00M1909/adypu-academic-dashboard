@@ -85,6 +85,13 @@ function auth_put(string $email, array $fields): void {
 function auth_user(): ?array {
     if (empty($_SESSION['email'])) return null;
     if (!empty($_SESSION['is_config_admin'])) {
+        // Promoted mid-session by a password change: the stored record is the
+        // account now, so stop answering with the synthetic one.
+        $stored = auth_find($_SESSION['email']);
+        if ($stored) {
+            unset($_SESSION['is_config_admin']);
+            return $stored;
+        }
         return ['email' => $_SESSION['email'], 'name' => 'Administrator',
                 'school' => '', 'status' => 'active', 'admin' => true];
     }
@@ -125,7 +132,15 @@ function auth_login(string $email, string $password): string {
     auth_session();
     $key = auth_key($email);
 
-    if (defined('ADMIN_EMAIL') && defined('ADMIN_HASH') && ADMIN_EMAIL !== ''
+    $u = auth_find($key);
+
+    // The bootstrap admin from config.local.php, and only while no stored
+    // account has claimed that email. The order matters: once this account
+    // changes its password it becomes a real record (auth_change_password),
+    // and that record has to win from then on. Checked first, the config hash
+    // would stay live forever as a second door into an admin account that no
+    // one could close without FTP.
+    if ($u === null && defined('ADMIN_EMAIL') && defined('ADMIN_HASH') && ADMIN_EMAIL !== ''
         && $key === auth_key(ADMIN_EMAIL) && password_verify($password, ADMIN_HASH)) {
         session_regenerate_id(true);
         $_SESSION['email'] = $key;
@@ -133,7 +148,6 @@ function auth_login(string $email, string $password): string {
         return '';
     }
 
-    $u = auth_find($key);
     if ($u && ($u['locked'] ?? 0) > time()) {
         return 'Too many attempts. Try again in ' . max(1, (int) ceil((($u['locked'] - time()) / 60))) . ' minutes.';
     }
@@ -238,11 +252,42 @@ function auth_signup(string $name, string $email, string $password, string $scho
 }
 
 function auth_change_password(string $email, string $current, string $new): string {
-    $u = auth_find($email);
-    if (!$u || !password_verify($current, $u['hash'] ?? '')) return 'Your current password is not right.';
+    $key = auth_key($email);
+    $u = auth_find($key);
+
+    // The bootstrap admin has no stored record to check against, so it verifies
+    // the config hash instead — and a successful change writes it into the
+    // store for the first time. That promotion is what makes the account
+    // changeable at all: its password otherwise lives in a file that only FTP
+    // can reach, which is no use to whoever is actually holding the phone.
+    $bootstrap = $u === null && defined('ADMIN_EMAIL') && defined('ADMIN_HASH')
+        && ADMIN_EMAIL !== '' && $key === auth_key(ADMIN_EMAIL);
+
+    $verified = $bootstrap
+        ? password_verify($current, ADMIN_HASH)
+        : ($u !== null && password_verify($current, $u['hash'] ?? ''));
+    if (!$verified) return 'Your current password is not right.';
     if (strlen($new) < AUTH_MIN_PASSWORD) return 'The new password needs at least ' . AUTH_MIN_PASSWORD . ' characters.';
-    auth_put($email, ['hash' => password_hash($new, PASSWORD_DEFAULT), 'remember' => '']);
-    auth_remember(auth_key($email));
+    if ($new === $current) return 'That is the password you already have.';
+
+    if ($bootstrap) {
+        auth_put($key, [
+            'name'    => 'Administrator',
+            'school'  => '',
+            'hash'    => password_hash($new, PASSWORD_DEFAULT),
+            'status'  => 'active',
+            'admin'   => true,
+            'created' => date('Y-m-d H:i'),
+            'fails'   => 0,
+            'locked'  => 0,
+        ]);
+    } else {
+        auth_put($key, ['hash' => password_hash($new, PASSWORD_DEFAULT)]);
+    }
+    // Every other device is signed out: a password change is the one action
+    // that should end a session someone else may be holding.
+    auth_put($key, ['remember' => '']);
+    auth_remember($key);
     return '';
 }
 
