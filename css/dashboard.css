@@ -571,6 +571,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
   transition: color 0.12s var(--ease-out), border-color 0.12s var(--ease-out);
 }
 .range-preset:hover { color: var(--red-ink); border-color: var(--red-tint-strong); }
+.chip-narrow { display: none; }
 .range-preset.is-active {
   color: #fff;
   background: var(--red-primary);
@@ -622,6 +623,17 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
   white-space: nowrap;
 }
 .range-export:hover { background: var(--red-tint); }
+/* Desktop has the room for the inputs themselves; this is the phone's handle. */
+.range-more { display: none; }
+/* Whether the page is showing this morning's push or Friday's. The edge caches
+   pages and the push can stop quietly, so this is the first question anyone
+   asks of the numbers. It shares the summary's top line, so it costs no
+   height on the screen where height is the scarce thing. */
+.range-summary-top { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.range-updated {
+  font-size: 11px; color: var(--ink-muted);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
 .print-range { display: none; }
 
 /* This follows the base range-bar rule so it can override the desktop header
@@ -629,6 +641,29 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
    to pin directly to the viewport. */
 @media (max-width: 640px) {
   .range-bar { top: 0; }
+  /* Pinned, this bar was ~200px of an 812px viewport: a permanent quarter of
+     the screen given to controls, on the page whose job is the tiles below it.
+     The dates, Apply and Export fold behind the Dates chip; the preset chips
+     and the headline number — the two things a phone actually reads — stay. */
+  .range-dates { display: none; }
+  .range-bar.is-open .range-dates { display: flex; flex-wrap: wrap; flex-basis: 100%; }
+  .range-more { display: inline-flex; align-items: center; }
+  /* Tight enough that all five chips hold one row at 375px. Two rows here cost
+     40px of a viewport this bar is already pinning a fifth of. */
+  .range-presets { gap: 6px; }
+  .range-preset { font-size: 12.5px; padding: 7px 11px; }
+  .chip-wide { display: none; }
+  .chip-narrow { display: inline; }
+  .range-more[aria-expanded="true"] { color: #fff; background: var(--red-primary); border-color: var(--red-primary); }
+}
+
+/* 360px is the common Android width, and the five chips spill to a second row
+   there at the sizing above. Another 14px across the row buys it back. This has
+   to FOLLOW that block, not precede it: same specificity, so source order is
+   what decides, and placed earlier it was simply overruled. */
+@media (max-width: 400px) {
+  .range-presets { gap: 5px; }
+  .range-preset { padding: 7px 8px; font-size: 12px; }
 }
 
 /* An average over several days has to say so, or two days out of seven reads
@@ -959,6 +994,59 @@ input:focus-visible, select:focus-visible {
 
 .mark-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
 .mark-tools .field-help { margin: 0; flex-basis: 100%; }
+.mark-tools .btn-quiet, .mark-tools .btn-danger { flex: 1 1 auto; min-height: 44px; padding: 10px 14px; font-size: 14px; }
+
+/* Ticking for ABSENT is the opposite of what most people expect, and reading it
+   backwards inverts the entire submission. It gets the loudest treatment above
+   the list rather than the quietest. */
+.mark-lead {
+  display: flex; align-items: flex-start; gap: 10px;
+  margin: 0 0 12px; padding: 12px 14px;
+  background: var(--red-tint); border: 1px solid var(--red-tint-strong);
+  border-radius: 12px;
+  font-size: 14px; line-height: 1.45; color: var(--red-ink);
+}
+.mark-lead svg {
+  width: 18px; height: 18px; flex: none; margin-top: 1px;
+  fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+
+/* "All absent" sat next to "All present" in the same clothes. One is the normal
+   opening move; the other discards a roll that took sixty taps. */
+.btn-danger {
+  background: transparent; color: var(--red-ink);
+  border: 1px dashed var(--red-tint-strong);
+  transition: background 0.15s var(--ease-out);
+}
+.btn-danger:hover { background: var(--red-tint); border-style: solid; }
+/* Armed: one tap from wiping the roll, so it stops looking like a quiet option. */
+.btn-danger.is-armed { background: var(--red-primary); color: #fff; border-style: solid; border-color: var(--red-primary); }
+/* A bulk button with nothing to do reads as broken when tapped. Disabled says
+   "already done" instead of saying nothing at all. */
+.mark-tools .btn-quiet:disabled, .mark-tools .btn-danger:disabled { opacity: 0.4; cursor: default; }
+.mark-tools .btn-quiet:disabled:hover { background: var(--surface); color: var(--ink); }
+.mark-tools .btn-danger:disabled:hover { background: transparent; border-style: dashed; }
+
+/* Sixty names is a lot of thumb. Rows are hidden, never removed, so a student
+   ticked absent and then filtered out of sight still posts. */
+.roster-filter {
+  display: flex; align-items: center; gap: 9px;
+  margin-bottom: 10px; padding: 0 13px;
+  background: var(--surface-raised);
+  border: 1px solid var(--hairline); border-radius: 12px;
+}
+.roster-filter:focus-within { border-color: var(--red-tint-strong); }
+.roster-filter svg {
+  width: 16px; height: 16px; flex: none;
+  fill: none; stroke: var(--ink-muted); stroke-width: 2; stroke-linecap: round;
+}
+.roster-filter input {
+  flex: 1; min-width: 0; font: inherit; font-size: 15px; color: var(--ink);
+  background: none; border: 0; padding: 12px 0; min-height: 44px;
+}
+.roster-filter input:focus { outline: none; }
+.roster-filter-count { font-size: 12px; color: var(--ink-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.roster-empty { margin: 14px 0; text-align: center; font-size: 14px; color: var(--ink-muted); }
 
 .roster { list-style: none; margin: 0; padding: 0; border: 1px solid var(--hairline); border-radius: 14px; overflow: hidden; background: var(--surface-raised); }
 .roster li + li { border-top: 1px solid var(--hairline); }
@@ -989,13 +1077,15 @@ input:focus-visible, select:focus-visible {
 .account-actions .btn-primary, .account-actions .btn-quiet { margin: 0; width: auto; flex: 1 1 auto; min-height: 44px; padding: 10px 14px; font-size: 14px; }
 
 .status { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 2px 8px; border-radius: 999px; }
-.status-active { background: rgba(21, 128, 61, 0.12); color: var(--att-good); }
+.status-active { background: var(--good-tint); color: var(--good-ink); }
 .status-pending { background: rgba(180, 83, 9, 0.12); color: var(--att-warn); }
 .status-disabled { background: var(--surface); color: var(--ink-muted); }
 .status-admin { background: var(--red-tint-strong); color: var(--red-ink); }
 
 .code-list { list-style: none; margin: 0; padding: 0; }
-.code-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 11px 0; border-top: 1px solid var(--hairline); font-size: 14px; }
+/* Nine of these stack up on a phone, so the row stays one line: name, code,
+   copy, action. Only the name gives way. */
+.code-row { display: flex; align-items: center; gap: 8px; padding: 9px 0; border-top: 1px solid var(--hairline); font-size: 14px; }
 .code-list li:first-child { border-top: 0; }
 .code-school { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* A nine-character code must never wrap: it took the row to two lines and
@@ -1080,6 +1170,7 @@ input:focus-visible, select:focus-visible {
     clip-path: none;
   }
   .range-presets, .range-dates { display: none; }
+  .tile-quiet { opacity: 1; }
   .range-summary {
     box-shadow: none;
     border: 1px solid var(--hairline);
