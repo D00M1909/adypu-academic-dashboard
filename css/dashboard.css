@@ -411,7 +411,10 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
   border-radius: 20px;
   padding: 24px;
   width: 100%;
-  max-width: 460px;
+  /* 640, not 460: two division columns at 460 were ~198px each, narrower than a
+     monospace "67 students, not reported", which scrolled the whole modal
+     sideways. The width: 100% above still lets it shrink on a phone. */
+  max-width: 640px;
   /* Listing every lecture under every division makes this as tall as the range
      is long, so it scrolls rather than running off the top of the viewport. */
   max-height: 85vh;
@@ -452,12 +455,16 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
 #modal-refresh:active svg { animation: spin 0.4s var(--ease-out); }
 @keyframes spin { to { transform: rotate(180deg); } }
 
-.division-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px 16px; margin-bottom: 16px; }
+/* minmax(0, 1fr), not 1fr: a plain 1fr column cannot shrink below its content,
+   so one long unbreakable line widened the grid past the modal instead of
+   wrapping inside its own column. */
+.division-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; margin-bottom: 16px; }
 /* A division listing its lectures needs the full width: two columns clip the
    slot and the faculty name. Set by dashboard.js when any division has one. */
 .division-grid.has-readings { grid-template-columns: minmax(0, 1fr); }
 .division-row { display: flex; flex-direction: column; gap: 6px; }
-.division-row-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; }
+/* Wraps as a last resort: the count drops under the name rather than overflow. */
+.division-row-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 8px; font-size: 13px; }
 /* min-width:0 so a long faculty name shrinks the name instead of shoving the
    count onto its own line; nowrap so the count never splits from its percent. */
 .division-name { min-width: 0; color: var(--ink-muted); font-weight: 500; }
