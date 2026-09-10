@@ -22,6 +22,10 @@ $me = auth_require();
 
 const LAST_CLASS_COOKIE = 'adypu_last_class';
 
+// Above this many students, scrolling to find one costs more than the filter
+// box costs in screen space. Engineering divisions run to 60.
+const ROSTER_FILTER_AT = 15;
+
 // --- Saving -----------------------------------------------------------------
 
 $error = '';
@@ -86,6 +90,11 @@ $date = row_date((string) ($_GET['date'] ?? '')) ?? date('Y-m-d');
 $time = row_time((string) ($_GET['time'] ?? '')) ?: date('H:00');
 
 $roster = $class ? roster_for($class) : [];
+// The sticky bar repeats the selection, because the picker card scrolls away
+// above a long roster and filing the 9am roll into the 2pm slot is the
+// expensive mistake on this screen. The school is dropped: a faculty member
+// knows which school they are in, and the bar has one line.
+$shortLabel = $label === '' ? '' : preg_replace('#^School of [^/]+ / #', '', $label);
 $saved = isset($_GET['saved']) ? (int) $_GET['saved'] : null;
 
 // Every class in the chosen school, for the second dropdown.
@@ -166,12 +175,35 @@ if (($me['status'] ?? '') !== 'active') {
              max="<?= (int) $class['strength'] ?>" value="<?= (int) $class['strength'] ?>" required>
     </div>
   <?php else: ?>
+    <?php /* Ticking for ABSENT is the opposite of what most people expect, and
+             getting it backwards inverts the whole submission. It was 11px of
+             muted help text; it is the loudest thing above the list now. */ ?>
+    <p class="mark-lead">
+      <svg aria-hidden="true"><use href="#icon-warn"/></svg>
+      <span>Everyone starts <strong>present</strong>. Tick only the students who are <strong>absent</strong>.</span>
+    </p>
+
     <div class="mark-tools">
       <button class="btn-quiet" type="button" data-all="present">All present</button>
-      <button class="btn-quiet" type="button" data-all="absent">All absent</button>
-      <span class="field-help">Tick a student to mark them <strong>absent</strong>.</span>
+      <?php /* Not styled like its neighbour on purpose: one is the normal
+               opening move, the other throws away a finished roll. */ ?>
+      <?php /* data-confirm is the label the button wears once armed, not a
+               dialog message: the first tap arms it, the second commits. */ ?>
+      <button class="btn-danger" type="button" data-all="absent"
+              data-confirm="Tap again to confirm">All absent</button>
     </div>
-    <ol class="roster">
+
+    <?php if (count($roster) >= ROSTER_FILTER_AT): ?>
+      <div class="roster-filter">
+        <svg aria-hidden="true"><use href="#icon-search"/></svg>
+        <label class="sr-only" for="roster-filter">Find a student</label>
+        <input id="roster-filter" type="search" autocomplete="off" spellcheck="false"
+               placeholder="Find a name or roll number">
+        <span class="roster-filter-count" id="roster-filter-count" role="status"></span>
+      </div>
+    <?php endif; ?>
+
+    <ol class="roster" id="roster">
       <?php foreach ($roster as $s): ?>
         <li>
           <label class="student">
@@ -182,6 +214,7 @@ if (($me['status'] ?? '') !== 'active') {
         </li>
       <?php endforeach; ?>
     </ol>
+    <p class="roster-empty" id="roster-empty" hidden>No student matches that.</p>
   <?php endif; ?>
 
   <?php /* Last in the form on purpose. `position: sticky; bottom: 0` holds an
@@ -189,11 +222,23 @@ if (($me['status'] ?? '') !== 'active') {
            not drag one down from the top. Placed above the list, the bar simply
            scrolled away with everything else. */ ?>
   <div class="mark-bar" id="mark-bar">
-    <div class="mark-count">
-      <strong><span id="mark-present"><?= $roster ? count($roster) : '' ?></span><?= $roster ? ' / ' . count($roster) : '' ?></strong>
-      <span><?= $roster ? 'present' : 'ready' ?></span>
+    <p class="mark-context">
+      <span class="mark-context-class"><?= htmlspecialchars($shortLabel) ?></span>
+      <span class="mark-context-when"><?= htmlspecialchars(date('j M', strtotime($date)) . ' at ' . date('g:i a', strtotime($time))) ?></span>
+    </p>
+    <div class="mark-bar-row">
+      <?php /* No count without a roster: there is nothing to count, and the
+               number the teacher typed is already on screen in its own box.
+               This used to render an empty slot that js/mark.js then filled
+               with a meaningless 0. */ ?>
+      <?php if ($roster): ?>
+        <div class="mark-count">
+          <strong><span id="mark-present"><?= count($roster) ?></span><span class="mark-count-total"> / <?= count($roster) ?></span></strong>
+          <span>present<span id="mark-absent"></span></span>
+        </div>
+      <?php endif; ?>
+      <button class="btn-primary" type="submit">Submit</button>
     </div>
-    <button class="btn-primary" type="submit">Submit</button>
   </div>
 </form>
 <?php endif; ?>
