@@ -81,6 +81,15 @@ $freshness = $lastWrite === null
         ? date('H:i', $lastWrite)
         : date('j M, H:i', $lastWrite));
 
+// Precomputed so the section heading can say how many schools actually
+// reported before the grid that proves it is rendered.
+$schoolTotals = [];
+$reportingSchools = 0;
+foreach (SCHOOLS as $sid => $sch) {
+    $schoolTotals[$sid] = attendance_totals([$sid => $tree[$sid] ?? []]);
+    if ($schoolTotals[$sid]['reported'] > 0) $reportingSchools++;
+}
+
 // "School of Engineering" -> "Engineering"; the tile has no room for the prefix.
 $shortSchool = fn(string $id): string => preg_replace('/^School of /', '', SCHOOLS[$id]['name'] ?? $id);
 ?>

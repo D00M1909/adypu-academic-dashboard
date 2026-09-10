@@ -325,8 +325,11 @@
     var grid = document.getElementById('schools-grid');
     grid.classList.toggle('is-drilled', !!schoolId);
     var total = document.querySelectorAll('.school-tile').length;
-    document.getElementById('schools-meta').textContent =
-      schoolId ? '1 of ' + total + ' schools' : total + ' schools';
+    // Undrilled, the useful number is how many schools reported, not how many
+    // exist: index.php counts them and parks it on the grid.
+    document.getElementById('schools-meta').textContent = schoolId
+      ? '1 of ' + total + ' schools'
+      : (grid.dataset.reporting || '0') + ' of ' + total + ' reporting';
   }
 
   function showSchoolLevel(schoolId) {
