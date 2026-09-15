@@ -82,22 +82,24 @@ function pd_workbook(array $book): array {
     $rows = [
         [['b', 'KNOWLEDGE PARTNERS - STUDENTS PER DIVISION - PLEASE COMPLETE']],
         [],
-        ['One row per partner program and year. Please fill in the yellow cells: the ADYPU division those students'],
-        ['sit in, and how many of them are enrolled in it. Branch only if the division has one.'],
+        ['One row per partner program and year. Please fill in the yellow cells: the division those students sit in'],
+        ['(A if the program has only one), and how many of them are enrolled in it.'],
         ['If a year is split across several divisions, copy the row once per division.'],
         ['Add a row for anything missing, and delete any row for a program or year that does not exist.'],
         ['"Students (partner total)" is the count the partner gave us for that program and year, where we have one.'],
         [],
+        // No branch column: the program is the branch, and no partner program
+        // exists as a branch in structure.php for one to be chosen from.
         array_map(fn($h) => ['b', $h], ['Partner', 'Program', 'Year', 'Students (partner total)', 'School',
-                                        'Branch (blank if none)', 'Division', 'ENROLLED IN DIVISION']),
+                                        'Division', 'ENROLLED IN DIVISION']),
     ];
     foreach ($book as $tab => $g) {
         // Partner tabs carry the template's faculty header; the contacts tab does not.
         if (($g[3][1] ?? '') !== 'Name of Faculty') continue;
         foreach (pd_students($g) ?: array_fill(0, 3, ['', '', '']) as [$program, $year, $count]) {
             $rows[] = [$tab, $program !== '' ? $program : $owe, $year !== '' ? $year : $owe, $count,
-                       $schools[pd_key($tab)] ?? $owe, '', $owe, $owe];
+                       $schools[pd_key($tab)] ?? $owe, $owe, $owe];
         }
     }
-    return ['Divisions' => ['cols' => [12, 44, 6, 22, 24, 22, 12, 22], 'rows' => $rows]];
+    return ['Divisions' => ['cols' => [12, 44, 6, 22, 24, 12, 22], 'rows' => $rows]];
 }

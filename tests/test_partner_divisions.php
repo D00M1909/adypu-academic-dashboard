@@ -55,7 +55,7 @@ $data = array_slice($book['Divisions']['rows'], 9);
 assert(array_keys($book) === ['Divisions'], 'one sheet');
 assert(count($data) === 6 + 3, 'the contacts tab is not a partner; a partner with no students gets 3 blank rows');
 assert($data[0][4] === 'School of Engineering', 'a partner with one dashboard school has it filled in');
-assert($data[0][6] === $owe && $data[0][7] === $owe && $data[0][5] === '', 'division and enrolled owed, branch optional');
+assert($data[0][5] === $owe && $data[0][6] === $owe && count($data[0]) === 7, 'division and enrolled owed, no branch column');
 assert($data[6][0] === 'Sunstone' && $data[6][1] === $owe && $data[6][4] === $owe,
     'a blank row owes the program, and a two-school partner owes the school');
 
