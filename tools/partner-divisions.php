@@ -80,13 +80,12 @@ function pd_workbook(array $book): array {
 
     $owe = ['y', ''];
     $rows = [
-        [['b', 'KNOWLEDGE PARTNERS - STUDENTS PER DIVISION - PLEASE COMPLETE']],
+        [['b', 'PARTNER STUDENTS PER DIVISION']],
         [],
-        ['One row per partner program and year. Please fill in the yellow cells: the division those students sit in'],
-        ['(A if the program has only one), and how many of them are enrolled in it.'],
-        ['If a year is split across several divisions, copy the row once per division.'],
-        ['Add a row for anything missing, and delete any row for a program or year that does not exist.'],
-        ['"Students (partner total)" is the count the partner gave us for that program and year, where we have one.'],
+        ['Please fill in the yellow cells.'],
+        ['Division = class name (e.g. A). Enrolled = how many students are in it.'],
+        ['Students split across divisions? Copy the row, one per division.'],
+        ['Add rows that are missing, delete rows that are wrong.'],
         [],
         // No branch column: the program is the branch, and no partner program
         // exists as a branch in structure.php for one to be chosen from.

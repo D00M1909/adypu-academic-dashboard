@@ -177,7 +177,7 @@ if ($mode === 'partner-divisions') {
     }
     $sheets = pd_workbook(read_xlsx($in));
     write_xlsx($outFile, $sheets);
-    fwrite(STDERR, "wrote $outFile (" . (count($sheets['Divisions']['rows']) - 9) . " rows)\n");
+    fwrite(STDERR, "wrote $outFile (" . (count($sheets['Divisions']['rows']) - 8) . " rows)\n");
     exit;
 }
 
