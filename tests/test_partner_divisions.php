@@ -51,7 +51,7 @@ $book = pd_workbook([
     'Sunstone' => [3 => [1 => 'Name of Faculty']],
 ]);
 $owe = ['y', ''];
-$data = array_slice($book['Divisions']['rows'], 9);
+$data = array_slice($book['Divisions']['rows'], 8);
 assert(array_keys($book) === ['Divisions'], 'one sheet');
 assert(count($data) === 6 + 3, 'the contacts tab is not a partner; a partner with no students gets 3 blank rows');
 assert($data[0][4] === 'School of Engineering', 'a partner with one dashboard school has it filled in');
