@@ -2,14 +2,13 @@
 // The partner divisions request. The partnerships office's Partners Information
 // workbook (a tab per partner: faculty, rooms, programs, student counts) is read
 // for the one thing the dashboard needs, which programs and years each partner
-// has students in, and re-issued as a single sheet asking which ADYPU division
-// those students sit in and how many. Nothing else in that workbook is asked
-// for: one person has to fill this in, fast.
+// has students in, and re-issued as a single sheet asking which of the
+// partner's divisions those students sit in and how many. Nothing else in that
+// workbook is asked for: one person has to fill this in, fast.
 //
 //   php tools/data-request.php partner-divisions "Partners Information.xlsx" out.xlsx
 
 require_once __DIR__ . '/xlsx.php';
-require_once __DIR__ . '/../includes/attendance.php';
 
 function pd_key(string $s): string {
     return strtolower(preg_replace('/[^a-z0-9]/i', '', $s));
@@ -72,12 +71,6 @@ function pd_students(array $g): array {
 }
 
 function pd_workbook(array $book): array {
-    // A partner with exactly one school on the dashboard gets it filled in.
-    $schools = [];
-    foreach (KNOWLEDGE_PARTNERS as $p) {
-        if (count($p['schools']) === 1) $schools[pd_key($p['name'])] = SCHOOLS[$p['schools'][0]]['name'];
-    }
-
     $owe = ['y', ''];
     $rows = [
         [['b', 'PARTNER STUDENTS PER DIVISION']],
@@ -87,18 +80,17 @@ function pd_workbook(array $book): array {
         ['Students split across divisions? Copy the row, one per division.'],
         ['Add rows that are missing, delete rows that are wrong.'],
         [],
-        // No branch column: the program is the branch, and no partner program
-        // exists as a branch in structure.php for one to be chosen from.
-        array_map(fn($h) => ['b', $h], ['Partner', 'Program', 'Year', 'Students (partner total)', 'School',
+        // No school or branch column: a partner's classes are its own, apart
+        // from the schools', and named by partner and program alone.
+        array_map(fn($h) => ['b', $h], ['Partner', 'Program', 'Year', 'Students (partner total)',
                                         'Division', 'ENROLLED IN DIVISION']),
     ];
     foreach ($book as $tab => $g) {
         // Partner tabs carry the template's faculty header; the contacts tab does not.
         if (($g[3][1] ?? '') !== 'Name of Faculty') continue;
         foreach (pd_students($g) ?: array_fill(0, 3, ['', '', '']) as [$program, $year, $count]) {
-            $rows[] = [$tab, $program !== '' ? $program : $owe, $year !== '' ? $year : $owe, $count,
-                       $schools[pd_key($tab)] ?? $owe, $owe, $owe];
+            $rows[] = [$tab, $program !== '' ? $program : $owe, $year !== '' ? $year : $owe, $count, $owe, $owe];
         }
     }
-    return ['Divisions' => ['cols' => [12, 44, 6, 22, 24, 12, 22], 'rows' => $rows]];
+    return ['Divisions' => ['cols' => [12, 44, 6, 22, 12, 22], 'rows' => $rows]];
 }
