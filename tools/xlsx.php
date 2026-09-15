@@ -1,10 +1,14 @@
 <?php
 // A spreadsheet with tabs, without a library. An .xlsx is a zip of XML parts,
 // and the handful below is everything Excel needs: no sharedStrings (cells
-// carry inline strings), no theme, one bold font.
+// carry inline strings), no theme, one bold font, one yellow fill.
 //
 // write_xlsx($path, ['Tab name' => ['cols' => [width, ...], 'rows' => [row, ...]]])
-// A row is a list of cell values; a cell is a string, or ['b', 'string'] for bold.
+// A row is a list of cell values; a cell is a string, or [style, 'string'] where
+// style is 'b' for bold or 'y' for a yellow cell someone still has to fill in,
+// which is written even when empty.
+//
+// read_xlsx($path) returns every tab as [row => [column => value]], both 0-based.
 //
 // ponytail: inline strings, so a huge sheet repeats every string. Switch to a
 // sharedStrings table if these ever stop being 25-row forms.
@@ -54,19 +58,21 @@ function write_xlsx(string $path, array $sheets): void {
         . '<Relationship Id="rId' . ($n + 1) . '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
         . '</Relationships>');
 
-    // Two cell formats: 0 plain, 1 bold. Excel rejects a fills list without
-    // the gray125 entry at index 1, hence the unused second fill.
+    // Three cell formats: 0 plain, 1 bold, 2 yellow. Excel rejects a fills list
+    // without the gray125 entry at index 1, hence the unused second fill.
     $zip->addFromString('xl/styles.xml',
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         . '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
         . '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font>'
         . '<font><b/><sz val="11"/><name val="Calibri"/></font></fonts>'
-        . '<fills count="2"><fill><patternFill patternType="none"/></fill>'
-        . '<fill><patternFill patternType="gray125"/></fill></fills>'
+        . '<fills count="3"><fill><patternFill patternType="none"/></fill>'
+        . '<fill><patternFill patternType="gray125"/></fill>'
+        . '<fill><patternFill patternType="solid"><fgColor rgb="FFFFEB9C"/><bgColor indexed="64"/></patternFill></fill></fills>'
         . '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>'
         . '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
-        . '<cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
-        . '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs>'
+        . '<cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+        . '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>'
+        . '<xf numFmtId="0" fontId="0" fillId="2" borderId="0" xfId="0" applyFill="1"/></cellXfs>'
         . '</styleSheet>');
 
     // close() is where the write actually happens; it fails if the file is
@@ -92,11 +98,13 @@ function xlsx_sheet(array $sheet): string {
     foreach ($sheet['rows'] as $r => $row) {
         $cells = '';
         foreach ($row as $c => $cell) {
-            $bold = is_array($cell);
-            $value = $bold ? $cell[1] : $cell;
-            if ($value === '' || $value === null) continue;
+            [$kind, $value] = is_array($cell) ? $cell : ['', $cell];
+            $style = ['' => '', 'b' => ' s="1"', 'y' => ' s="2"'][$kind];
             $ref = xlsx_col($c) . ($r + 1);
-            $style = $bold ? ' s="1"' : '';
+            if ($value === '' || $value === null) {
+                if ($style !== '') $cells .= '<c r="' . $ref . '"' . $style . '/>';
+                continue;
+            }
             $cells .= is_numeric($value)
                 ? '<c r="' . $ref . '"' . $style . '><v>' . $value . '</v></c>'
                 : '<c r="' . $ref . '"' . $style . ' t="inlineStr"><is><t xml:space="preserve">' . xlsx_esc((string)$value) . '</t></is></c>';
@@ -112,6 +120,54 @@ function xlsx_col(int $i): string {
         $s = chr(65 + ($i - 1) % 26) . $s;
     }
     return $s;
+}
+
+function xlsx_col_index(string $letters): int {
+    $n = 0;
+    foreach (str_split($letters) as $ch) $n = $n * 26 + ord($ch) - 64;
+    return $n - 1;
+}
+
+// Every tab's cell values as trimmed strings, blanks left out. A formula cell
+// reads as the result Excel last saved, and a number as Excel stored it
+// ("60.0", "9.860074278E9"): what it meant is the caller's business.
+function read_xlsx(string $path): array {
+    $zip = new ZipArchive();
+    if ($zip->open($path) !== true) {
+        throw new RuntimeException("cannot read $path");
+    }
+    $part = fn(string $name) => simplexml_load_string((string)$zip->getFromName($name));
+    // Rich text splits one string into runs, each with its own <t>.
+    $text = fn(SimpleXMLElement $e) => implode('', array_map('strval', $e->xpath('.//*[local-name()="t"]')));
+
+    $strings = [];
+    if ($zip->locateName('xl/sharedStrings.xml') !== false) {
+        foreach ($part('xl/sharedStrings.xml')->si as $si) $strings[] = $text($si);
+    }
+    $targets = [];
+    foreach ($part('xl/_rels/workbook.xml.rels')->Relationship as $rel) {
+        $targets[(string)$rel['Id']] = preg_replace('#^/?(xl/)?#', '', (string)$rel['Target']);
+    }
+
+    $book = [];
+    foreach ($part('xl/workbook.xml')->sheets->sheet as $sheet) {
+        $rid = (string)$sheet->attributes('http://schemas.openxmlformats.org/officeDocument/2006/relationships')['id'];
+        $grid = [];
+        foreach ($part('xl/' . $targets[$rid])->sheetData->row as $row) {
+            foreach ($row->c as $c) {
+                preg_match('/^([A-Z]+)(\d+)$/', (string)$c['r'], $ref);
+                $value = trim(match ((string)$c['t']) {
+                    's' => $strings[(int)$c->v] ?? '',
+                    'inlineStr' => $text($c),
+                    default => (string)$c->v,
+                });
+                if ($value !== '') $grid[(int)$ref[2] - 1][xlsx_col_index($ref[1])] = $value;
+            }
+        }
+        $book[(string)$sheet['name']] = $grid;
+    }
+    $zip->close();
+    return $book;
 }
 
 // Excel: 31 chars max, and []:*?/\ are illegal in a tab name.
