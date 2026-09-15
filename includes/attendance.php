@@ -35,6 +35,10 @@ const SCHOOLS = [
 // 27 Aug 2026 - column B (Partner) with its blank rows forward-filled, and
 // column A (School) collected per partner. Admission numbers deliberately not
 // copied: they belong to the report project and would go stale here.
+// Vedam, ICRI and Noval added 15 Sep 2026 from Partners Information.xlsx, the
+// partnerships office's own workbook: Noval's school from its programs' "Under
+// school of", Vedam's and ICRI's from its contacts tab, which lists none of
+// their programs' schools and says SOE for nearly every partner.
 // Which divisions a partner's students sit in is not known yet; that is what
 // tools/data-request.php partners asks for.
 const KNOWLEDGE_PARTNERS = [
@@ -48,6 +52,9 @@ const KNOWLEDGE_PARTNERS = [
     ['name' => 'Upgrad',    'schools' => ['eng']],
     ['name' => 'PixelPop',  'schools' => ['eng']],
     ['name' => 'Flyglam',   'schools' => ['mgmt']],
+    ['name' => 'Vedam',     'schools' => ['eng']],
+    ['name' => 'ICRI',      'schools' => ['mgmt']],
+    ['name' => 'Noval',     'schools' => ['science']],
 ];
 
 // Used until real submissions arrive (SPEC.md §8.1). Shape matches a real row;
