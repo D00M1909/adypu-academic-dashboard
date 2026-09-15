@@ -6,6 +6,7 @@
 //   php tools/data-request.php structure     02-structure-request.xlsx
 //   php tools/data-request.php partners      03-partners-request.xlsx
 //   php tools/data-request.php roster        04-roster-request.xlsx
+//   php tools/data-request.php partner-divisions "Partners Information.xlsx" 05-partner-divisions-request.xlsx
 //
 // Engineering's structure is real, read from the timetable DB — it needs a
 // headcount against each known division. Every other school's structure is
@@ -20,10 +21,14 @@
 // we learn the real enrolment, which no other request has managed to extract.
 //
 // The partners file goes to whoever owns the partnerships, not to a school. We
-// know the ten partner names and which schools they appear against; what we do
+// know the partner names and which schools they appear against; what we do
 // not know is which divisions their students actually sit in, which is the one
 // thing that would let the Knowledge Partner tab show attendance instead of
-// ten inert tiles.
+// inert tiles.
+//
+// The partner divisions file reads which programs and years each partner has
+// students in from that office's own workbook, and asks only which division
+// each sits in. See tools/partner-divisions.php.
 
 require_once __DIR__ . '/../includes/structure.php';
 require_once __DIR__ . '/xlsx.php';
@@ -162,8 +167,22 @@ if ($mode === 'roster') {
     exit;
 }
 
+if ($mode === 'partner-divisions') {
+    require_once __DIR__ . '/partner-divisions.php';
+    $in = $argv[2] ?? '';
+    $outFile = $argv[3] ?? '05-partner-divisions-request.xlsx';
+    if (!is_file($in)) {
+        fwrite(STDERR, "usage: php tools/data-request.php partner-divisions \"Partners Information.xlsx\" [outfile.xlsx]\n");
+        exit(1);
+    }
+    $sheets = pd_workbook(read_xlsx($in));
+    write_xlsx($outFile, $sheets);
+    fwrite(STDERR, "wrote $outFile (" . (count($sheets['Divisions']['rows']) - 9) . " rows)\n");
+    exit;
+}
+
 if ($mode !== 'structure' && $mode !== 'structure-csv') {
-    fwrite(STDERR, "usage: php tools/data-request.php engineering|structure|partners|roster [outfile.xlsx]|structure-csv\n");
+    fwrite(STDERR, "usage: php tools/data-request.php engineering|structure|partners|roster [outfile.xlsx]|partner-divisions <in.xlsx> [outfile.xlsx]|structure-csv\n");
     exit(1);
 }
 
