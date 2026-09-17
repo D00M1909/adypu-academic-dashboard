@@ -12,19 +12,9 @@
     });
   }
 
-  document.querySelectorAll('.tab').forEach(function (tab) {
-    tab.addEventListener('click', function () {
-      document.querySelectorAll('.tab').forEach(function (t) {
-        t.classList.remove('active');
-        t.setAttribute('aria-selected', 'false');
-      });
-      tab.classList.add('active');
-      tab.setAttribute('aria-selected', 'true');
-      var target = tab.dataset.tab;
-      document.getElementById('tab-adypu').hidden = target !== 'adypu';
-      document.getElementById('tab-partners').hidden = target !== 'partners';
-    });
-  });
+  // 'school', or 'partner' on the Knowledge Partner view, which is this same
+  // page drawn over the partner tree (see index.php).
+  var noun = (window.DASHBOARD_VIEW || {}).noun || 'school';
 
   // The theme toggle lives in js/theme.js, shared with the faculty pages.
 
@@ -125,7 +115,7 @@
     // suggested filename from the document title, so the export names itself
     // after the breadcrumb and the range instead of "index".
     document.title = 'ADYPU Attendance - ' +
-      (parts.length ? parts.join(' ') : 'All schools') +
+      (parts.length ? parts.join(' ') : 'All ' + noun + 's') +
       ' - ' + window.ATTENDANCE_RANGE.label;
 
     window.Charts.render(state, t);
@@ -136,7 +126,7 @@
   }
 
   function renderBreadcrumb() {
-    var crumbs = [{ key: 'schools', label: 'Schools' }];
+    var crumbs = [{ key: 'schools', label: noun === 'partner' ? 'Knowledge Partners' : 'Schools' }];
     if (state.school) {
       crumbs.push({ key: 'school', label: window.SCHOOLS[state.school].name });
     }
@@ -196,7 +186,7 @@
       grid.appendChild(tile);
     });
 
-    document.getElementById('branches-meta').textContent = branches.length + (branches.length === 1 ? ' branch' : ' branches');
+    document.getElementById('branches-meta').textContent = branches.length + ' ' + (noun === 'partner' ? 'program' : 'branch') + (branches.length === 1 ? '' : noun === 'partner' ? 's' : 'es');
     section.hidden = false;
     if (state.branch !== null) {
       renderDivisions(schoolId, year, state.branch, selectedDivision);
@@ -328,7 +318,7 @@
     // Undrilled, the useful number is how many schools reported, not how many
     // exist: index.php counts them and parks it on the grid.
     document.getElementById('schools-meta').textContent = schoolId
-      ? '1 of ' + total + ' schools'
+      ? '1 of ' + total + ' ' + noun + 's'
       : (grid.dataset.reporting || '0') + ' of ' + total + ' reporting';
   }
 
@@ -580,8 +570,8 @@
       rememberScroll();
 
       if (preset === 'latest') {
-        // No parameters at all: the server picks the newest day with data.
-        window.location.search = '';
+        // No range at all: the server picks the newest day with data.
+        window.location.search = window.DASHBOARD_VIEW && window.DASHBOARD_VIEW.partners ? '?view=partners' : '';
         return;
       }
       var latest = window.ATTENDANCE_RANGE.latest;

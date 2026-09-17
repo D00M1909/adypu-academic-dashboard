@@ -9,7 +9,8 @@ $branch = $_GET['branch'] ?? '';
 $from = row_date($_GET['from'] ?? '');
 $to = row_date($_GET['to'] ?? '');
 
-if ($school === '' || $year === '' || !isset(SCHOOLS[$school])) {
+$partner = isset(partner_groups()[$school]);
+if ($school === '' || $year === '' || (!isset(SCHOOLS[$school]) && !$partner)) {
     http_response_code(400);
     echo json_encode(['error' => 'valid school and year are required']);
     exit;
@@ -17,7 +18,7 @@ if ($school === '' || $year === '' || !isset(SCHOOLS[$school])) {
 
 $days = get_attendance_days();
 [$from, $to] = resolve_range($days, $from, $to);
-$tree = get_attendance($from, $to);
+$tree = $partner ? aggregate_days($days, $from, $to, partner_rows()) : get_attendance($from, $to);
 $divisions = $tree[$school][$year][$branch] ?? [];
 $total = attendance_totals([$school => [$year => [$branch => $divisions]]]);
 
@@ -39,7 +40,7 @@ unset($d);
 
 echo json_encode([
     'school' => $school,
-    'schoolName' => SCHOOLS[$school]['name'],
+    'schoolName' => group_name($school),
     'year' => $year,
     'branch' => $branch,
     'divisions' => $divisions,

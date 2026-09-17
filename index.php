@@ -12,12 +12,19 @@ header('Cache-Control: no-store');
 // the header can show whose it is. Nothing here requires a login.
 auth_boot();
 
+// Which tree the page draws. The Knowledge Partner tab is this same page over
+// partner_rows() instead of class_rows(): its own tiles, totals, charts and
+// reported pill, and not one partner class inside a school number.
+$isPartners = ($_GET['view'] ?? '') === 'partners';
+$groups = $isPartners ? partner_groups() : SCHOOLS;
+$groupRows = $isPartners ? partner_rows() : class_rows();
+
 // The range the page is showing. Both ends missing means the newest day that
 // has data (resolve_range), so the landing view is one real, labelled day and
 // never the empty page "today" gives every morning before the first form.
 $days = get_attendance_days();
 [$from, $to] = resolve_range($days, row_date($_GET['from'] ?? ''), row_date($_GET['to'] ?? ''));
-$tree = $days ? aggregate_days($days, $from, $to) : get_attendance($from, $to);
+$tree = $days || $isPartners ? aggregate_days($days, $from, $to, $groupRows) : get_attendance($from, $to);
 $totals = attendance_totals($tree);
 $rangeLabel = range_label($from, $to);
 $overallPct = attendance_pct($totals);
@@ -28,9 +35,16 @@ $overallPct = attendance_pct($totals);
 // Sent whole, one entry per lecture, because the printed report lists them.
 // charts.js collapses a day to its latest reading with the same rule
 // day_present() uses, so the trend line and the tiles cannot drift apart.
-$rangeDays = array_filter($days, fn($d) => $d >= $from && $d <= $to, ARRAY_FILTER_USE_KEY);
 $classStrength = [];
-foreach (class_rows() as $c) $classStrength[class_key($c)] = $c['strength'];
+foreach ($groupRows as $c) $classStrength[class_key($c)] = $c['strength'];
+// Only this view's classes: the charts scope by key prefix, and at the top of
+// the page the prefix is '', which would sweep the other tree's readings in.
+$rangeDays = [];
+foreach ($days as $d => $classes) {
+    if ($d < $from || $d > $to) continue;
+    $mine = array_intersect_key($classes, $classStrength);
+    if ($mine) $rangeDays[$d] = $mine;
+}
 $dataDates = $days ? [min(array_keys($days)), max(array_keys($days))] : [$from, $to];
 
 // Which preset chip the current range is, so the bar shows what you are
@@ -91,13 +105,19 @@ $freshness = $lastWrite === null
 // reported before the grid that proves it is rendered.
 $schoolTotals = [];
 $reportingSchools = 0;
-foreach (SCHOOLS as $sid => $sch) {
+foreach ($groups as $sid => $sch) {
     $schoolTotals[$sid] = attendance_totals([$sid => $tree[$sid] ?? []]);
     if ($schoolTotals[$sid]['reported'] > 0) $reportingSchools++;
 }
 
 // "School of Engineering" -> "Engineering"; the tile has no room for the prefix.
-$shortSchool = fn(string $id): string => preg_replace('/^School of /', '', SCHOOLS[$id]['name'] ?? $id);
+$groupNoun = $isPartners ? 'partner' : 'school';
+
+// The tabs are links, so switching keeps the range on screen.
+$tabHref = fn(bool $partners): string => '?' . http_build_query(array_filter([
+    'view' => $partners ? 'partners' : null,
+    'from' => $_GET['from'] ?? null, 'to' => $_GET['to'] ?? null, 'preset' => $_GET['preset'] ?? null,
+]));
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -197,6 +217,13 @@ try {
       <path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
       <path d="m6.18 5.276 3.1 3.899" />
     </symbol>
+    <symbol id="icon-partner" viewBox="0 0 24 24">
+      <path d="m11 17 2 2a1 1 0 1 0 3-3" />
+      <path d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4" />
+      <path d="m21 3 1 11h-2" />
+      <path d="M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3" />
+      <path d="M3 4h8" />
+    </symbol>
     <symbol id="icon-user" viewBox="0 0 24 24">
       <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
       <circle cx="12" cy="7" r="4" />
@@ -251,9 +278,9 @@ try {
       <h1>ADYPU: Academic Dashboard</h1>
     </div>
     <div class="header-controls">
-      <nav class="tabs" role="tablist">
-        <button class="tab active" data-tab="adypu" role="tab" aria-selected="true">ADYPU</button>
-        <button class="tab" data-tab="partners" role="tab" aria-selected="false">Knowledge Partner</button>
+      <nav class="tabs" aria-label="View">
+        <a class="tab<?= $isPartners ? '' : ' active' ?>" href="<?= htmlspecialchars($tabHref(false)) ?>"<?= $isPartners ? '' : ' aria-current="page"' ?>>ADYPU</a>
+        <a class="tab<?= $isPartners ? ' active' : '' ?>" href="<?= htmlspecialchars($tabHref(true)) ?>"<?= $isPartners ? ' aria-current="page"' : '' ?>>Knowledge Partner</a>
       </nav>
       <button class="theme-toggle no-print" id="theme-toggle" type="button" aria-label="Switch to dark mode" aria-pressed="false" title="Switch theme">
         <svg class="theme-icon-moon" aria-hidden="true"><use href="#icon-moon"/></svg>
@@ -271,6 +298,7 @@ try {
 
   <form class="range-bar" method="get" id="range-form">
     <input type="hidden" name="preset" id="range-preset" value="<?= htmlspecialchars($activePreset) ?>">
+    <?php if ($isPartners): ?><input type="hidden" name="view" value="partners"><?php endif; ?>
     <div class="range-presets">
       <button class="<?= $presetClass('latest') ?>" type="button" data-preset="latest" aria-pressed="<?= $activePreset === 'latest' ? 'true' : 'false' ?>"><?php /* Five chips have to fit one row on a 375px phone, or the dock grows a
              whole line. Only this label is long enough to matter. */ ?><span class="chip-wide">Latest day</span><span class="chip-narrow">Latest</span></button>
@@ -309,21 +337,24 @@ try {
 
     <section class="tile-section" id="schools-section">
       <div class="section-title">
-        <h2>Schools</h2>
+        <h2><?= $isPartners ? 'Knowledge Partners' : 'Schools' ?></h2>
         <?php /* How many schools filed anything, not just how many exist. Eight
                  "Not reported" tiles beside one real number made the page read
                  as empty when it was not; the heading now says which it is. */ ?>
-        <span class="section-meta" id="schools-meta"><?= $reportingSchools ?> of <?= count(SCHOOLS) ?> reporting</span>
+        <span class="section-meta" id="schools-meta"><?= $reportingSchools ?> of <?= count($groups) ?> reporting</span>
       </div>
       <div class="tile-grid schools-grid" id="schools-grid" data-reporting="<?= $reportingSchools ?>">
-        <?php foreach (SCHOOLS as $id => $school):
+        <?php foreach ($groups as $id => $school):
           $st = $schoolTotals[$id];
           $stPct = attendance_pct($st);
         ?>
         <button class="tile school-tile<?= $st['reported'] === 0 ? ' tile-quiet' : '' ?>" type="button" data-school="<?= htmlspecialchars($id) ?>">
-          <svg class="tile-icon-svg"><use href="#icon-<?= htmlspecialchars($id) ?>"/></svg>
+          <svg class="tile-icon-svg"><use href="#icon-<?= $isPartners ? 'partner' : htmlspecialchars($id) ?>"/></svg>
           <span class="tile-label"><?= htmlspecialchars($school['name']) ?></span>
-          <?php if ($st['reported'] === 0 && is_placeholder_school($id)): ?>
+          <?php if ($st['classes'] === 0): ?>
+          <span class="tile-stat tile-unreported">No programs yet</span>
+          <span class="division-bar"><span class="division-bar-fill" style="width:0"></span></span>
+          <?php elseif ($st['reported'] === 0 && ($school['placeholder'] ?? is_placeholder_school($id))): ?>
           <span class="tile-stat tile-unreported">Not reported</span>
           <span class="division-bar"><span class="division-bar-fill" style="width:0"></span></span>
           <?php elseif ($st['reported'] === 0): ?>
@@ -350,7 +381,7 @@ try {
 
     <section class="tile-section" id="branches-section" hidden>
       <div class="section-title">
-        <h2>Branches</h2>
+        <h2><?= $isPartners ? 'Programs' : 'Branches' ?></h2>
         <span class="section-meta" id="branches-meta"></span>
       </div>
       <div class="tile-grid branches-grid" id="branches-grid"></div>
@@ -436,22 +467,6 @@ try {
     </section>
   </div>
 
-  <div id="tab-partners" class="tab-panel" hidden>
-    <section class="tile-section">
-      <div class="section-title">
-        <span>Knowledge Partners</span>
-        <span class="section-meta"><?= count(KNOWLEDGE_PARTNERS) ?> partners</span>
-      </div>
-      <div class="tile-grid partners-grid">
-        <?php foreach (KNOWLEDGE_PARTNERS as $p): ?>
-        <div class="tile partner-tile">
-          <div class="tile-label"><?= htmlspecialchars($p['name']) ?></div>
-          <div class="tile-tag"><?= htmlspecialchars(implode(', ', array_map($shortSchool, $p['schools']))) ?></div>
-        </div>
-        <?php endforeach; ?>
-      </div>
-    </section>
-  </div>
 </main>
 
 <div id="division-modal" class="modal-backdrop" hidden>
@@ -476,10 +491,12 @@ try {
   <?php
   // The placeholder flag rides along with the name so every tile, bar and table
   // in JS can tell an invented strength from a counted one off one lookup.
+  // On the partner view these are the partners, which is all the scripts need.
   $schoolsJs = [];
-  foreach (SCHOOLS as $sid => $s) $schoolsJs[$sid] = $s + ['placeholder' => is_placeholder_school($sid)];
+  foreach ($groups as $sid => $s) $schoolsJs[$sid] = $s + ['placeholder' => is_placeholder_school($sid)];
   ?>
   window.SCHOOLS = <?= json_encode($schoolsJs) ?>;
+  window.DASHBOARD_VIEW = <?= json_encode(['partners' => $isPartners, 'noun' => $groupNoun]) ?>;
   window.ATTENDANCE_RANGE = <?= json_encode([
       'from' => $from, 'to' => $to, 'label' => $rangeLabel,
       'latest' => $dataDates[1], 'earliest' => $dataDates[0],
