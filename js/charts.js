@@ -270,9 +270,9 @@ window.Charts = (function () {
       return t;
     }
 
-    var node = data, label = 'school';
+    var node = data, label = (window.DASHBOARD_VIEW || {}).noun || 'school';
     if (state.school) { node = (data[state.school] || {}); label = 'year'; }
-    if (state.school && state.year) { node = (node[state.year] || {}); label = 'branch'; }
+    if (state.school && state.year) { node = (node[state.year] || {}); label = (window.DASHBOARD_VIEW || {}).noun === 'partner' ? 'program' : 'branch'; }
     if (state.school && state.year && state.branch !== null && state.branch !== undefined) {
       node = node[state.branch] || [];
       label = 'division';
@@ -289,8 +289,8 @@ window.Charts = (function () {
     } else {
       Object.keys(node).forEach(function (k) {
         out.push({
-          name: label === 'school' ? (window.SCHOOLS[k] ? window.SCHOOLS[k].name.replace(/^School of /, '') : k) : (k || 'General'),
-          school: label === 'school' ? k : state.school,
+          name: !state.school ? (window.SCHOOLS[k] ? window.SCHOOLS[k].name.replace(/^School of /, '') : k) : (k || 'General'),
+          school: !state.school ? k : state.school,
           totals: sum(node[k])
         });
       });

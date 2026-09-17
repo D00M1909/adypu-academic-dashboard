@@ -236,6 +236,7 @@ button {
   cursor: pointer;
   font-size: 13.5px;
   font-weight: 600;
+  text-decoration: none;
   transition: background 0.15s var(--ease-out), color 0.15s var(--ease-out);
 }
 .tab:hover { color: #fff; }

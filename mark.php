@@ -81,7 +81,8 @@ $class = $label === '' ? null : parse_class_label($label);
 if ($class === null) $label = '';
 
 $school = $class['school'] ?? (string) ($_GET['school'] ?? $me['school'] ?? '');
-if (!isset(SCHOOLS[$school])) $school = array_key_first(SCHOOLS);
+$partners = partner_groups();
+if (!isset(SCHOOLS[$school]) && !isset($partners[$school])) $school = array_key_first(SCHOOLS);
 
 $date = row_date((string) ($_GET['date'] ?? '')) ?? date('Y-m-d');
 // Defaulting to the hour, not the minute, so a correction filed a few minutes
@@ -94,12 +95,12 @@ $roster = $class ? roster_for($class) : [];
 // above a long roster and filing the 9am roll into the 2pm slot is the
 // expensive mistake on this screen. The school is dropped: a faculty member
 // knows which school they are in, and the bar has one line.
-$shortLabel = $label === '' ? '' : preg_replace('#^School of [^/]+ / #', '', $label);
+$shortLabel = $label === '' ? '' : substr($label, strlen(group_name($school) . CLASS_SEP));
 $saved = isset($_GET['saved']) ? (int) $_GET['saved'] : null;
 
 // Every class in the chosen school, for the second dropdown.
 $classesHere = [];
-foreach (class_rows() as $c) {
+foreach (isset($partners[$school]) ? partner_rows() : class_rows() as $c) {
     if ($c['school'] === $school) $classesHere[] = class_label($c['school'], $c['year'], $c['branch'], $c['division']);
 }
 
@@ -131,6 +132,11 @@ if (($me['status'] ?? '') !== 'active') {
     <?php foreach (SCHOOLS as $id => $s): ?>
       <option value="<?= htmlspecialchars($id) ?>"<?= $id === $school ? ' selected' : '' ?>><?= htmlspecialchars($s['name']) ?></option>
     <?php endforeach; ?>
+    <optgroup label="Knowledge partners">
+      <?php foreach ($partners as $id => $p): ?>
+        <option value="<?= htmlspecialchars($id) ?>"<?= $id === $school ? ' selected' : '' ?>><?= htmlspecialchars($p['name']) ?></option>
+      <?php endforeach; ?>
+    </optgroup>
   </select>
 
   <label for="p-class">Class</label>
@@ -138,7 +144,7 @@ if (($me['status'] ?? '') !== 'active') {
     <option value="">Choose a class</option>
     <?php foreach ($classesHere as $option): ?>
       <option value="<?= htmlspecialchars($option) ?>"<?= $option === $label ? ' selected' : '' ?>>
-        <?= htmlspecialchars(preg_replace('#^School of [^/]+ / #', '', $option)) ?>
+        <?= htmlspecialchars(substr($option, strlen(group_name($school) . CLASS_SEP))) ?>
       </option>
     <?php endforeach; ?>
   </select>
