@@ -171,10 +171,11 @@ function is_placeholder_school(string $school): bool {
     return isset(placeholder_schools()[$school]);
 }
 
-// Flattens class_structure() to one row per division.
-function class_rows(): array {
+// Flattens a structure to one row per division: the schools' by default, the
+// partners' when partner_rows() passes theirs.
+function class_rows(?array $structure = null): array {
     $rows = [];
-    foreach (class_structure() as $school => $years) {
+    foreach ($structure ?? class_structure() as $school => $years) {
         foreach ($years as $year => $branches) {
             foreach ($branches as $branch => $divisions) {
                 foreach ($divisions as $division => $strength) {
@@ -189,7 +190,7 @@ function class_rows(): array {
 // "School of Engineering / 2nd Year / CSE / A", or without the branch segment
 // for a school that has none. This exact string is what the Form stores.
 function class_label(string $school, string $year, string $branch, string $division): string {
-    $name = SCHOOLS[$school]['name'] ?? $school;
+    $name = group_name($school);
     $parts = $branch === ''
         ? [$name, $year, $division]
         : [$name, $year, $branch, $division];
@@ -209,10 +210,13 @@ function parse_class_label(string $label): ?array {
         return null;
     }
 
-    $school = school_id_for_name($name);
+    // A partner class comes back in the same shape, its partner id in the
+    // school field, so every writer and reader downstream stays as it is.
+    $school = school_id_for_name($name) ?? partner_id_for_name($name);
     if ($school === null) return null;
 
-    $strength = class_strength($school, $year, $branch, $division);
+    $strength = class_strength($school, $year, $branch, $division)
+        ?? partner_structure()[$school][$year][$branch][$division] ?? null;
     if ($strength === null) return null;
 
     return compact('school', 'year', 'branch', 'division', 'strength');
@@ -241,10 +245,11 @@ function class_strength(string $school, string $year, string $branch, string $di
 // one more chance to mis-route the School question.
 //
 // Returns [section title => [class label, ...]], in the order to build them.
-function form_sections(): array {
+// partner_structure() goes through the same split, one section per partner.
+function form_sections(?array $structure = null): array {
     $out = [];
-    foreach (class_structure() as $school => $years) {
-        $name = SCHOOLS[$school]['name'] ?? $school;
+    foreach ($structure ?? class_structure() as $school => $years) {
+        $name = group_name($school);
         $classes = 0;
         foreach ($years as $branches) {
             foreach ($branches as $divisions) $classes += count($divisions);
@@ -270,8 +275,141 @@ function form_sections(): array {
                     $labels[] = class_label($school, $year, $branch, $division);
                 }
             }
-            $out["$name \u{2014} $year"] = $labels;
+            $out["$name: $year"] = $labels;
         }
     }
     return $out;
+}
+
+// --- Knowledge partners -----------------------------------------------------
+//
+// Partner classes are their own tree, never part of class_structure(): they
+// never count toward a school tile, the university percentage or the classes
+// reported pill, and show only on the Knowledge Partner view. Keyed by partner
+// id (kp-aero), which no school id can equal, so no class key is shared either.
+
+// id => ['name' => ..., 'placeholder' => true], in KNOWLEDGE_PARTNERS order.
+// Every partner is a placeholder until tools/data-request.php partner-divisions
+// comes back: the divisions below are invented, so no tile may state their
+// enrolment as fact.
+function partner_groups(): array {
+    $out = [];
+    foreach (KNOWLEDGE_PARTNERS as $p) {
+        $out['kp-' . strtolower(preg_replace('/[^a-z0-9]/i', '', $p['name']))] = ['name' => $p['name'], 'placeholder' => true];
+    }
+    return $out;
+}
+
+function partner_id_for_name(string $name): ?string {
+    foreach (partner_groups() as $id => $p) {
+        if ($id === $name || strcasecmp($p['name'], $name) === 0) return $id;
+    }
+    return null;
+}
+
+// A school's or a partner's display name, for labels and headings.
+function group_name(string $id): string {
+    return SCHOOLS[$id]['name'] ?? partner_groups()[$id]['name'] ?? $id;
+}
+
+// partner => year => program => [division => strength], the same shape as
+// class_structure() with the program in the branch slot.
+//
+// PLACEHOLDERS, the way Engineering 1st Year's 60s are. Programs and years are
+// read from Partners Information.xlsx (15 Sep 2026); every program-year is one
+// invented division A. Its strength is the partner's own student total for that
+// program-year where the workbook gave one, and 60 where it did not. The total
+// rather than 60 wherever one exists, because a count is capped at the strength
+// and Newton's 404 would otherwise read as 60 of 60.
+//
+// Cleaned on the way in: the same program under two spellings is one program
+// (Emversity's long names, Seamedu's "ITDS"), Flyglam's student table says BBA
+// where its program list says BBA Aviation, Seamedu's blank first-year BCA and
+// MCA specialisations are its "FY" rows, and M.Tech years past the 2nd are
+// dropped. Vedam's tab is a copy of Sunstone's, so its three rows are a guess.
+// Upgrad, PixelPop and ICRI sent no programs and have no classes.
+//
+// Replace with the returned 05-partner-divisions-request.xlsx, then re-run
+// tools/form-options.php, exactly as a school's structure is replaced.
+function partner_structure(): array {
+    $programs = [
+        'kp-aero' => [
+            '1st Year' => ['B.Tech Aeronautical' => 60, 'B.Tech Aerospace' => 60, 'B.Tech Avionics' => 60,
+                           'B.Tech Defence Technology' => 60, 'Integrated Aerospace' => 60,
+                           'Integrated Defence Technology' => 60, 'M.Tech Aerospace' => 60,
+                           'M.Tech Space Technology' => 60, 'M.Tech Defence Technology' => 60],
+            '2nd Year' => ['B.Tech Aeronautical' => 45, 'B.Tech Aerospace' => 60, 'B.Tech Avionics' => 10,
+                           'Integrated Aerospace' => 30, 'Integrated Defence Technology' => 30,
+                           'M.Tech Aerospace' => 6],
+            '3rd Year' => ['B.Tech Aeronautical' => 52, 'B.Tech Aerospace' => 60, 'B.Tech Avionics' => 4,
+                           'Integrated Aerospace' => 30, 'Integrated Defence Technology' => 16],
+            '4th Year' => ['B.Tech Aeronautical' => 56, 'B.Tech Aerospace' => 60, 'B.Tech Avionics' => 11,
+                           'Dual Degree Aerospace' => 16],
+            '5th Year' => ['Dual Degree Aerospace' => 60],
+        ],
+        'kp-newton' => [
+            '1st Year' => ['B.Tech CSE (AI&ML)' => 351],
+            '2nd Year' => ['B.Tech CSE (AI&ML)' => 404],
+            '3rd Year' => ['B.Tech CSE (AI&ML)' => 313],
+        ],
+        'kp-sunstone' => [
+            '1st Year' => ['B.Tech (CS&IT)' => 121, 'B.Tech CSE (AI)' => 140, 'BCA (FSD)' => 50,
+                           'MCA (FSD)' => 28, 'BBA' => 45, 'MBA' => 25],
+            '2nd Year' => ['B.Tech (CS&IT)' => 196, 'B.Tech CSE (AI)' => 140, 'BCA (FSD)' => 62,
+                           'MCA (FSD)' => 52, 'BBA' => 33, 'MBA' => 27],
+            '3rd Year' => ['B.Tech (CS&IT)' => 124, 'BCA (FSD)' => 104, 'BBA' => 36],
+        ],
+        'kp-nxtwave' => [
+            '1st Year' => ['B.Tech CSE (DS)' => 280],
+            '2nd Year' => ['B.Tech CSE (DS)' => 335],
+        ],
+        'kp-emversity' => [
+            '1st Year' => ['B.Sc CVT' => 97, 'B.Sc AOTT' => 35, 'B.Sc MLT' => 8, 'B.Sc RT' => 15],
+            '2nd Year' => ['B.Sc CVT' => 37, 'B.Sc AOTT' => 33, 'B.Sc MLT' => 5, 'B.Sc RT' => 60],
+        ],
+        'kp-veloces' => array_fill_keys(['1st Year', '2nd Year', '3rd Year'], [
+            'B.Tech CSE (Cyber Forensics & Information Security)' => 60,
+            'B.Tech CSE (Virtual & Augmented Reality)' => 60,
+        ]),
+        'kp-seamedu' => [
+            '1st Year' => ['B.Tech (AI&DE)' => 18, 'B.Tech (CSDF)' => 3, 'B.Tech (ITDS)' => 60,
+                           'BCA FY' => 43, 'MCA FY' => 45, 'BBA (IB)' => 60, 'BBA (BKFS)' => 60,
+                           'BBA (DM)' => 60, 'MBA (IB)' => 60, 'MBA (BKFS)' => 60, 'MBA (BAI)' => 60,
+                           'B.Sc Sound Engineering' => 60, 'BCA Game Development' => 60,
+                           'BBA Media and Communication' => 60],
+            '2nd Year' => ['B.Tech (AI&DS)' => 26, 'B.Tech (ITDS)' => 60, 'BCA (CS)' => 29,
+                           'BCA (AI&DS)' => 25, 'MCA (CC)' => 20, 'MCA (CSDF)' => 43, 'MCA (DSA)' => 26,
+                           'BBA (IB)' => 60, 'BBA (BKFS)' => 60, 'BBA (DM)' => 60, 'MBA (IB)' => 60,
+                           'MBA (BKFS)' => 60, 'B.Sc Sound Engineering' => 60,
+                           'BCA Game Development' => 60, 'BBA Media and Communication' => 60],
+            '3rd Year' => ['B.Tech (ITDS)' => 10, 'BCA (CFIS)' => 10, 'BCA (AIML)' => 37, 'BCA (MIT)' => 9,
+                           'BBA (IB)' => 60, 'BBA (BKFS)' => 60, 'B.Sc Sound Engineering' => 60,
+                           'BCA Game Development' => 60, 'BBA Media and Communication' => 60],
+            '4th Year' => ['B.Tech (ITDS)' => 44, 'B.Tech (CTIS)' => 20],
+        ],
+        'kp-flyglam' => [
+            '1st Year' => ['BBA Aviation' => 8],
+            '2nd Year' => ['BBA Aviation' => 12, 'MBA Aviation' => 5],
+            '3rd Year' => ['BBA Aviation' => 8],
+        ],
+        'kp-vedam' => [
+            '2nd Year' => ['B.Tech (CS&IT)' => 60, 'B.Tech CSE (AI)' => 60],
+            '3rd Year' => ['B.Tech (CS&IT)' => 60],
+        ],
+        'kp-noval' => [
+            '1st Year' => ['B.Sc Clinical Research and Technology' => 60],
+            '2nd Year' => ['B.Sc Clinical Research and Technology' => 10, 'M.Sc Clinical Research' => 8],
+        ],
+    ];
+    $out = [];
+    foreach ($programs as $partner => $years) {
+        foreach ($years as $year => $list) {
+            foreach ($list as $program => $strength) $out[$partner][$year][$program] = ['A' => $strength];
+        }
+    }
+    return $out;
+}
+
+function partner_rows(): array {
+    return class_rows(partner_structure());
 }
