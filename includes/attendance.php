@@ -39,8 +39,8 @@ const SCHOOLS = [
 // partnerships office's own workbook: Noval's school from its programs' "Under
 // school of", Vedam's and ICRI's from its contacts tab, which lists none of
 // their programs' schools and says SOE for nearly every partner.
-// Which divisions a partner's students sit in is not known yet; that is what
-// tools/data-request.php partners asks for.
+// Their classes are partner_structure() in structure.php, placeholders until
+// tools/data-request.php partner-divisions comes back.
 const KNOWLEDGE_PARTNERS = [
     ['name' => 'Aero',      'schools' => ['eng']],
     ['name' => 'Newton',    'schools' => ['eng']],
@@ -369,9 +369,14 @@ function resolve_range(array $days, ?string $from = null, ?string $to = null): a
 // absence. 'days' rides along so the UI can say how much of the range the
 // number actually rests on — a class that reported once in a week must not be
 // able to pass that off as the week.
-function aggregate_days(array $days, ?string $from = null, ?string $to = null): array {
+//
+// $rows picks the tree: the schools' class_rows() by default, partner_rows() for
+// the Knowledge Partner view. Only classes in $rows are built, so a partner's
+// readings in the same day map never reach a school total, and the other way.
+function aggregate_days(array $days, ?string $from = null, ?string $to = null, ?array $rows = null): array {
     require_once __DIR__ . '/structure.php';
     [$from, $to] = resolve_range($days, $from, $to);
+    $rows ??= class_rows();
 
     // A class cannot have more students present than it has enrolled, so a day
     // that says otherwise is the structure's strength being wrong, not a real
@@ -382,7 +387,7 @@ function aggregate_days(array $days, ?string $from = null, ?string $to = null): 
     // rather than after the mean, because charts.js caps dailySeries() the same
     // way and the trend line must not drift from the tiles.
     $strength = [];
-    foreach (class_rows() as $c) $strength[class_key($c)] = $c['strength'];
+    foreach ($rows as $c) $strength[class_key($c)] = $c['strength'];
 
     $sum = [];
     $count = [];
@@ -396,7 +401,7 @@ function aggregate_days(array $days, ?string $from = null, ?string $to = null): 
     }
 
     $tree = [];
-    foreach (class_rows() as $c) {
+    foreach ($rows as $c) {
         $key = class_key($c);
         $n = $count[$key] ?? 0;
         $tree[$c['school']][$c['year']][$c['branch']][] = [

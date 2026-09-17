@@ -431,6 +431,38 @@ $ot = attendance_totals($over);
 assert(attendance_pct($ot) === 100, 'a percentage must not exceed 100: ' . attendance_pct($ot));
 assert($ot['strength_reported'] - $ot['present'] === 0, 'absent must not go negative');
 
+// --- Knowledge partners are their own tree ----------------------------------
+// A partner label parses like a school's, but its reading must reach only the
+// partner tree: never a school tile, the university total or its pill.
+$partnerKeys = array_map('class_key', partner_rows());
+$schoolKeys = array_map('class_key', class_rows());
+assert(!array_intersect($partnerKeys, $schoolKeys), 'a partner class shares a key with a school class');
+assert(count($partnerKeys) === count(array_unique($partnerKeys)), 'two partner classes share a key');
+foreach (array_keys(partner_structure()) as $pid) {
+    assert(isset(partner_groups()[$pid]) && !isset(SCHOOLS[$pid]), "partner id $pid is not a known partner, or is a school id");
+}
+
+$kp = day_map(parse_attendance_csv(
+    "date,class,present\n2026-09-16,Newton / 2nd Year / B.Tech CSE (AI&ML) / A,300\n" .
+    "2026-09-16,School of Law / 2nd Year / A,15\n", $kpSkipped
+));
+assert($kpSkipped === [], 'a partner label was skipped: ' . json_encode($kpSkipped));
+$kpSchools = attendance_totals(aggregate_days($kp));
+assert($kpSchools['reported'] === 1 && $kpSchools['present'] === 15, 'a partner reading leaked into the schools: ' . json_encode($kpSchools));
+$kpTree = aggregate_days($kp, null, null, partner_rows());
+$kpTotals = attendance_totals($kpTree);
+assert($kpTotals['reported'] === 1 && $kpTotals['present'] === 300 && $kpTotals['strength_reported'] === 404,
+    'partner tree wrong: ' . json_encode($kpTotals));
+assert(!isset($kpTree['law']) && isset($kpTree['kp-newton']), 'the partner tree must hold partners only');
+
+$kpSections = form_sections(partner_structure());
+$kpSeen = [];
+foreach ($kpSections as $labels) foreach ($labels as $label) {
+    assert(parse_class_label($label) !== null, "partner option is not a real class: $label");
+    $kpSeen[$label] = true;
+}
+assert(count($kpSeen) === count($partnerKeys), 'partner sections miss a class');
+
 // --- Range labels -----------------------------------------------------------
 assert(range_label('2026-08-26', '2026-08-26') === '26 Aug 2026', range_label('2026-08-26', '2026-08-26'));
 assert(range_label('2026-08-24', '2026-08-26') === '24 Aug to 26 Aug 2026', range_label('2026-08-24', '2026-08-26'));
