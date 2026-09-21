@@ -288,14 +288,13 @@ function form_sections(?array $structure = null): array {
 // reported pill, and show only on the Knowledge Partner view. Keyed by partner
 // id (kp-aero), which no school id can equal, so no class key is shared either.
 
-// id => ['name' => ..., 'placeholder' => true], in KNOWLEDGE_PARTNERS order.
-// Every partner is a placeholder until tools/data-request.php partner-divisions
-// comes back: the divisions below are invented, so no tile may state their
+// id => ['name' => ..., 'placeholder' => bool], in KNOWLEDGE_PARTNERS order.
+// A placeholder partner returned no divisions, so no tile may state its
 // enrolment as fact.
 function partner_groups(): array {
     $out = [];
     foreach (KNOWLEDGE_PARTNERS as $p) {
-        $out['kp-' . strtolower(preg_replace('/[^a-z0-9]/i', '', $p['name']))] = ['name' => $p['name'], 'placeholder' => true];
+        $out['kp-' . strtolower(preg_replace('/[^a-z0-9]/i', '', $p['name']))] = ['name' => $p['name'], 'placeholder' => in_array($p['name'], ['Vedam', 'PixelPop', 'ICRI'], true)];
     }
     return $out;
 }
@@ -313,24 +312,24 @@ function group_name(string $id): string {
 }
 
 // partner => year => program => [division => strength], the same shape as
-// class_structure() with the program in the branch slot.
+// class_structure() with the program in the branch slot. A bare number is one
+// division A of that strength.
 //
-// PLACEHOLDERS, the way Engineering 1st Year's 60s are. Programs and years are
-// read from Partners Information.xlsx (15 Sep 2026); every program-year is one
-// invented division A. Its strength is the partner's own student total for that
-// program-year where the workbook gave one, and 60 where it did not. The total
-// rather than 60 wherever one exists, because a count is capped at the strength
-// and Newton's 404 would otherwise read as 60 of 60.
+// From the returned 05-partner-divisions-request.xlsx (21 Sep 2026), read
+// literally: its division letters are the divisions (NxtWave's 2nd year starts
+// at G, Veloces's 1st year is Q). Program names are kept as they were so the
+// Form options stay put where a program did not change. Cleaned on the way in:
+// - Programs of 0 students are dropped (Seamedu's ITDS 1st/2nd and CSDF 2nd,
+//   Emversity's RT 2nd). M.Tech years past the 2nd are dropped.
+// - Sunstone's B.Tech CSE (AI) 2nd year has a third, unlettered row of 40,
+//   taken as division C.
+// - Flyglam listed BBA and MBA twice, plain and Aviation, with near identical
+//   counts. It has only the Aviation programs, so only those are kept.
 //
-// Cleaned on the way in: the same program under two spellings is one program
-// (Emversity's long names, Seamedu's "ITDS"), Flyglam's student table says BBA
-// where its program list says BBA Aviation, Seamedu's blank first-year BCA and
-// MCA specialisations are its "FY" rows, and M.Tech years past the 2nd are
-// dropped. Vedam's tab is a copy of Sunstone's, so its three rows are a guess.
-// Upgrad, PixelPop and ICRI sent no programs and have no classes.
-//
-// Replace with the returned 05-partner-divisions-request.xlsx, then re-run
-// tools/form-options.php, exactly as a school's structure is replaced.
+// STILL PLACEHOLDERS (60 each, left blank in the sheet): Aero's whole 1st Year
+// and Dual Degree 5th Year, and Noval's B.Sc 1st Year. Vedam was not in the
+// sheet at all, so its three rows remain a guess copied from Sunstone's tab.
+// PixelPop and ICRI sent nothing and have no classes.
 function partner_structure(): array {
     $programs = [
         'kp-aero' => [
@@ -348,47 +347,57 @@ function partner_structure(): array {
             '5th Year' => ['Dual Degree Aerospace' => 60],
         ],
         'kp-newton' => [
-            '1st Year' => ['B.Tech CSE (AI&ML)' => 351],
-            '2nd Year' => ['B.Tech CSE (AI&ML)' => 404],
-            '3rd Year' => ['B.Tech CSE (AI&ML)' => 313],
+            '1st Year' => ['B.Tech CSE (AI&ML)' => ['A' => 118, 'B' => 118, 'C' => 117]],
+            '2nd Year' => ['B.Tech CSE (AI&ML)' => ['A' => 101, 'B' => 100, 'C' => 102, 'D' => 100]],
+            '3rd Year' => ['B.Tech CSE (AI&ML)' => ['A' => 111, 'B' => 114, 'C' => 88]],
         ],
         'kp-sunstone' => [
-            '1st Year' => ['B.Tech (CS&IT)' => 121, 'B.Tech CSE (AI)' => 140, 'BCA (FSD)' => 50,
-                           'MCA (FSD)' => 28, 'BBA' => 45, 'MBA' => 25],
-            '2nd Year' => ['B.Tech (CS&IT)' => 196, 'B.Tech CSE (AI)' => 140, 'BCA (FSD)' => 62,
-                           'MCA (FSD)' => 52, 'BBA' => 33, 'MBA' => 27],
-            '3rd Year' => ['B.Tech (CS&IT)' => 124, 'BCA (FSD)' => 104, 'BBA' => 36],
+            '1st Year' => ['B.Tech (CS&IT)' => 133, 'B.Tech CSE (AI)' => ['A' => 76, 'B' => 56],
+                           'BCA (FSD)' => 38, 'MCA (FSD)' => 33, 'BBA' => 37, 'MBA' => 16],
+            '2nd Year' => ['B.Tech (CS&IT)' => ['A' => 79, 'B' => 118],
+                           'B.Tech CSE (AI)' => ['A' => 50, 'B' => 50, 'C' => 40],
+                           'BCA (FSD)' => 62, 'MCA (FSD)' => 52, 'BBA' => 33, 'MBA' => 27],
+            '3rd Year' => ['B.Tech (CS&IT)' => 118, 'BCA (FSD)' => 104, 'BBA' => 33],
         ],
         'kp-nxtwave' => [
-            '1st Year' => ['B.Tech CSE (DS)' => 280],
-            '2nd Year' => ['B.Tech CSE (DS)' => 335],
+            '1st Year' => ['B.Tech CSE (DS)' => array_fill_keys(['A', 'B', 'C', 'D', 'E'], 56)],
+            '2nd Year' => ['B.Tech CSE (DS)' => array_fill_keys(['G', 'H', 'I', 'J', 'K'], 67)],
         ],
         'kp-emversity' => [
-            '1st Year' => ['B.Sc CVT' => 97, 'B.Sc AOTT' => 35, 'B.Sc MLT' => 8, 'B.Sc RT' => 15],
-            '2nd Year' => ['B.Sc CVT' => 37, 'B.Sc AOTT' => 33, 'B.Sc MLT' => 5, 'B.Sc RT' => 60],
+            '1st Year' => ['B.Sc CVT' => 108, 'B.Sc AOTT' => 39, 'B.Sc MLT' => 7, 'B.Sc RT' => 16],
+            '2nd Year' => ['B.Sc CVT' => 34, 'B.Sc AOTT' => 33, 'B.Sc MLT' => 7],
         ],
-        'kp-veloces' => array_fill_keys(['1st Year', '2nd Year', '3rd Year'], [
-            'B.Tech CSE (Cyber Forensics & Information Security)' => 60,
-            'B.Tech CSE (Virtual & Augmented Reality)' => 60,
-        ]),
+        'kp-veloces' => [
+            '1st Year' => ['B.Tech CSE (Cyber Forensics & Information Security)' => ['Q' => 34],
+                           'B.Tech CSE (Virtual & Augmented Reality)' => ['Q' => 5]],
+            '2nd Year' => ['B.Tech CSE (Cyber Forensics & Information Security)' => 52,
+                           'B.Tech CSE (Virtual & Augmented Reality)' => 9],
+            '3rd Year' => ['B.Tech CSE (Cyber Forensics & Information Security)' => 47,
+                           'B.Tech CSE (Virtual & Augmented Reality)' => 32],
+        ],
         'kp-seamedu' => [
-            '1st Year' => ['B.Tech (AI&DE)' => 18, 'B.Tech (CSDF)' => 3, 'B.Tech (ITDS)' => 60,
-                           'BCA FY' => 43, 'MCA FY' => 45, 'BBA (IB)' => 60, 'BBA (BKFS)' => 60,
-                           'BBA (DM)' => 60, 'MBA (IB)' => 60, 'MBA (BKFS)' => 60, 'MBA (BAI)' => 60,
-                           'B.Sc Sound Engineering' => 60, 'BCA Game Development' => 60,
-                           'BBA Media and Communication' => 60],
-            '2nd Year' => ['B.Tech (AI&DS)' => 26, 'B.Tech (ITDS)' => 60, 'BCA (CS)' => 29,
-                           'BCA (AI&DS)' => 25, 'MCA (CC)' => 20, 'MCA (CSDF)' => 43, 'MCA (DSA)' => 26,
-                           'BBA (IB)' => 60, 'BBA (BKFS)' => 60, 'BBA (DM)' => 60, 'MBA (IB)' => 60,
-                           'MBA (BKFS)' => 60, 'B.Sc Sound Engineering' => 60,
-                           'BCA Game Development' => 60, 'BBA Media and Communication' => 60],
+            '1st Year' => ['B.Tech (AI&DE)' => 17, 'B.Tech (CSDF)' => 3, 'BCA FY' => 43, 'MCA FY' => 45,
+                           'BBA (IB+BFS+DM)' => 13, 'MBA (IB+BFS+BAI)' => 9,
+                           'B.Sc Sound Engineering' => 26, 'BCA Game Development' => 12,
+                           'BBA Media and Communication' => 5, 'B.Sc Filmmaking' => 15,
+                           'B.Sc Animation and Visual Effects' => 13, 'B.Sc Game Art and Design' => 9],
+            '2nd Year' => ['B.Tech (AI&DS)' => 26, 'BCA (CS)' => 29, 'BCA (AI&DS)' => 25, 'MCA (CC)' => 20,
+                           'MCA (CSDF)' => 43, 'MCA (DSA)' => 26, 'BBA (IB)' => 9, 'BBA (BKFS)' => 3,
+                           'BBA (DM)' => 4, 'MBA (IB)' => 2, 'MBA (BKFS)' => 3,
+                           'B.Sc Sound Engineering' => 26, 'BCA Game Development' => 22,
+                           'BA Journalism and Media Production' => 6, 'B.Sc Filmmaking' => 13,
+                           'B.Sc Animation and Visual Effects' => 27, 'B.Sc Game Art and Design' => 15],
             '3rd Year' => ['B.Tech (ITDS)' => 10, 'BCA (CFIS)' => 10, 'BCA (AIML)' => 37, 'BCA (MIT)' => 9,
-                           'BBA (IB)' => 60, 'BBA (BKFS)' => 60, 'B.Sc Sound Engineering' => 60,
-                           'BCA Game Development' => 60, 'BBA Media and Communication' => 60],
+                           'BBA (IB)' => 9, 'B.Sc Sound Engineering' => 19, 'BCA Game Development' => 31,
+                           'BA Journalism and Media Production' => 3, 'B.Sc Filmmaking' => 23,
+                           'B.Sc Animation and Visual Effects' => 30, 'B.Sc Game Art and Design' => 14],
             '4th Year' => ['B.Tech (ITDS)' => 44, 'B.Tech (CTIS)' => 20],
         ],
+        'kp-upgrad' => [
+            '1st Year' => ['B.Tech CS in AI' => ['A' => 76, 'B' => 71]],
+        ],
         'kp-flyglam' => [
-            '1st Year' => ['BBA Aviation' => 8],
+            '1st Year' => ['BBA Aviation' => 7],
             '2nd Year' => ['BBA Aviation' => 12, 'MBA Aviation' => 5],
             '3rd Year' => ['BBA Aviation' => 8],
         ],
@@ -404,7 +413,7 @@ function partner_structure(): array {
     $out = [];
     foreach ($programs as $partner => $years) {
         foreach ($years as $year => $list) {
-            foreach ($list as $program => $strength) $out[$partner][$year][$program] = ['A' => $strength];
+            foreach ($list as $program => $divs) $out[$partner][$year][$program] = is_array($divs) ? $divs : ['A' => $divs];
         }
     }
     return $out;

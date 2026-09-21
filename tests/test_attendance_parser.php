@@ -451,7 +451,7 @@ $kpSchools = attendance_totals(aggregate_days($kp));
 assert($kpSchools['reported'] === 1 && $kpSchools['present'] === 15, 'a partner reading leaked into the schools: ' . json_encode($kpSchools));
 $kpTree = aggregate_days($kp, null, null, partner_rows());
 $kpTotals = attendance_totals($kpTree);
-assert($kpTotals['reported'] === 1 && $kpTotals['present'] === 300 && $kpTotals['strength_reported'] === 404,
+assert($kpTotals['reported'] === 1 && $kpTotals['present'] === 101 && $kpTotals['strength_reported'] === 101,
     'partner tree wrong: ' . json_encode($kpTotals));
 assert(!isset($kpTree['law']) && isset($kpTree['kp-newton']), 'the partner tree must hold partners only');
 
