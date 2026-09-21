@@ -39,8 +39,7 @@ const SCHOOLS = [
 // partnerships office's own workbook: Noval's school from its programs' "Under
 // school of", Vedam's and ICRI's from its contacts tab, which lists none of
 // their programs' schools and says SOE for nearly every partner.
-// Their classes are partner_structure() in structure.php, placeholders until
-// tools/data-request.php partner-divisions comes back.
+// Their classes are partner_structure() in structure.php.
 const KNOWLEDGE_PARTNERS = [
     ['name' => 'Aero',      'schools' => ['eng']],
     ['name' => 'Newton',    'schools' => ['eng']],
