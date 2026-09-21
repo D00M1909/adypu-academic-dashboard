@@ -58,6 +58,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 auth_put($email, ['admin' => false]);
                 $ok = 'Admin access removed.';
                 break;
+            case 'delete':
+                // Disabled first, so one misclick cannot remove a working account.
+                if ((auth_find($email)['status'] ?? '') !== 'disabled') break;
+                store_update('faculty', function (array $d) use ($email) {
+                    unset($d['users'][$email]);
+                    return $d;
+                });
+                $ok = 'Deleted.';
+                break;
             case 'reset':
                 $temp = auth_reset_password($email);
                 $ok = 'Read this to them now. It is not shown again.';
@@ -169,6 +178,10 @@ $shortSchool = fn(string $id): string => preg_replace('/^School of /', '', SCHOO
               <button class="btn-quiet" name="action" value="disable" type="submit">Disable</button>
             <?php endif; ?>
           </form>
+          <?php if ($status === 'disabled'): ?>
+          <form method="post" onsubmit="return confirm('Delete this account for good?')"><?= csrf_field() ?><input type="hidden" name="email" value="<?= htmlspecialchars($email) ?>">
+            <button class="btn-quiet" name="action" value="delete" type="submit">Delete</button></form>
+          <?php endif; ?>
           <form method="post"><?= csrf_field() ?><input type="hidden" name="email" value="<?= htmlspecialchars($email) ?>">
             <button class="btn-quiet" name="action" value="reset" type="submit">Reset password</button></form>
           <form method="post"><?= csrf_field() ?><input type="hidden" name="email" value="<?= htmlspecialchars($email) ?>">
