@@ -35,10 +35,9 @@ const SCHOOLS = [
 // 27 Aug 2026 - column B (Partner) with its blank rows forward-filled, and
 // column A (School) collected per partner. Admission numbers deliberately not
 // copied: they belong to the report project and would go stale here.
-// Vedam, ICRI and Noval added 15 Sep 2026 from Partners Information.xlsx, the
-// partnerships office's own workbook: Noval's school from its programs' "Under
-// school of", Vedam's and ICRI's from its contacts tab, which lists none of
-// their programs' schools and says SOE for nearly every partner.
+// Noval added 15 Sep 2026 from Partners Information.xlsx, the partnerships
+// office's own workbook, its school from its programs' "Under school of".
+// Vedam and ICRI were added then too and removed 22 Sep 2026.
 // Their classes are partner_structure() in structure.php.
 const KNOWLEDGE_PARTNERS = [
     ['name' => 'Aero',      'schools' => ['eng']],
@@ -51,8 +50,6 @@ const KNOWLEDGE_PARTNERS = [
     ['name' => 'Upgrad',    'schools' => ['eng']],
     ['name' => 'PixelPop',  'schools' => ['eng']],
     ['name' => 'Flyglam',   'schools' => ['mgmt']],
-    ['name' => 'Vedam',     'schools' => ['eng']],
-    ['name' => 'ICRI',      'schools' => ['mgmt']],
     ['name' => 'Noval',     'schools' => ['science']],
 ];
 
