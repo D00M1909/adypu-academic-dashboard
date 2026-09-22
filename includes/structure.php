@@ -294,7 +294,7 @@ function form_sections(?array $structure = null): array {
 function partner_groups(): array {
     $out = [];
     foreach (KNOWLEDGE_PARTNERS as $p) {
-        $out['kp-' . strtolower(preg_replace('/[^a-z0-9]/i', '', $p['name']))] = ['name' => $p['name'], 'placeholder' => in_array($p['name'], ['Vedam', 'PixelPop', 'ICRI'], true)];
+        $out['kp-' . strtolower(preg_replace('/[^a-z0-9]/i', '', $p['name']))] = ['name' => $p['name'], 'placeholder' => $p['name'] === 'PixelPop'];
     }
     return $out;
 }
@@ -315,36 +315,37 @@ function group_name(string $id): string {
 // class_structure() with the program in the branch slot. A bare number is one
 // division A of that strength.
 //
-// From the returned 05-partner-divisions-request.xlsx (21 Sep 2026), read
+// From the returned 05-partner-divisions-request.xlsx (21 Sep 2026, Aero,
+// Emversity and Noval updated from its second return on 22 Sep), read
 // literally: its division letters are the divisions (NxtWave's 2nd year starts
-// at G, Veloces's 1st year is Q). Program names are kept as they were so the
-// Form options stay put where a program did not change. Cleaned on the way in:
+// at G, Veloces's and Aero's 1st years are Q, R, S). Program names are kept as
+// they were so the Form options stay put where a program did not change.
+// Cleaned on the way in:
 // - Programs of 0 students are dropped (Seamedu's ITDS 1st/2nd and CSDF 2nd,
-//   Emversity's RT 2nd). M.Tech years past the 2nd are dropped.
+//   Emversity's RT 2nd).
 // - Sunstone's B.Tech CSE (AI) 2nd year has a third, unlettered row of 40,
 //   taken as division C.
 // - Flyglam listed BBA and MBA twice, plain and Aviation, with near identical
 //   counts. It has only the Aviation programs, so only those are kept.
+// - Emversity's 1st year is one combined program in two divisions; its 2nd
+//   year "Medical Laboratory Science" is kept as B.Sc MLT.
 //
-// STILL PLACEHOLDERS (60 each, left blank in the sheet): Aero's whole 1st Year
-// and Dual Degree 5th Year, and Noval's B.Sc 1st Year. Vedam was not in the
-// sheet at all, so its three rows remain a guess copied from Sunstone's tab.
-// PixelPop and ICRI sent nothing and have no classes.
+// PixelPop sent nothing and has no classes.
 function partner_structure(): array {
     $programs = [
         'kp-aero' => [
-            '1st Year' => ['B.Tech Aeronautical' => 60, 'B.Tech Aerospace' => 60, 'B.Tech Avionics' => 60,
-                           'B.Tech Defence Technology' => 60, 'Integrated Aerospace' => 60,
-                           'Integrated Defence Technology' => 60, 'M.Tech Aerospace' => 60,
-                           'M.Tech Space Technology' => 60, 'M.Tech Defence Technology' => 60],
-            '2nd Year' => ['B.Tech Aeronautical' => 45, 'B.Tech Aerospace' => 60, 'B.Tech Avionics' => 10,
-                           'Integrated Aerospace' => 30, 'Integrated Defence Technology' => 30,
-                           'M.Tech Aerospace' => 6],
-            '3rd Year' => ['B.Tech Aeronautical' => 52, 'B.Tech Aerospace' => 60, 'B.Tech Avionics' => 4,
-                           'Integrated Aerospace' => 30, 'Integrated Defence Technology' => 16],
-            '4th Year' => ['B.Tech Aeronautical' => 56, 'B.Tech Aerospace' => 60, 'B.Tech Avionics' => 11,
-                           'Dual Degree Aerospace' => 16],
-            '5th Year' => ['Dual Degree Aerospace' => 60],
+            '1st Year' => ['B.Tech Aeronautical' => ['R' => 28], 'B.Tech Aerospace' => ['S' => 35],
+                           'B.Tech Avionics' => ['Q' => 5], 'B.Tech Defence Technology' => 15,
+                           'Integrated Aerospace' => 12, 'Integrated Defence Technology' => 18,
+                           'M.Tech Aerospace' => 3, 'M.Tech Space Technology' => 5,
+                           'M.Tech Defence Technology' => 1],
+            '2nd Year' => ['B.Tech Aeronautical' => 44, 'B.Tech Aerospace' => 49, 'B.Tech Avionics' => 12,
+                           'Integrated Aerospace' => 28, 'Integrated Defence Technology' => 32,
+                           'M.Tech Aerospace' => 7],
+            '3rd Year' => ['B.Tech Aeronautical' => 49, 'B.Tech Aerospace' => 58, 'B.Tech Avionics' => 4,
+                           'Integrated Aerospace' => 28, 'Integrated Defence Technology' => 18],
+            '4th Year' => ['B.Tech Aeronautical' => 50, 'B.Tech Aerospace' => 58, 'B.Tech Avionics' => 9,
+                           'Dual Degree Aerospace' => 15],
         ],
         'kp-newton' => [
             '1st Year' => ['B.Tech CSE (AI&ML)' => ['A' => 118, 'B' => 118, 'C' => 117]],
@@ -364,7 +365,7 @@ function partner_structure(): array {
             '2nd Year' => ['B.Tech CSE (DS)' => array_fill_keys(['G', 'H', 'I', 'J', 'K'], 67)],
         ],
         'kp-emversity' => [
-            '1st Year' => ['B.Sc CVT' => 108, 'B.Sc AOTT' => 39, 'B.Sc MLT' => 7, 'B.Sc RT' => 16],
+            '1st Year' => ['B.Sc (AOTT, CVT, MLS, RT)' => ['A' => 75, 'B' => 75]],
             '2nd Year' => ['B.Sc CVT' => 34, 'B.Sc AOTT' => 33, 'B.Sc MLT' => 7],
         ],
         'kp-veloces' => [
@@ -401,12 +402,8 @@ function partner_structure(): array {
             '2nd Year' => ['BBA Aviation' => 12, 'MBA Aviation' => 5],
             '3rd Year' => ['BBA Aviation' => 8],
         ],
-        'kp-vedam' => [
-            '2nd Year' => ['B.Tech (CS&IT)' => 60, 'B.Tech CSE (AI)' => 60],
-            '3rd Year' => ['B.Tech (CS&IT)' => 60],
-        ],
         'kp-noval' => [
-            '1st Year' => ['B.Sc Clinical Research and Technology' => 60],
+            '1st Year' => ['B.Sc Clinical Research and Technology' => 4],
             '2nd Year' => ['B.Sc Clinical Research and Technology' => 10, 'M.Sc Clinical Research' => 8],
         ],
     ];
