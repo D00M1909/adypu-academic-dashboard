@@ -32,6 +32,15 @@
     });
   }
 
+  // The range dock pins just below the sticky header, whose height depends on
+  // whether its controls wrap to a second row. Measured, not assumed.
+  var header = document.querySelector('.app-header');
+  if (header && window.ResizeObserver) {
+    new ResizeObserver(function () {
+      document.documentElement.style.setProperty('--header-h', header.offsetHeight + 'px');
+    }).observe(header);
+  }
+
   // Mirrors att_class() in index.php and --att-* in dashboard.css.
   function attClass(pct) {
     if (pct >= 75) return 'att-good';
