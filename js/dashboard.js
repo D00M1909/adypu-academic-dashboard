@@ -52,6 +52,13 @@
     return strength ? Math.round((present / strength) * 100) : 0;
   }
 
+  // Whether any class under a node of the tree (a year's branch map, or a
+  // branch's division list) reported in the range.
+  function hasReport(node) {
+    if (Array.isArray(node)) return node.some(function (d) { return d.reported; });
+    return Object.keys(node || {}).some(function (k) { return hasReport(node[k]); });
+  }
+
   // Totals for whatever the user currently has selected. state.branch is '' for
   // a branchless school (a real key in the tree) and null when no branch is
   // selected — the two must not be conflated or a branchless school would sum
@@ -293,7 +300,12 @@
     document.getElementById('years-meta').textContent = years.length + (years.length === 1 ? ' year' : ' years');
 
     if (years.length) {
-      state.year = years.indexOf(selectedYear) !== -1 ? selectedYear : years[0];
+      // The first year that reported, not simply the first year: clicking a
+      // school with one 2nd Year class in used to open on an empty 1st Year.
+      var firstReported = years.filter(function (y) {
+        return hasReport(window.ATTENDANCE_DATA[schoolId][y]);
+      })[0];
+      state.year = years.indexOf(selectedYear) !== -1 ? selectedYear : firstReported || years[0];
       Array.prototype.forEach.call(grid.children, function (tile) {
         if (tile.dataset.year === state.year) tile.classList.add('active');
       });
