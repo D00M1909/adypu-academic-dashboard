@@ -535,7 +535,10 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
      The negative top margin preserves the original visual position; the
      padding becomes an opaque buffer when tile content scrolls underneath. */
   position: sticky;
-  top: 80px;
+  /* The header's measured height, set by js/dashboard.js. A fixed 80px was
+     the one-row header; between a phone and a wide desktop the header wraps to
+     two rows and slid the chips and the headline number underneath it. */
+  top: var(--header-h, 80px);
   z-index: 10;
   isolation: isolate;
   /* Extra space below turns the row into a deliberate control dock. Without
