@@ -405,19 +405,6 @@
     }
   });
 
-  function firstAvailableSelection() {
-    var schoolId = state.school || Object.keys(window.ATTENDANCE_DATA)[0];
-    var year = state.year;
-    if (schoolId && !year) {
-      year = Object.keys(window.ATTENDANCE_DATA[schoolId] || {})[0];
-    }
-    var branch = state.branch;
-    if (schoolId && year && branch === null) {
-      branch = Object.keys(window.ATTENDANCE_DATA[schoolId][year] || {})[0] || '';
-    }
-    return { schoolId: schoolId, year: year, branch: branch };
-  }
-
   function showModal() {
     modal.hidden = false;
     requestAnimationFrame(function () { modal.classList.add('is-open'); });
@@ -434,27 +421,38 @@
     if (e.key === 'Escape') hideModal();
   }
 
+  // The breakdown behind the headline number, for exactly what is selected.
+  // It used to fill in the levels you had not picked with the first school,
+  // year and branch, so the all-schools number opened on Engineering 1st Year
+  // Core, which had nothing in it.
   function openDivisionModal() {
-    var pick = firstAvailableSelection();
-    if (!pick.schoolId || !pick.year) return;
-
-    var url = 'api/division.php?school=' + encodeURIComponent(pick.schoolId) +
-      '&year=' + encodeURIComponent(pick.year) +
-      '&branch=' + encodeURIComponent(pick.branch || '') +
-      '&from=' + encodeURIComponent(window.ATTENDANCE_RANGE.from) +
-      '&to=' + encodeURIComponent(window.ATTENDANCE_RANGE.to);
+    var params = { from: window.ATTENDANCE_RANGE.from, to: window.ATTENDANCE_RANGE.to };
+    if (window.DASHBOARD_VIEW && window.DASHBOARD_VIEW.partners) params.view = 'partners';
+    if (state.school) params.school = state.school;
+    if (state.school && state.year) params.year = state.year;
+    // '' is a real branch (a branchless school); null is "none picked".
+    if (state.school && state.year && state.branch !== null) params.branch = state.branch;
+    var url = 'api/division.php?' + Object.keys(params).map(function (k) {
+      return k + '=' + encodeURIComponent(params[k]);
+    }).join('&');
 
     fetch(url).then(function (r) { return r.json(); }).then(function (data) {
+      document.getElementById('modal-title').textContent = data.single ? 'Division-wise Attendance' : 'Classes reported';
       document.getElementById('modal-subtitle').textContent =
-        data.schoolName + ' · ' + data.year + (data.branch ? ' · ' + data.branch : '') +
+        data.schoolName + (data.year ? ' · ' + data.year : '') + (data.branch ? ' · ' + data.branch : '') +
         ' · ' + data.rangeLabel;
 
       var grid = document.getElementById('division-grid');
       grid.innerHTML = '';
+      if (!data.divisions.length) {
+        grid.innerHTML = '<p class="division-empty">No class in this selection has reported yet.</p>';
+      }
       // Two columns leaves a row about 215px, which a lecture list does not fit
       // in: the slot wraps over two lines and the faculty name is cut to
       // "Advait Bhat...". One column whenever any division carries such a list.
-      grid.classList.toggle('has-readings', data.divisions.some(function (d) {
+      // A wider scope names each class by its whole path, which needs the
+      // width for the same reason.
+      grid.classList.toggle('has-readings', !data.single || data.divisions.some(function (d) {
         return (d.readings || []).length > 1;
       }));
       data.divisions.forEach(function (d) {
@@ -522,7 +520,8 @@
           }).join('') + '</ul>';
         row.innerHTML =
           '<div class="division-row-top">' +
-            '<span class="division-name">' + divisionLabel(d.division) + days + at + by + '</span>' +
+            '<span class="division-name">' + (d.path || []).concat(divisionLabel(d.division)).join(' · ') +
+              days + at + by + '</span>' +
             '<span class="division-count">' + readout + '</span>' +
           '</div>' +
           '<div class="division-bar"><div class="division-bar-fill ' +
