@@ -44,6 +44,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // A future date parks a reading past every real one, and the dashboard
         // opens on the newest day it holds, so it would sit there forever.
         $error = 'Please choose the date the class actually met.';
+    } elseif (!roster_for($class) && !ctype_digit(trim((string) ($_POST['present'] ?? '')))) {
+        // The box is required in the browser too; this is the phone that skips
+        // it. A blank used to be cast to 0 and saved as a class nobody came to.
+        $error = 'Please enter how many students were present.';
     } else {
         $roster = roster_for($class);
         if ($roster) {
@@ -177,8 +181,10 @@ if (($me['status'] ?? '') !== 'active') {
         The tick list appears here automatically once the list arrives.
       </p>
       <label for="p-present">Students present</label>
+      <?php /* Empty, not the class strength: prefilled, a Submit tapped without
+               typing filed a full house. Refilled after a failed save only. */ ?>
       <input id="p-present" name="present" type="number" inputmode="numeric" min="0"
-             max="<?= (int) $class['strength'] ?>" value="<?= (int) $class['strength'] ?>" required>
+             max="<?= (int) $class['strength'] ?>" value="<?= htmlspecialchars((string) ($_POST['present'] ?? '')) ?>" required>
     </div>
   <?php else: ?>
     <?php /* Ticking for ABSENT is the opposite of what most people expect, and
