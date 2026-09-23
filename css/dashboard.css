@@ -207,6 +207,8 @@ button {
 .range-summary-count { font-family: "IBM Plex Mono", monospace; font-size: 17px; font-weight: 700; color: var(--ink); }
 .range-summary-sep { color: var(--ink-muted); margin: 0 2px; font-weight: 500; }
 .range-summary .att-pct { font-size: 14px; font-weight: 700; }
+.range-summary-count[hidden] { display: none; }
+.range-summary-empty { font-size: 14px; font-weight: 600; color: var(--ink-muted); }
 .division-empty { margin: 0; font-size: 13px; color: var(--ink-muted); }
 .range-summary-coverage { font-size: 12px; font-weight: 500; color: var(--ink-muted); }
 .range-summary-icon {

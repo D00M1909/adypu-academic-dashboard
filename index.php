@@ -315,8 +315,12 @@ try {
         <span class="range-updated" title="When the data behind this page was last written"><?= htmlspecialchars($freshness) ?></span>
       </span>
       <span class="range-summary-figures">
-        <span class="range-summary-count"><span id="stat-present"><?= $totals['present'] ?></span><span class="range-summary-sep">/</span><span id="stat-strength"><?= $totals['strength_reported'] ?></span></span>
+        <span class="range-summary-count" id="stat-count"<?= $totals['reported'] ? '' : ' hidden' ?>><span id="stat-present"><?= $totals['present'] ?></span><span class="range-summary-sep">/</span><span id="stat-strength"><?= $totals['strength_reported'] ?></span></span>
+        <?php if ($totals['reported']): ?>
         <span class="att-pct <?= att_class($overallPct) ?>" id="stat-pct"><?= $overallPct ?>%</span>
+        <?php else: ?>
+        <span class="range-summary-empty" id="stat-pct">No reports yet</span>
+        <?php endif; ?>
         <span class="range-summary-coverage"><span id="stat-reported"><?= $totals['reported'] ?></span> of <span id="stat-classes"><?= $totals['classes'] ?></span> reported</span>
         <svg class="range-summary-icon" aria-hidden="true"><use href="#icon-chevron"/></svg>
       </span>

@@ -110,9 +110,11 @@
     document.getElementById('stat-reported').textContent = t.reported;
     document.getElementById('stat-classes').textContent = t.classes;
 
+    // "0/0 --" read as a broken counter; with nothing in, say so in words.
+    document.getElementById('stat-count').hidden = !t.reported;
     var pctEl = document.getElementById('stat-pct');
-    pctEl.textContent = t.reported ? p + '%' : '--';
-    pctEl.className = 'att-pct ' + (t.reported ? attClass(p) : '');
+    pctEl.textContent = t.reported ? p + '%' : 'No reports yet';
+    pctEl.className = t.reported ? 'att-pct ' + attClass(p) : 'range-summary-empty';
 
     var parts = [];
     // "School of " on the front of a four-part path is what pushed the
@@ -534,8 +536,10 @@
       var totalPct = data.pct;
       document.getElementById('division-total').innerHTML =
         '<span>Total present <small>(' + data.total.reported + ' of ' + data.total.classes +
-        ' reported)</small></span><span class="division-count">' + data.total.present +
-        '<span class="division-count-sep">/</span>' + data.total.strength_reported + ' · ' + totalPct + '%</span>';
+        ' reported)</small></span>' + (data.total.reported
+          ? '<span class="division-count">' + data.total.present + '<span class="division-count-sep">/</span>' +
+            data.total.strength_reported + ' · ' + totalPct + '%</span>'
+          : '<span>No reports yet</span>');
 
       showModal();
     });
