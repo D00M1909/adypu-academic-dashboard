@@ -473,6 +473,8 @@ try {
 
 </main>
 
+<?php site_footer(); ?>
+
 <div id="division-modal" class="modal-backdrop" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
     <div class="modal-header">
