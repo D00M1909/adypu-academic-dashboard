@@ -25,27 +25,32 @@ function placeholderSchool(id) {
   return !!(s && s.placeholder);
 }
 
-// A year the drill-down lists every division of at once, as structure.php
-// declares them (FLAT_YEARS). Global for the same reason as the two above.
+// A school the drill-down walks program first (school > program > year), and a
+// year it lists every division of at once, as structure.php declares them
+// (PROGRAM_FIRST_SCHOOLS, FLAT_YEARS). Global for the same reason as the two
+// above: dashboard.js draws the drill-down, this file ranks it.
+function programFirstSchool(id) {
+  return ((window.DASHBOARD_VIEW || {}).programFirst || []).indexOf(id) !== -1;
+}
 function flatYear(school, year) {
   return (((window.DASHBOARD_VIEW || {}).flatYears || {})[school] || []).indexOf(year) !== -1;
 }
 
 window.Charts = (function () {
-  // A class key is "school|year|branch|division", so the current selection is
-  // a prefix of every key inside it. Branchless schools key on an empty branch
-  // segment, which is why the trailing '|' matters: 'law|2nd Year|' must match
-  // 'law|2nd Year||A'.
-  function scopePrefix(state) {
-    var parts = [];
-    if (state.school) parts.push(state.school);
-    if (state.year) parts.push(state.year);
-    if (state.branch !== null && state.branch !== undefined) parts.push(state.branch);
-    if (!parts.length) return '';
-    // A division is the whole key, so it takes no trailing separator: with one
-    // it would match nothing and every chart would empty out.
-    if (state.division) return parts.join('|') + '|' + state.division;
-    return parts.join('|') + '|';
+  // Whether a class key ("school|year|branch|division") is inside the current
+  // selection. A prefix match did this until a program-first school made a
+  // selection with a branch and no year (Management > BBA), which no prefix of
+  // "mgmt|2nd Year|BBA|A" can express. A branchless school keys on an empty
+  // branch segment, which '' === '' matches as it should.
+  function scopeTest(state) {
+    var fixedBranch = state.branch !== null && state.branch !== undefined;
+    return function (key) {
+      var p = key.split('|');
+      return (!state.school || p[0] === state.school) &&
+        (!state.year || p[1] === state.year) &&
+        (!fixedBranch || p[2] === state.branch) &&
+        (!state.division || p[3] === state.division);
+    };
   }
 
   function attClass(pct) {
@@ -135,13 +140,13 @@ window.Charts = (function () {
   // inside the scope: present, the strength of just those classes, and how
   // many of the scope's classes they were. A day nobody reported is left out
   // rather than drawn as a zero, which would read as total absence.
-  function dailySeries(prefix) {
+  function dailySeries(inScope) {
     var days = window.ATTENDANCE_DAYS || {};
     var strengths = window.CLASS_STRENGTH || {};
     return Object.keys(days).sort().map(function (date) {
       var present = 0, strength = 0, reported = 0;
       Object.keys(days[date]).forEach(function (key) {
-        if (key.indexOf(prefix) !== 0) return;
+        if (!inScope(key)) return;
         // Capped at the class's strength, exactly as aggregate_days() caps it:
         // more present than enrolled is a wrong enrolment, and uncapped it drew
         // a 211% day and a negative absent count. Change both together.
@@ -153,9 +158,9 @@ window.Charts = (function () {
     }).filter(function (d) { return d.reported > 0; });
   }
 
-  function classesInScope(prefix) {
+  function classesInScope(inScope) {
     return Object.keys(window.CLASS_STRENGTH || {}).filter(function (key) {
-      return key.indexOf(prefix) === 0;
+      return inScope(key);
     }).length;
   }
 
@@ -190,8 +195,8 @@ window.Charts = (function () {
   // Attendance percentage per day. The one chart the date range exists for:
   // a single number can only say where a school is, this says which way it is
   // going.
-  function renderTrend(el, prefix) {
-    var series = dailySeries(prefix);
+  function renderTrend(el, inScope) {
+    var series = dailySeries(inScope);
     if (!series.length) {
       empty(el, 'No days reported in this range.');
       return;
@@ -276,6 +281,28 @@ window.Charts = (function () {
       return t;
     }
 
+    // A program-first school ranks what its drill-down shows next: its
+    // programs, then one program's years. Neither is a node of the tree (a
+    // program lives inside every year), so they are gathered across years.
+    if (state.school && programFirstSchool(state.school) && !state.year) {
+      var school = data[state.school] || {};
+      var hasBranch = state.branch !== null && state.branch !== undefined;
+      var gathered = {};
+      Object.keys(school).forEach(function (year) {
+        Object.keys(school[year]).forEach(function (program) {
+          if (hasBranch && program !== state.branch) return;
+          var key = hasBranch ? year : program;
+          (gathered[key] = gathered[key] || {})[year + '|' + program] = school[year][program];
+        });
+      });
+      return {
+        rows: Object.keys(gathered).map(function (k) {
+          return { name: k, school: state.school, totals: sum(gathered[k]) };
+        }),
+        label: hasBranch ? 'year' : 'program'
+      };
+    }
+
     var node = data, label = (window.DASHBOARD_VIEW || {}).noun || 'school';
     if (state.school) { node = (data[state.school] || {}); label = 'year'; }
     if (state.school && state.year) { node = (node[state.year] || {}); label = (window.DASHBOARD_VIEW || {}).noun === 'partner' ? 'program' : 'branch'; }
@@ -335,16 +362,16 @@ window.Charts = (function () {
   // How many of the scope's classes filled the form in, per day. The honesty
   // chart: a 95% attendance figure resting on 6 of 136 classes should be
   // visible as exactly that.
-  function renderCompliance(el, prefix) {
+  function renderCompliance(el, inScope) {
     // Every day in the range, not just the ones with submissions: a day nobody
     // reported is the whole point of this chart, and dropping it let a class
     // that reported twice in a week look like perfect compliance.
     var days = window.ATTENDANCE_DAYS || {};
-    var total = classesInScope(prefix);
+    var total = classesInScope(inScope);
     var series = Object.keys(days).sort().map(function (date) {
       var reported = 0;
       Object.keys(days[date]).forEach(function (key) {
-        if (key.indexOf(prefix) === 0) reported++;
+        if (inScope(key)) reported++;
       });
       return { date: date, reported: reported };
     });
@@ -469,8 +496,8 @@ window.Charts = (function () {
   // aggregate_days in includes/attendance.php), so the only honest total is
   // the one already on the stat tiles above, and a second one computed a
   // different way here would sooner or later disagree with it in public.
-  function renderDays(section, meta, tbody, prefix) {
-    var series = dailySeries(prefix);
+  function renderDays(section, meta, tbody, inScope) {
+    var series = dailySeries(inScope);
     // One day is not a breakdown: the tiles above already say it, twice.
     section.hidden = series.length < 2;
     if (section.hidden) return;
@@ -490,11 +517,11 @@ window.Charts = (function () {
   // Called by dashboard.js on every selection change. totals comes from
   // scopeTotals() there rather than being recomputed here.
   function render(state, totals) {
-    var prefix = scopePrefix(state);
+    var inScope = scopeTest(state);
     renderDonut(document.getElementById('chart-donut'), totals);
-    renderTrend(document.getElementById('chart-trend'), prefix);
+    renderTrend(document.getElementById('chart-trend'), inScope);
     renderBars(document.getElementById('chart-bars'), document.getElementById('chart-bars-caption'), state);
-    renderCompliance(document.getElementById('chart-compliance'), prefix);
+    renderCompliance(document.getElementById('chart-compliance'), inScope);
     renderBreakdown(
       document.getElementById('breakdown-section'),
       document.getElementById('breakdown-meta'),
@@ -505,7 +532,7 @@ window.Charts = (function () {
       document.getElementById('daybyday-section'),
       document.getElementById('daybyday-meta'),
       document.getElementById('daybyday-rows'),
-      prefix
+      inScope
     );
     document.getElementById('charts-scope').textContent = window.ATTENDANCE_RANGE.label;
   }

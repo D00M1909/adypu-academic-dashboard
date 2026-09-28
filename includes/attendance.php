@@ -193,7 +193,7 @@ function class_from_row(array $r): ?array {
     if ($school === null) return null;
 
     $year     = trim($r['year'] ?? '');
-    $branch   = trim($r['branch'] ?? '');
+    $branch   = legacy_branch($school, trim($r['branch'] ?? ''));
     $division = trim($r['division'] ?? '');
     $strength = class_strength($school, $year, $branch, $division);
     if ($strength === null) return null;
@@ -533,10 +533,14 @@ function merge_readings(array $base, array $overlay): array {
 }
 
 function get_attendance_days(): array {
-    $app = submitted('days');
+    require_once __DIR__ . '/structure.php';
+    // Both stores may hold keys from before a class was renamed (Management's
+    // branchless labels): translated on the way in, so the file on disk never
+    // has to be rewritten and a push of the old sheet still counts.
+    $app = remap_legacy_days(submitted('days'));
     $cached = read_attendance_cache();
     if (isset($cached['days']) && is_array($cached['days'])) {
-        return merge_readings($cached['days'], $app);
+        return merge_readings(remap_legacy_days($cached['days']), $app);
     }
     // A cache from before the day map holds a bare tree with no dates in it;
     // get_attendance() serves that one as-is, so handing back only the app's own
@@ -553,9 +557,11 @@ function get_attendance_days(): array {
 // rows. Every caller must treat an absent name as "not recorded", never as an
 // error — the attendance numbers stand on their own.
 function get_attendance_faculty(): array {
+    require_once __DIR__ . '/structure.php';
     $cached = read_attendance_cache();
     $pushed = is_array($cached['faculty'] ?? null) ? $cached['faculty'] : [];
-    return merge_readings($pushed, submitted('faculty'));
+    // Same keys as the day map, so the same translation (get_attendance_days).
+    return merge_readings(remap_legacy_days($pushed), remap_legacy_days(submitted('faculty')));
 }
 
 function get_attendance(?string $from = null, ?string $to = null): array {

@@ -504,9 +504,9 @@ try {
   window.SCHOOLS = <?= json_encode($schoolsJs) ?>;
   window.DASHBOARD_VIEW = <?= json_encode([
       'partners' => $isPartners, 'noun' => $groupNoun,
-      // Years the drill-down lists every division of at once (structure.php
-      // says which, and why).
-      'flatYears' => (object) FLAT_YEARS,
+      // How the drill-down walks the schools that are not year > branch
+      // (structure.php says which, and why).
+      'programFirst' => PROGRAM_FIRST_SCHOOLS, 'flatYears' => (object) FLAT_YEARS,
   ]) ?>;
   window.ATTENDANCE_RANGE = <?= json_encode([
       'from' => $from, 'to' => $to, 'label' => $rangeLabel,

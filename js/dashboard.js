@@ -120,8 +120,9 @@
     // "School of " on the front of a four-part path is what pushed the
     // division off the end of the card; the crumb trail spells it out anyway.
     if (state.school) parts.push(window.SCHOOLS[state.school].name.replace(/^School of /, ''));
-    if (state.year) parts.push(state.year);
-    if (state.branch) parts.push(state.branch);
+    // In the order the drill-down walks it: "Management · BBA · 2nd Year".
+    (programFirstSchool(state.school) ? [state.branch, state.year] : [state.year, state.branch])
+      .forEach(function (p) { if (p) parts.push(p); });
     if (state.division) parts.push(divisionLabel(state.division));
     // Drilled in, the path is the useful label; the range stays visible in the
     // date bar. At root there is no path, so the range takes its place.
@@ -148,15 +149,13 @@
     if (state.school) {
       crumbs.push({ key: 'school', label: window.SCHOOLS[state.school].name });
     }
+    var yearCrumb = state.year ? { key: 'year', label: state.year } : null;
     // A flat year has no branch step to go back to, so its branch rides on the
     // division's crumb instead ("Core · Division B").
     var flat = state.year && flatYear(state.school, state.year);
-    if (state.year) {
-      crumbs.push({ key: 'year', label: state.year });
-    }
-    if (state.branch && !flat) {
-      crumbs.push({ key: 'branch', label: state.branch });
-    }
+    var branchCrumb = state.branch && !flat ? { key: 'branch', label: state.branch } : null;
+    (programFirstSchool(state.school) ? [branchCrumb, yearCrumb] : [yearCrumb, branchCrumb])
+      .forEach(function (c) { if (c) crumbs.push(c); });
     if (state.division) {
       crumbs.push({ key: 'division', label: (flat && state.branch ? esc(state.branch) + ' · ' : '') + divisionLabel(state.division) });
     }
@@ -347,12 +346,129 @@
     renderBreadcrumb();
   }
 
+  // --- Program first (Management: MBA / BBA, then years) ------------------
+  //
+  // The same tree, walked in a different order: the program is the branch, so
+  // picking one fixes state.branch with no year yet, and its years are only
+  // those the program runs (MBA two, BBA three). The Programs section moves
+  // above Years for these schools and back for every other.
+  var branchesHeading = document.querySelector('#branches-section h2').textContent;
+  function orderSections(schoolId) {
+    var years = document.getElementById('years-section');
+    var branches = document.getElementById('branches-section');
+    var first = programFirstSchool(schoolId);
+    if (first) years.parentNode.insertBefore(branches, years);
+    else years.parentNode.insertBefore(years, branches);
+    // An MBA is a program, not a branch; index.php's own heading otherwise.
+    branches.querySelector('h2').textContent = first ? 'Programs' : branchesHeading;
+  }
+
+  function programsOf(schoolId) {
+    var data = window.ATTENDANCE_DATA[schoolId] || {};
+    var out = [];
+    Object.keys(data).forEach(function (y) {
+      Object.keys(data[y]).forEach(function (p) { if (out.indexOf(p) === -1) out.push(p); });
+    });
+    return out;
+  }
+
+  function programYears(schoolId, program) {
+    var data = window.ATTENDANCE_DATA[schoolId] || {};
+    return Object.keys(data).filter(function (y) { return data[y][program] !== undefined; });
+  }
+
+  // `pick` walks on down to a year and its divisions, as picking a school
+  // does; without it (the school's crumb) the programs wait to be chosen.
+  function renderPrograms(schoolId, selectedProgram, selectedYear, selectedDivision, pick) {
+    var programs = programsOf(schoolId);
+    var grid = document.getElementById('branches-grid');
+    grid.innerHTML = '';
+    programs.forEach(function (program) {
+      var tile = document.createElement('button');
+      tile.type = 'button';
+      tile.className = 'tile branch-tile';
+      tile.dataset.branch = program;
+      tile.textContent = program;
+      tile.addEventListener('click', function () {
+        grid.querySelectorAll('.branch-tile').forEach(function (t) { t.classList.remove('active'); });
+        tile.classList.add('active');
+        renderProgramYears(schoolId, program, null, null, true);
+      });
+      grid.appendChild(tile);
+    });
+    document.getElementById('branches-meta').textContent =
+      programs.length + (programs.length === 1 ? ' program' : ' programs');
+    document.getElementById('branches-section').hidden = programs.length === 0;
+
+    if (!pick || !programs.length) {
+      state.branch = null;
+      state.year = null;
+      hideDivisions();
+      document.getElementById('years-section').hidden = true;
+      renderBreadcrumb();
+      return;
+    }
+    // The first program that reported, for the same reason renderYears opens
+    // on the first year that did.
+    var program = programs.indexOf(selectedProgram) !== -1 ? selectedProgram
+      : programs.filter(function (p) {
+          return programYears(schoolId, p).some(function (y) {
+            return hasReport(window.ATTENDANCE_DATA[schoolId][y][p]);
+          });
+        })[0] || programs[0];
+    Array.prototype.forEach.call(grid.children, function (t) {
+      t.classList.toggle('active', t.dataset.branch === program);
+    });
+    renderProgramYears(schoolId, program, selectedYear, selectedDivision, true);
+  }
+
+  function renderProgramYears(schoolId, program, selectedYear, selectedDivision, pick) {
+    var years = programYears(schoolId, program);
+    var grid = document.getElementById('years-grid');
+    state.branch = program;
+    state.year = null;
+    grid.innerHTML = '';
+    years.forEach(function (year) {
+      var tile = document.createElement('button');
+      tile.type = 'button';
+      tile.className = 'tile year-tile';
+      tile.dataset.year = year;
+      tile.textContent = year;
+      tile.addEventListener('click', function () {
+        state.year = year;
+        grid.querySelectorAll('.year-tile').forEach(function (t) { t.classList.remove('active'); });
+        tile.classList.add('active');
+        renderDivisions(schoolId, year, program, null);
+      });
+      grid.appendChild(tile);
+    });
+    document.getElementById('years-section').hidden = years.length === 0;
+    document.getElementById('years-meta').textContent = years.length + (years.length === 1 ? ' year' : ' years');
+
+    if (!pick || !years.length) {
+      hideDivisions();
+      renderBreadcrumb();
+      return;
+    }
+    state.year = years.indexOf(selectedYear) !== -1 ? selectedYear
+      : years.filter(function (y) { return hasReport(window.ATTENDANCE_DATA[schoolId][y][program]); })[0] || years[0];
+    Array.prototype.forEach.call(grid.children, function (t) {
+      t.classList.toggle('active', t.dataset.year === state.year);
+    });
+    renderDivisions(schoolId, state.year, program, selectedDivision);
+  }
+
   function selectSchool(schoolId, selectedYear, selectedBranch, selectedDivision) {
     markSchool(schoolId);
+    orderSections(schoolId);
     state.school = schoolId;
     state.year = null;
     state.branch = null;
     state.division = null;
+    if (programFirstSchool(schoolId)) {
+      renderPrograms(schoolId, selectedBranch, selectedYear, selectedDivision, true);
+      return;
+    }
     renderYears(schoolId, selectedYear, selectedBranch, selectedDivision);
   }
 
@@ -382,6 +498,10 @@
     state.year = null;
     state.branch = null;
     hideDivisions();
+    if (programFirstSchool(schoolId)) {
+      renderPrograms(schoolId, null, null, null, false);
+      return;
+    }
     document.getElementById('branches-section').hidden = true;
     document.getElementById('branches-grid').innerHTML = '';
 
@@ -430,6 +550,15 @@
       renderBreadcrumb();
     } else if (crumb.dataset.crumb === 'school' && state.school) {
       showSchoolLevel(state.school);
+    } else if (programFirstSchool(state.school)) {
+      // Program, then year: the program's crumb lists its years again, the
+      // year's crumb its divisions.
+      if (crumb.dataset.crumb === 'branch' && state.branch !== null) {
+        document.getElementById('years-grid').querySelectorAll('.year-tile').forEach(function (t) { t.classList.remove('active'); });
+        renderProgramYears(state.school, state.branch, null, null, false);
+      } else if (crumb.dataset.crumb === 'year' && state.year) {
+        renderDivisions(state.school, state.year, state.branch, null);
+      }
     } else if (crumb.dataset.crumb === 'year' && state.school && state.year) {
       state.branch = null;
       updateBranches(state.school, state.year, null, null);
@@ -463,8 +592,9 @@
     if (window.DASHBOARD_VIEW && window.DASHBOARD_VIEW.partners) params.view = 'partners';
     if (state.school) params.school = state.school;
     if (state.school && state.year) params.year = state.year;
-    // '' is a real branch (a branchless school); null is "none picked".
-    if (state.school && state.year && state.branch !== null) params.branch = state.branch;
+    // '' is a real branch (a branchless school); null is "none picked". A
+    // program-first school picks its branch before any year.
+    if (state.school && state.branch !== null) params.branch = state.branch;
     var url = 'api/division.php?' + Object.keys(params).map(function (k) {
       return k + '=' + encodeURIComponent(params[k]);
     }).join('&');
