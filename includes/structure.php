@@ -162,6 +162,12 @@ function placeholder_schools(): array {
     return $out;
 }
 
+// Years whose branches are scheduling groups rather than anything a student is
+// in (Engineering 1st Year's Core and CS are the timetable's two halves), so
+// the drill-down lists every division of the year at once, each tagged with its
+// group, instead of making you pick a group first.
+const FLAT_YEARS = ['eng' => ['1st Year']];
+
 // Whether a school's strengths are invented rather than counted. Nothing may
 // state those as fact: "450 students" on Law's tile reads as a roll count when
 // it is five years of the A=30/B=60 default. Derived from placeholder_schools()

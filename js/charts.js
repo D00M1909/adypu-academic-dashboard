@@ -25,6 +25,12 @@ function placeholderSchool(id) {
   return !!(s && s.placeholder);
 }
 
+// A year the drill-down lists every division of at once, as structure.php
+// declares them (FLAT_YEARS). Global for the same reason as the two above.
+function flatYear(school, year) {
+  return (((window.DASHBOARD_VIEW || {}).flatYears || {})[school] || []).indexOf(year) !== -1;
+}
+
 window.Charts = (function () {
   // A class key is "school|year|branch|division", so the current selection is
   // a prefix of every key inside it. Branchless schools key on an empty branch
