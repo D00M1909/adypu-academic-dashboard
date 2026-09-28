@@ -149,12 +149,19 @@ function class_structure(): array {
 // The five schools that returned nothing usable, until one of them confirms its
 // real year / branch / division structure. Two divisions per year, no branches.
 // Management did send a structure (MBA 1-2, BBA 1-3) but no student numbers, so
-// it stays here rather than draw a percentage over an invented denominator.
+// it stays here rather than draw a percentage over an invented denominator; its
+// programs are real, so they are its branches, and only the strengths invented.
 function placeholder_schools(): array {
-    $yearCounts = ['mgmt' => 4, 'law' => 5, 'arch' => 4, 'lib' => 4, 'film' => 4];
     $ordinals = ['1st', '2nd', '3rd', '4th', '5th'];
     $out = [];
-    foreach ($yearCounts as $school => $count) {
+    // Year by year, MBA before BBA inside each, so the years come out in order.
+    $programs = ['MBA' => 2, 'BBA' => 3];
+    for ($y = 0; $y < max($programs); $y++) {
+        foreach ($programs as $program => $length) {
+            if ($y < $length) $out['mgmt'][$ordinals[$y] . ' Year'][$program] = ['A' => 30, 'B' => 60];
+        }
+    }
+    foreach (['law' => 5, 'arch' => 4, 'lib' => 4, 'film' => 4] as $school => $count) {
         for ($y = 0; $y < $count; $y++) {
             $out[$school][$ordinals[$y] . ' Year'][''] = ['A' => 30, 'B' => 60];
         }
@@ -162,11 +169,53 @@ function placeholder_schools(): array {
     return $out;
 }
 
+// Schools the dashboard walks program first (school > program > year >
+// division) because that is how the school itself is organised: an MBA and a
+// BBA are different lengths, and "2nd Year" means nothing until you know which.
+// The data keeps its one shape (the program is the branch); only the order of
+// the drill-down changes, in js/dashboard.js.
+const PROGRAM_FIRST_SCHOOLS = ['mgmt'];
+
 // Years whose branches are scheduling groups rather than anything a student is
 // in (Engineering 1st Year's Core and CS are the timetable's two halves), so
 // the drill-down lists every division of the year at once, each tagged with its
 // group, instead of making you pick a group first.
 const FLAT_YEARS = ['eng' => ['1st Year']];
+
+// Management's classes named no program until 28 Sep 2026 ("School of
+// Management / 2nd Year / A"), and the Form and the app both filed rows under
+// those labels. They count as BBA, which runs all three years, so every old
+// label has somewhere to land and nothing already reported stops counting.
+const LEGACY_BRANCH = ['mgmt' => 'BBA'];
+
+// The branch an old, branchless label for $school now means.
+function legacy_branch(string $school, string $branch): string {
+    return $branch === '' ? (LEGACY_BRANCH[$school] ?? '') : $branch;
+}
+
+// A day map with every old branchless key moved to its new one. Where an old
+// and a new key meet on the same day and lecture, the reading filed under the
+// new label wins, whichever order the two arrive in: it is the later of them.
+function remap_legacy_days(array $days): array {
+    $out = [];
+    foreach ($days as $date => $classes) {
+        foreach ($classes as $key => $readings) {
+            $parts = explode('|', (string) $key);
+            if (count($parts) === 4) $parts[2] = legacy_branch($parts[0], $parts[2]);
+            $new = implode('|', $parts);
+            if (!isset($out[$date][$new])) {
+                $out[$date][$new] = $readings;
+                continue;
+            }
+            // + keeps the left operand's value for a slot both hold.
+            $out[$date][$new] = $new === (string) $key
+                ? (array) $readings + (array) $out[$date][$new]
+                : (array) $out[$date][$new] + (array) $readings;
+            ksort($out[$date][$new]);
+        }
+    }
+    return $out;
+}
 
 // Whether a school's strengths are invented rather than counted. Nothing may
 // state those as fact: "450 students" on Law's tile reads as a roll count when
@@ -220,6 +269,7 @@ function parse_class_label(string $label): ?array {
     // school field, so every writer and reader downstream stays as it is.
     $school = school_id_for_name($name) ?? partner_id_for_name($name);
     if ($school === null) return null;
+    $branch = legacy_branch($school, $branch);
 
     $strength = class_strength($school, $year, $branch, $division)
         ?? partner_structure()[$school][$year][$branch][$division] ?? null;
@@ -244,7 +294,7 @@ function class_strength(string $school, string $year, string $branch, string $di
 
 // The Form's sections. Google Forms has no dependent dropdowns, so one "School"
 // question jumps to a section holding only that school's classes. Engineering
-// alone carries 61 of the 136 classes, too many for one dropdown, so it splits
+// alone carries 61 of the 138 classes, too many for one dropdown, so it splits
 // one level further, by year. Nothing else does: Design's 26 options are no
 // worse than the 22 Engineering's own first year already asks a faculty member
 // to scroll, and every extra section is one more Form page to build by hand and
