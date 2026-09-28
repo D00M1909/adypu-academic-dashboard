@@ -148,14 +148,17 @@
     if (state.school) {
       crumbs.push({ key: 'school', label: window.SCHOOLS[state.school].name });
     }
+    // A flat year has no branch step to go back to, so its branch rides on the
+    // division's crumb instead ("Core · Division B").
+    var flat = state.year && flatYear(state.school, state.year);
     if (state.year) {
       crumbs.push({ key: 'year', label: state.year });
     }
-    if (state.branch) {
+    if (state.branch && !flat) {
       crumbs.push({ key: 'branch', label: state.branch });
     }
     if (state.division) {
-      crumbs.push({ key: 'division', label: divisionLabel(state.division) });
+      crumbs.push({ key: 'division', label: (flat && state.branch ? esc(state.branch) + ' · ' : '') + divisionLabel(state.division) });
     }
     breadcrumb.innerHTML = crumbs.map(function (crumb, index) {
       var current = index === crumbs.length - 1;
@@ -178,6 +181,16 @@
     var section = document.getElementById('branches-section');
     var grid = document.getElementById('branches-grid');
     var hasRealBranches = !(branches.length === 1 && branches[0] === '');
+
+    // A flat year (Engineering 1st Year) skips its branch step too, but keeps
+    // every branch: all its divisions at once, each tagged with its group.
+    if (flatYear(schoolId, year)) {
+      section.hidden = true;
+      grid.innerHTML = '';
+      state.branch = null;
+      renderDivisions(schoolId, year, null, selectedDivision, selectedBranch);
+      return;
+    }
 
     if (!hasRealBranches) {
       section.hidden = true;
@@ -223,21 +236,33 @@
   // The leaf of the drill-down. Selecting one narrows the summary card, the
   // breadcrumb and every chart to that single class, which is what the date
   // range makes worth doing: one division's week, on its own.
-  function renderDivisions(schoolId, year, branch, selectedDivision) {
-    var divisions = (window.ATTENDANCE_DATA[schoolId][year] || {})[branch] || [];
+  //
+  // branch null is a flat year: every branch's divisions in one grid, each
+  // tile carrying its branch, since Core B and Biomedical B are both "B".
+  // Picking one fixes state.branch to its own; unpicking frees it again.
+  function renderDivisions(schoolId, year, branch, selectedDivision, selectedBranch) {
+    var yearNode = window.ATTENDANCE_DATA[schoolId][year] || {};
+    var flat = branch === null;
+    var divisions = [];
+    (flat ? Object.keys(yearNode) : [branch]).forEach(function (b) {
+      (yearNode[b] || []).forEach(function (d) { divisions.push({ branch: b, d: d }); });
+    });
     var section = document.getElementById('divisions-section');
     var grid = document.getElementById('divisions-grid');
 
     state.division = null;
     grid.innerHTML = '';
-    divisions.forEach(function (d) {
+    divisions.forEach(function (item) {
+      var d = item.d;
       var divPct = pct(d.present, d.strength);
       var tile = document.createElement('button');
       tile.type = 'button';
       tile.className = 'tile division-tile';
       tile.dataset.division = d.division;
+      tile.dataset.branch = item.branch;
       tile.innerHTML =
         '<span class="tile-label">' + divisionLabel(d.division) + '</span>' +
+        (flat ? '<span class="tile-tag">' + esc(item.branch) + '</span>' : '') +
         (d.reported
           ? '<span class="tile-stat">' + d.present + '<span class="tile-stat-sep">/</span>' +
             d.strength + ' \u00b7 <span class="att-pct ' + attClass(divPct) + '">' + divPct + '%</span></span>' +
@@ -250,11 +275,13 @@
               '<span class="division-bar"><span class="division-bar-fill" style="width:0"></span></span>' +
               '<span class="tile-meta">Not reported</span>');
       tile.addEventListener('click', function () {
-        var selecting = state.division !== d.division;
+        // By the tile, not by the division name: in a flat year two tiles can
+        // share a letter.
+        var selecting = !tile.classList.contains('active');
         state.division = selecting ? d.division : null;
-        grid.querySelectorAll('.division-tile').forEach(function (t) {
-          t.classList.toggle('active', t.dataset.division === state.division);
-        });
+        if (flat) state.branch = selecting ? item.branch : null;
+        grid.querySelectorAll('.division-tile').forEach(function (t) { t.classList.remove('active'); });
+        if (selecting) tile.classList.add('active');
         renderBreadcrumb();
         // The same breakdown the summary card opens: picking a division is
         // exactly when you want its branch's numbers side by side.
@@ -264,9 +291,13 @@
     });
 
     if (divisions.length && selectedDivision) {
-      var match = grid.querySelector('[data-division="' + selectedDivision + '"]');
+      var match = Array.prototype.filter.call(grid.children, function (t) {
+        return t.dataset.division === selectedDivision &&
+          (!flat || selectedBranch === undefined || selectedBranch === null || t.dataset.branch === selectedBranch);
+      })[0];
       if (match) {
         state.division = selectedDivision;
+        if (flat) state.branch = match.dataset.branch;
         match.classList.add('active');
       }
     }
