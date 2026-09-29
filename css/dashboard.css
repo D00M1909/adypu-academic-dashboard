@@ -12,9 +12,9 @@
   --total-bg: #fde3e6;
   --total-text: #7a1017;
   --total-sep: rgba(122, 16, 23, 0.5);
-  --surface: #f8fafc;
+  --surface: #e9edf3;
   --surface-raised: #ffffff;
-  --hairline: #eef1f5;
+  --hairline: #d3dae4;
   --ink: #0f172a;
   --ink-muted: #64748b;
   /* Decorative strokes ONLY — 2.56:1 on white, below the 4.5:1 AA floor, so it
@@ -35,8 +35,8 @@
      time. One tint, and an ink dark enough to sit on it. */
   --good-tint: rgba(21, 128, 61, 0.12);
   --good-ink: #166534;
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 1px rgba(15, 23, 42, 0.04);
-  --shadow-md: 0 8px 20px -6px rgba(15, 23, 42, 0.12), 0 2px 6px rgba(15, 23, 42, 0.06);
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.10), 0 1px 1px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 8px 20px -6px rgba(15, 23, 42, 0.18), 0 2px 6px rgba(15, 23, 42, 0.08);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   color-scheme: light;
 }
