@@ -15,9 +15,11 @@
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/roster.php';
 require_once __DIR__ . '/includes/page.php';
+require_once __DIR__ . '/includes/traffic.php';
 
 header('Cache-Control: no-store');
 auth_boot();
+traffic_hit('mark');
 $me = auth_require();
 
 const LAST_CLASS_COOKIE = 'adypu_last_class';

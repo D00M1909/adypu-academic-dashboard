@@ -7,9 +7,11 @@
 
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/page.php';
+require_once __DIR__ . '/includes/traffic.php';
 
 header('Cache-Control: no-store');
 auth_boot();
+traffic_hit('login');
 
 if (isset($_GET['logout'])) {
     auth_logout();
