@@ -150,6 +150,26 @@ $now = $rows[$today];
   </p>
 </section>
 
+<section class="card">
+  <h2>Footer clicks, <?= $e($day === $today ? 'today' : date('j M', strtotime($day))) ?></h2>
+  <table class="stat-table stat-table-groups">
+    <thead><tr><th scope="col">Link</th><th scope="col">Clicks</th><th scope="col">Browsers</th><th scope="col">Last <?= STATS_DAYS ?> days</th></tr></thead>
+    <tbody>
+      <?php foreach (TRAFFIC_LINKS as $key => $label):
+        $total = 0;
+        foreach ($dates as $d) $total += (int) ($traffic[$d]['clicks'][$key] ?? 0); ?>
+        <tr>
+          <th scope="row"><?= $e($label) ?></th>
+          <td><?= ($traffic[$day]['clicks'][$key] ?? 0) ?: '<span class="stat-nil">0</span>' ?></td>
+          <td><?= ($traffic[$day]['clickers'][$key] ?? 0) ?: '<span class="stat-nil">0</span>' ?></td>
+          <td><?= $total ?: '<span class="stat-nil">0</span>' ?></td>
+        </tr>
+      <?php endforeach; ?>
+    </tbody>
+  </table>
+  <p class="field-help">Browsers are distinct browsers that clicked the link that day, so ten clicks from one person read as 10 clicks, 1 browser.</p>
+</section>
+
 <?php foreach ($groups as $section => $list): ?>
 <section class="card">
   <h2><?= $e($section) ?>, <?= $e($day === $today ? 'today' : date('j M', strtotime($day))) ?></h2>

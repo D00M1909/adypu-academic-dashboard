@@ -310,6 +310,16 @@ assert($raw['days']['2026-09-30']['visitors'] === 1, 'yesterday\'s visitor is ne
 assert(count($raw['seen']) === 1, 'only today\'s visitor hashes are kept');
 assert(!str_contains(json_encode($raw), '1.2.3.4'), 'no address may reach the disk');
 
+// Footer clicks: counted per link, distinct per browser, bots and unknown keys ignored.
+traffic_click('repo', '1.2.3.4', $chrome, '2026-09-30');
+traffic_click('repo', '1.2.3.4', $chrome, '2026-09-30');
+traffic_click('repo', '5.6.7.8', $chrome, '2026-09-30');
+traffic_click('repo', '9.9.9.9', 'WhatsApp/2.23.20.0', '2026-09-30');
+traffic_click('bogus', '1.2.3.4', $chrome, '2026-09-30');
+$t = traffic_days()['2026-09-30'];
+assert($t['clicks'] === ['repo' => 3], 'clicks by link: ' . json_encode($t['clicks']));
+assert($t['clickers'] === ['repo' => 2], 'two browsers clicked: ' . json_encode($t['clickers']));
+
 // A form post redirects to a GET; counting both would double every save.
 $_SERVER['REQUEST_METHOD'] = 'POST';
 traffic_hit('mark', '1.2.3.4', $chrome, '2026-09-30');
