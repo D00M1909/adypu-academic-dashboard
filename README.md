@@ -3,8 +3,8 @@
 Daily attendance for Ajeenkya D Y Patil University: nine schools, 136 classes,
 drilled from School to Year to Branch to Division over any date range.
 
-Live: <https://adypu-academic-dashboard.fast-page.org/>
-Dev (faculty marking and accounts): <https://adypu-daybook.fast-page.org/>
+- Live: <https://adypu-academic-dashboard.fast-page.org/>
+- Dev (faculty marking and accounts): <https://adypu-daybook.fast-page.org/>
 
 ![The dashboard](docs/screenshots/dashboard.png)
 
