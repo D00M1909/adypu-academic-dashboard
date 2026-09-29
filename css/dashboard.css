@@ -1178,6 +1178,33 @@ input:focus-visible, select:focus-visible {
 .status-disabled { background: var(--surface); color: var(--ink-muted); }
 .status-admin { background: var(--red-tint-strong); color: var(--red-ink); }
 
+/* ---------- Usage (stats.php) ---------- */
+
+.stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+@media (max-width: 520px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } }
+.stat { background: var(--surface); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 2px; }
+.stat-value { font-family: 'IBM Plex Mono', monospace; font-size: 24px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.stat-value small { font-size: 14px; color: var(--ink-muted); }
+.stat-label { font-size: 12px; font-weight: 600; color: var(--ink-muted); }
+/* Six columns do not fit a phone; the table scrolls inside the card, the page does not. */
+.stat-table-wrap { overflow-x: auto; margin: 0 -16px; padding: 0 16px; }
+.stat-table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+.stat-table th, .stat-table td { padding: 8px 6px; text-align: right; border-top: 1px solid var(--hairline); white-space: nowrap; }
+.stat-table thead th { border-top: 0; font-size: 12px; font-weight: 600; color: var(--ink-muted); }
+.stat-table th:first-child { text-align: left; padding-left: 0; }
+.stat-table tbody th { font-weight: 600; }
+.stat-table tbody th a { color: var(--ink); text-decoration: none; }
+.stat-table tbody th a:hover { color: var(--red-ink); text-decoration: underline; }
+.stat-table tr.is-selected th, .stat-table tr.is-selected td { background: var(--red-tint); }
+.stat-table-groups tbody th { white-space: normal; }
+.stat-nil { color: var(--ink-faint); }
+.stat-sub { font-size: 12px; color: var(--ink-muted); }
+.skip-list { list-style: none; margin: 0; padding: 0; }
+.skip-list li { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--hairline); font-size: 13px; }
+.skip-list li:first-child { border-top: 0; }
+.skip-list code { overflow-wrap: anywhere; }
+.skip-list span { flex: none; color: var(--ink-muted); }
+
 .code-list { list-style: none; margin: 0; padding: 0; }
 /* Nine of these stack up on a phone, so the row stays one line: name, code,
    copy, action. Only the name gives way. */

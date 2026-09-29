@@ -287,4 +287,33 @@ assert(!isset(store_read('roster/hosp')['hosp|2nd Year|MSc Hospitality and Hotel
 require_once __DIR__ . '/../includes/roster.php';
 assert(count(roster_for($class)) === 2, 'the roster must reach the marking screen');
 
+// --- The hit counter ----------------------------------------------------------
+// The host's own counter includes every stylesheet and push, which is why this
+// one exists; so a push must never pass for a visitor, nor a link preview.
+require_once __DIR__ . '/../includes/traffic.php';
+$chrome = 'Mozilla/5.0 (Linux; Android 14) Chrome/128.0 Mobile Safari/537.36';
+traffic_hit('dashboard', '1.2.3.4', $chrome, '2026-09-29');
+traffic_hit('dashboard', '1.2.3.4', $chrome, '2026-09-29');
+traffic_hit('class', '1.2.3.4', $chrome, '2026-09-29');
+traffic_hit('dashboard', '5.6.7.8', $chrome, '2026-09-29');
+traffic_hit('dashboard', '9.9.9.9', 'WhatsApp/2.23.20.0', '2026-09-29');
+traffic_hit('push', '66.249.0.1', 'Mozilla/5.0 (compatible; Google-Apps-Script)', '2026-09-29');
+$t = traffic_days()['2026-09-29'];
+assert($t['visitors'] === 2, 'two browsers, however many pages: ' . $t['visitors']);
+assert($t['views'] === ['dashboard' => 3, 'class' => 1, 'push' => 1], 'views by page: ' . json_encode($t['views']));
+assert($t['bots'] === 1, 'a link preview is a bot, not a visitor');
+
+// The next day starts its own visitor count, and the old hashes are gone.
+traffic_hit('dashboard', '1.2.3.4', $chrome, '2026-09-30');
+$raw = store_read('traffic');
+assert($raw['days']['2026-09-30']['visitors'] === 1, 'yesterday\'s visitor is new today');
+assert(count($raw['seen']) === 1, 'only today\'s visitor hashes are kept');
+assert(!str_contains(json_encode($raw), '1.2.3.4'), 'no address may reach the disk');
+
+// A form post redirects to a GET; counting both would double every save.
+$_SERVER['REQUEST_METHOD'] = 'POST';
+traffic_hit('mark', '1.2.3.4', $chrome, '2026-09-30');
+unset($_SERVER['REQUEST_METHOD']);
+assert(!isset(traffic_days()['2026-09-30']['views']['mark']), 'a POST is not a page view');
+
 echo "OK\n";

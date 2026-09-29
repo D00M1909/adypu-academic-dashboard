@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/../includes/attendance.php';
 require_once __DIR__ . '/../includes/structure.php';
+require_once __DIR__ . '/../includes/traffic.php';
+traffic_hit('class');
 header('Content-Type: application/json');
 
 // The breakdown behind whatever the headline number is showing. Every level is

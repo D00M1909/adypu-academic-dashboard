@@ -12,6 +12,7 @@
 
 require_once __DIR__ . '/../includes/attendance.php';
 require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/traffic.php';
 
 header('Content-Type: application/json');
 
@@ -58,10 +59,18 @@ $days = day_map($rows);
 if (!is_dir(dirname(ATTENDANCE_CACHE_FILE))) {
     @mkdir(dirname(ATTENDANCE_CACHE_FILE), 0775, true);
 }
-$payload = ['days' => $days, 'faculty' => faculty_map($rows)];
+// `push` is for stats.php: when the last push landed and which Form labels it
+// could not place, so a dropped row is visible without opening the Apps Script
+// log. Class labels and a count only: this file is publicly readable.
+$payload = ['days' => $days, 'faculty' => faculty_map($rows), 'push' => [
+    'at'      => date('Y-m-d H:i:s'),
+    'rows'    => count($rows),
+    'skipped' => array_count_values($skipped),
+]];
 if (@file_put_contents(ATTENDANCE_CACHE_FILE, json_encode($payload)) === false) {
     fail(500, 'could not write the cache file — check that cache/ is writable');
 }
+traffic_hit('push');
 
 // Reported over the default view's range (the newest day with data), which is
 // what the dashboard will actually show, so the push log and the site agree.

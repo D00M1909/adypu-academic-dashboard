@@ -3,6 +3,7 @@ require_once __DIR__ . '/includes/attendance.php';
 require_once __DIR__ . '/includes/structure.php';
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/page.php';
+require_once __DIR__ . '/includes/traffic.php';
 
 // The numbers change whenever Google pushes, which is any time. Without this
 // the host's edge serves a page rendered before the last push.
@@ -11,6 +12,7 @@ header('Cache-Control: no-store');
 // The dashboard stays open to everyone; this only reads an existing session so
 // the header can show whose it is. Nothing here requires a login.
 auth_boot();
+traffic_hit('dashboard');
 
 // Which tree the page draws. The Knowledge Partner tab is this same page over
 // partner_rows() instead of class_rows(): its own tiles, totals, charts and
