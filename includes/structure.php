@@ -29,7 +29,7 @@ require_once __DIR__ . '/attendance.php';
 const CLASS_SEP = ' / ';
 
 // How many classes a school may hold before its Form section splits by year.
-// Only Engineering (64) is over it; raising it past 64 would put every class in
+// Only Engineering (66) is over it; raising it past 66 would put every class in
 // one dropdown, lowering it past 26 costs Design three more Form sections.
 const SECTION_SPLIT_AT = 30;
 
@@ -49,7 +49,7 @@ function class_structure(): array {
                 'Core'       => ['A' => 60, 'B' => 60, 'C' => 60, 'D' => 60, 'E' => 60, 'F' => 60],
                 'CS'         => ['M' => 60, 'N' => 60, 'O' => 60, 'P' => 60, 'S' => 60,
                                  'T' => 60, 'U' => 60, 'V' => 60, 'W' => 60, 'X' => 60,
-                                 'Y' => 60, 'AA' => 60, 'AB' => 60],
+                                 'Y' => 60, 'Z' => 60, 'AA' => 60, 'AB' => 60, 'MA' => 60],
                 'M. Tech'    => ['Biotechnology' => 5, 'Bioinformatics' => 1],
                 'Biomedical' => ['B' => 14, 'C' => 7, 'D' => 6, 'E' => 7], // no division A, per the sheet
             ],
@@ -295,9 +295,9 @@ function class_strength(string $school, string $year, string $branch, string $di
 
 // The Form's sections. Google Forms has no dependent dropdowns, so one "School"
 // question jumps to a section holding only that school's classes. Engineering
-// alone carries 64 of the 141 classes, too many for one dropdown, so it splits
+// alone carries 66 of the 143 classes, too many for one dropdown, so it splits
 // one level further, by year. Nothing else does: Design's 26 options are no
-// worse than the 22 Engineering's own first year already asks a faculty member
+// worse than the 27 Engineering's own first year already asks a faculty member
 // to scroll, and every extra section is one more Form page to build by hand and
 // one more chance to mis-route the School question.
 //

@@ -72,7 +72,7 @@ $divC = find_div($tree, 'eng', '2nd Year', 'CSE', 'C');
 assert($divC['reported'] === false && $divC['present'] === 0, 'unsubmitted division should be zero/unreported');
 
 $totals = attendance_totals($tree);
-assert($totals['strength'] === 5144, 'denominator is the whole university: ' . $totals['strength']);
+assert($totals['strength'] === 5264, 'denominator is the whole university: ' . $totals['strength']);
 assert($totals['present'] === 123, 'total present wrong: ' . $totals['present']);
 assert($totals['reported'] === 4, 'four distinct classes were submitted, got ' . $totals['reported']);
 
@@ -91,9 +91,9 @@ assert(count($pTree['eng']['2nd Year']) === 8, 'unreported year must keep its br
 assert(isset($pTree['law']['5th Year']), 'unreported school must keep its years');
 
 $pt = attendance_totals($pTree);
-assert($pt['strength'] === 5144, 'denominator must be the whole university: ' . $pt['strength']);
+assert($pt['strength'] === 5264, 'denominator must be the whole university: ' . $pt['strength']);
 assert($pt['present'] === 75, 'present should count only submissions: ' . $pt['present']);
-assert($pt['reported'] === 2 && $pt['classes'] === 141,
+assert($pt['reported'] === 2 && $pt['classes'] === 143,
     "reported count wrong: {$pt['reported']}/{$pt['classes']}");
 
 // A school nobody reported has a real denominator, not 0/0.
@@ -441,7 +441,7 @@ $partialDay = aggregate_days(day_map(parse_attendance_csv(
     "date,class,present\n2026-08-26,School of Law / 2nd Year / A,15\n"
 )));
 $pd = attendance_totals($partialDay);
-assert($pd['strength'] === 5144, 'full strength should still be reported: ' . $pd['strength']);
+assert($pd['strength'] === 5264, 'full strength should still be reported: ' . $pd['strength']);
 assert($pd['strength_reported'] === 30, 'reported strength wrong: ' . $pd['strength_reported']);
 assert(attendance_pct($pd) === 50, 'percentage should be over reported classes only: ' . attendance_pct($pd));
 assert(attendance_pct(attendance_totals(aggregate_days([]))) === 0, 'no data must not divide by zero');
