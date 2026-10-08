@@ -219,13 +219,6 @@ try {
       <path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
       <path d="m6.18 5.276 3.1 3.899" />
     </symbol>
-    <symbol id="icon-partner" viewBox="0 0 24 24">
-      <path d="m11 17 2 2a1 1 0 1 0 3-3" />
-      <path d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4" />
-      <path d="m21 3 1 11h-2" />
-      <path d="M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3" />
-      <path d="M3 4h8" />
-    </symbol>
     <symbol id="icon-user" viewBox="0 0 24 24">
       <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
       <circle cx="12" cy="7" r="4" />
@@ -355,7 +348,13 @@ try {
           $stPct = attendance_pct($st);
         ?>
         <button class="tile school-tile<?= $st['reported'] === 0 ? ' tile-quiet' : '' ?>" type="button" data-school="<?= htmlspecialchars($id) ?>">
-          <svg class="tile-icon-svg"><use href="#icon-<?= $isPartners ? 'partner' : htmlspecialchars($id) ?>"/></svg>
+          <?php /* A partner has no school symbol, and one shared handshake on
+                   eleven tiles told them apart by nothing; its initial does. */ ?>
+          <?php if ($isPartners): ?>
+          <span class="tile-monogram" aria-hidden="true"><?= htmlspecialchars(mb_substr($school['name'], 0, 1)) ?></span>
+          <?php else: ?>
+          <svg class="tile-icon-svg"><use href="#icon-<?= htmlspecialchars($id) ?>"/></svg>
+          <?php endif; ?>
           <span class="tile-label"><?= htmlspecialchars($school['name']) ?></span>
           <?php if ($st['classes'] === 0): ?>
           <span class="tile-stat tile-unreported">No programs yet</span>
