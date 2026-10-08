@@ -3,6 +3,7 @@ node_modules/
 Thumbs.db
 design/
 CLAUDE.md
+AGENTS.md
 cache/*.json
 includes/config.local.php
 upload/
