@@ -153,6 +153,13 @@ function timetable_room_slots(array $t, string $room): array {
     return $out;
 }
 
+// What a room is called on the page. A room number used in two ULCs (105 in
+// ULC 1 and ULC 6) is stored as "105 (ULC 1)" so the two stay apart, but the
+// page has already picked the ULC, so the bracket would only repeat it.
+function timetable_room_label(string $room): string {
+    return preg_replace('/\s*\(ULC \d+\)$/', '', $room);
+}
+
 // The weekday a date falls on, if the timetable teaches that day, else ''. The
 // official timetable repeats every week, so a date only ever picks its weekday.
 function timetable_day(array $t, DateTimeImmutable $date): string {

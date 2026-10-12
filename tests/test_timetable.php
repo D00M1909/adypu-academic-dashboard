@@ -124,6 +124,9 @@ assert($g['cells']['1.30 to 2.30']['Monday']['rows'] === 4);
 assert(!empty($g['covered']['3.00 to 4.00']) && isset($g['cells']['3.30 to 4.30']['Monday']));
 assert(timetable_minutes('12.30 to 1.30') === [750, 810] && timetable_minutes('Room no.') === null);
 
+// A room number in two ULCs is stored apart but shown plain.
+assert(timetable_room_label('105 (ULC 1)') === '105' && timetable_room_label('IT Lab (S2)') === 'IT Lab (S2)' && timetable_room_label('402') === '402');
+
 assert(timetable_grid($t, 'nope') === ['cells' => [], 'covered' => []]);
 
 echo "OK\n";

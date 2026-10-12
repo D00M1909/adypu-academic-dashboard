@@ -74,7 +74,7 @@ page_head('Room timetable', 'page-wide');
         <select id="tt-room" name="room" onchange="this.form.submit()"<?= $rooms ? '' : ' disabled' ?>>
           <?php if (!$rooms): ?><option>None yet</option><?php endif; ?>
           <?php foreach ($rooms as $r): ?>
-            <option value="<?= $e($r) ?>"<?= $r === $room ? ' selected' : '' ?>><?= $e($r) ?></option>
+            <option value="<?= $e($r) ?>"<?= $r === $room ? ' selected' : '' ?>><?= $e(timetable_room_label($r)) ?></option>
           <?php endforeach; ?>
         </select>
       </div>
@@ -87,7 +87,7 @@ page_head('Room timetable', 'page-wide');
     <p class="tt-none">No classrooms listed for <?= $e($ulc) ?> yet. They come with the next timetable update.</p>
 <?php else: ?>
     <div class="tt-head">
-      <h2 class="tt-room"><?= $e($room) ?></h2>
+      <h2 class="tt-room"><?= $e(timetable_room_label($room)) ?></h2>
       <span class="tt-when"><?= $e($ulc) ?> &middot; <?= $week ? 'Week of ' . $e($date->modify('monday this week')->format('j M Y')) : $e($date->format('l j M Y')) ?></span>
       <?php if ($days): ?><span class="tt-usage"><?= $used ?> of <?= $total ?> periods booked</span><?php endif; ?>
       <a class="tt-toggle no-print" href="<?= $e($week ? $link([]) : $link(['week' => 1])) ?>"><?= $week ? 'Show one day' : 'Show whole week' ?></a>
@@ -158,7 +158,7 @@ page_head('Room timetable', 'page-wide');
 <?php if ($room !== ''): ?>
 <script>
   // The saved PDF is named after document.title, so name it after the room and day.
-  document.title = <?= json_encode('Room ' . $room . ' ' . ($week ? 'week of ' . $date->modify('monday this week')->format('j M Y') : $date->format('l j M Y')), JSON_HEX_TAG) ?>;
+  document.title = <?= json_encode('Room ' . timetable_room_label($room) . ' ' . $ulc . ' ' . ($week ? 'week of ' . $date->modify('monday this week')->format('j M Y') : $date->format('l j M Y')), JSON_HEX_TAG) ?>;
 </script>
 <?php endif; ?>
 <?php page_foot(); ?>
