@@ -105,6 +105,25 @@ assert(timetable_room_slots($t, '2') === []);
 $lab = timetable_room_slots(['rooms' => ['x' => [['time' => '09.30 to 10.30', 'span' => 2]]]] + $t, 'x');
 assert(array_column($lab, 'time') === ['09.30 to 10.30', '10.30 to 11.30'], 'a two-hour lab keeps its second row');
 
+// Two schools' clocks in one list: a two-hour lab from 1.30 runs into the
+// 2.30 row, never into another school's 1.30 to 3.30 or 3.00 to 4.00.
+$mixed = ['days' => ['Monday'], 'slots' => array_map(fn($x) => ['time' => $x, 'break' => ''],
+    ['1.30 to 2.30', '1.30 to 3.30', '2.30 to 3.30', '3.00 to 4.00', '3.30 to 4.30']),
+    'rooms' => ['L' => [
+        ['day' => 'Monday', 'time' => '1.30 to 2.30', 'span' => 2] + $e('Monday', ''),
+        ['day' => 'Monday', 'time' => '3.30 to 4.30', 'span' => 1] + $e('Monday', ''),
+    ]]] + $t;
+assert(array_column(timetable_room_slots($mixed, 'L'), 'time') === ['1.30 to 2.30', '2.30 to 3.30', '3.30 to 4.30'],
+    'span rows found by the clock: ' . json_encode(array_column(timetable_room_slots($mixed, 'L'), 'time')));
+$g = timetable_grid(['slots' => timetable_room_slots($mixed, 'L')] + $mixed, 'L');
+assert($g['cells']['1.30 to 2.30']['Monday']['rows'] === 2 && !empty($g['covered']['2.30 to 3.30']['Monday']));
+// Drawn over every row, the lab covers every row that starts before it ends at
+// 3.30, another clock's 3.00 included (the room is busy then), and stops there.
+$g = timetable_grid($mixed, 'L');
+assert($g['cells']['1.30 to 2.30']['Monday']['rows'] === 4);
+assert(!empty($g['covered']['3.00 to 4.00']) && isset($g['cells']['3.30 to 4.30']['Monday']));
+assert(timetable_minutes('12.30 to 1.30') === [750, 810] && timetable_minutes('Room no.') === null);
+
 assert(timetable_grid($t, 'nope') === ['cells' => [], 'covered' => []]);
 
 echo "OK\n";

@@ -95,22 +95,52 @@ function timetable_parse(string $json): array|string {
     ];
 }
 
+// "1.30 to 3.30" -> [810, 930], minutes from midnight. The sheets write a
+// 12-hour clock with no am/pm, so an hour before 8 is afternoon. Null for a
+// label that is not a time range.
+function timetable_minutes(string $time): ?array {
+    if (!preg_match('/(\d{1,2})[.:](\d{2})\s*to\s*(\d{1,2})[.:](\d{2})/i', $time, $m)) return null;
+    $h = fn($x) => (int) $x < 8 ? (int) $x + 12 : (int) $x;
+    return [$h($m[1]) * 60 + (int) $m[2], $h($m[3]) * 60 + (int) $m[4]];
+}
+
+// When a booking ends. A long one is written as its first hour plus a span
+// ("1.30 to 2.30", span 2), so it ends span hours after it starts.
+function timetable_end(array $e): ?int {
+    $m = timetable_minutes($e['time']);
+    if (!$m) return null;
+    $span = $e['span'] ?? 1;
+    return $span > 1 ? $m[0] + 60 * $span : $m[1];
+}
+
 // The time rows one room's grid draws: every slot the room is booked in on any
-// day of the week, plus the breaks between its first and last. Classes keep
-// their own clocks (one runs 12.30 to 1.30, the next 1.00 to 2.00), and drawing
-// every class's slot for every room would fill each grid with overlapping
-// "free" rows that are not free time at all. Using the whole week rather than
-// the day keeps a day's free periods visible.
+// day of the week, the hours a long booking runs on into, and the breaks
+// between its first and last. Classes keep their own clocks (one runs 12.30 to
+// 1.30, the next 1.00 to 2.00), and drawing every class's slot for every room
+// would fill each grid with overlapping "free" rows that are not free time at
+// all. Using the whole week rather than the day keeps a day's free periods
+// visible.
 function timetable_room_slots(array $t, string $room): array {
     $times = array_column($t['slots'], 'time');
     $used = [];
     foreach ($t['rooms'][$room] ?? [] as $e) {
-        // A two-hour lab needs its second row even if nothing else uses it,
-        // but, as in timetable_grid(), a span never runs into a break.
         $i = array_search($e['time'], $times, true);
         if ($i === false) continue;
         $used[$times[$i]] = true;
-        for ($n = 1; $n < ($e['span'] ?? 1) && isset($times[$i + $n]) && $t['slots'][$i + $n]['break'] === ''; $n++) $used[$times[$i + $n]] = true;
+        if (($e['span'] ?? 1) < 2) continue;
+        // A two-hour lab needs its second hour's row even if nothing else
+        // uses it. Found by the clock, not by position: with several clocks
+        // in one list, the next slot is often another school's.
+        $start = timetable_minutes($e['time']);
+        $end = timetable_end($e);
+        foreach ($t['slots'] as $s) {
+            $m = timetable_minutes($s['time']);
+            if (!$start || !$m || $s['break'] !== '') continue;
+            if ($m[0] > $start[0] && $m[1] <= $end && $m[1] - $m[0] === 60 && ($m[0] - $start[0]) % 60 === 0) $used[$s['time']] = true;
+        }
+        if (!$start) {
+            for ($n = 1; $n < $e['span'] && isset($times[$i + $n]) && $t['slots'][$i + $n]['break'] === ''; $n++) $used[$times[$i + $n]] = true;
+        }
     }
     $at = [];
     foreach ($t['slots'] as $i => $s) if (isset($used[$s['time']])) $at[] = $i;
@@ -158,8 +188,18 @@ function timetable_grid(array $t, string $room): array {
         foreach ($byCell[$time] ?? [] as $day => $entries) {
             // Two bookings in one cell (a clash in the source) share the shorter span.
             $span = min(array_column($entries, 'span'));
+            // A long booking covers every row that starts before it ends,
+            // another clock's rows included: the room is busy then too.
+            // Labels that are not times fall back to counting rows.
+            $ends = array_map('timetable_end', $entries);
+            $end = in_array(null, $ends, true) ? null : min($ends);
+            $within = function (int $i) use ($end, $times, $span, &$rows): bool {
+                if ($end === null) return $rows < $span;
+                $m = timetable_minutes($times[$i]);
+                return $m !== null && $m[0] < $end;
+            };
             $rows = 1;
-            for ($i = $at + 1; $rows < $span && $i < count($times) && $breaks[$times[$i]] === ''; $i++, $rows++) {
+            for ($i = $at + 1; ($span > 1 || $end === null) && $i < count($times) && $within($i) && $breaks[$times[$i]] === ''; $i++, $rows++) {
                 // Something else booked in a slot this one claims: show both
                 // rather than hide the second under a tall cell.
                 if (!empty($byCell[$times[$i]][$day])) break;

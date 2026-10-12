@@ -127,9 +127,12 @@ classes). **Show whole week** gives the full grid, and **Export PDF** prints it.
 Each room draws only the time rows it is booked in, because classes keep their
 own clocks (one runs 12.30 to 1.30, another 1.00 to 2.00).
 
-For now the only ULC is ULC 1, filled from two schools' classwise timetable
-workbooks, Law and Liberal Arts (one tab per class, each period a subject,
-faculty and room row). A lecture typed on several classes' tabs, such as a
+For now the only ULC is ULC 1, filled from five departments' timetables: Law
+and Liberal Arts as classwise workbooks (one tab per class, each period a
+subject, faculty and room row), and Biotechnology, Civil and Biomedical, whose
+layouts (a PDF, a days-by-class grid, merged two-hour cells) are first turned
+into data files the build script reads. Rooms in another ULC are left out. A lab or lecture
+longer than an hour covers the rows its hours fall in, by the clock. A lecture typed on several classes' tabs, such as a
 common first-year subject, is one booking listing every class, and two
 bookings in one room at one time are outlined as a clash. This host
 cannot make outbound requests, so the page reads a file, `timetable/rooms.php`,
