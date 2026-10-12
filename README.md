@@ -129,12 +129,12 @@ own clocks (one runs 12.30 to 1.30, another 1.00 to 2.00).
 
 Two ULCs so far. ULC 1 is filled from Law and Liberal Arts (classwise
 workbooks: one tab per class, each period a subject, faculty and room row) and
-from Management, Biotechnology, Civil, Biomedical, ECE and CSE, whose layouts (a PDF, a
+from Management, Biotechnology, Civil, Biomedical, ECE, CSE and AIDS, whose layouts (a PDF, a
 days-by-class grid, merged two-hour cells, a room-by-period master sheet) are
 first turned into data files the build script reads. ULC 6 is the School of
 Engineering First Year, from its PDF; each division keeps its own clock, so its
 periods are snapped to the hour they fall in. A room another department holds,
-and no class of ours is in, shows as booked. Rooms outside a ULC are left out. A lab or lecture
+and no class of ours is in, shows as booked. Rooms in a ULC the page does not offer yet (ULC 5), or in none, are left out; a room number used in two ULCs is named with its ULC. A lab or lecture
 longer than an hour covers the rows its hours fall in, by the clock. A lecture typed on several classes' tabs, such as a
 common first-year subject, is one booking listing every class, and two
 bookings in one room at one time are outlined as a clash. This host
