@@ -129,7 +129,7 @@ own clocks (one runs 12.30 to 1.30, another 1.00 to 2.00).
 
 Two ULCs so far. ULC 1 is filled from Law and Liberal Arts (classwise
 workbooks: one tab per class, each period a subject, faculty and room row) and
-from Biotechnology, Civil, Biomedical and ECE, whose layouts (a PDF, a
+from Management, Biotechnology, Civil, Biomedical and ECE, whose layouts (a PDF, a
 days-by-class grid, merged two-hour cells, a room-by-period master sheet) are
 first turned into data files the build script reads. ULC 6 is the School of
 Engineering First Year, from its PDF; each division keeps its own clock, so its
