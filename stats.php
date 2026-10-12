@@ -76,7 +76,6 @@ foreach ([[class_rows(), 'Schools'], [partner_rows(), 'Knowledge partners']] as 
 $push = is_array($cache['push'] ?? null) ? $cache['push'] : [];
 $pushedAt = $push['at'] ?? (is_file(ATTENDANCE_CACHE_FILE) ? date('Y-m-d H:i:s', filemtime(ATTENDANCE_CACHE_FILE)) : '');
 $pushAge = $pushedAt !== '' ? time() - strtotime($pushedAt) : null;
-$skipped = $push['skipped'] ?? [];
 
 $firstCounted = $traffic ? array_key_first($traffic) : null;
 $fmtDay = fn(string $d): string => $d === $today ? 'Today' : date('D j M', strtotime($d));
@@ -87,17 +86,6 @@ $now = $rows[$today];
 ?>
 <?php if ($pushAge !== null && $pushAge > 3 * 3600): ?>
   <?php page_notice('warn', 'No Form push has landed for ' . round($pushAge / 3600) . ' hours. Run pushStatus() in the Apps Script.'); ?>
-<?php endif; ?>
-<?php if ($skipped): ?>
-  <?php page_notice('warn', array_sum($skipped) . ' Form ' . (array_sum($skipped) === 1 ? 'row names' : 'rows name') . ' a class the dashboard does not have, so ' . (array_sum($skipped) === 1 ? 'it is' : 'they are') . ' not counted. Fix the Form option to match.'); ?>
-  <section class="card">
-    <h2>Rows not counted</h2>
-    <ul class="skip-list">
-      <?php foreach ($skipped as $label => $n): ?>
-        <li><code><?= $e($label) ?></code><span><?= (int) $n ?> <?= $n === 1 ? 'row' : 'rows' ?></span></li>
-      <?php endforeach; ?>
-    </ul>
-  </section>
 <?php endif; ?>
 
 <section class="card">

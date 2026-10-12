@@ -1240,11 +1240,6 @@ input:focus-visible, select:focus-visible {
 .stat-table-groups tbody th { white-space: normal; }
 .stat-nil { color: var(--ink-faint); }
 .stat-sub { font-size: 12px; color: var(--ink-muted); }
-.skip-list { list-style: none; margin: 0; padding: 0; }
-.skip-list li { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--hairline); font-size: 13px; }
-.skip-list li:first-child { border-top: 0; }
-.skip-list code { overflow-wrap: anywhere; }
-.skip-list span { flex: none; color: var(--ink-muted); }
 
 .code-list { list-style: none; margin: 0; padding: 0; }
 /* Nine of these stack up on a phone, so the row stays one line: name, code,
