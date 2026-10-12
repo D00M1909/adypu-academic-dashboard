@@ -86,7 +86,7 @@ try {
     </div>
     <div class="header-controls">
       <a class="header-link is-compact" href="index.php"><svg aria-hidden="true"><use href="#icon-back"/></svg><span>Dashboard</span></a>
-      <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch theme" aria-pressed="false" title="Switch theme">
+      <button class="theme-toggle no-print" id="theme-toggle" type="button" aria-label="Switch theme" aria-pressed="false" title="Switch theme">
         <svg class="theme-icon-moon" aria-hidden="true"><use href="#icon-moon"/></svg>
         <svg class="theme-icon-sun" aria-hidden="true"><use href="#icon-sun"/></svg>
       </button>

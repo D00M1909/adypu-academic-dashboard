@@ -7,3 +7,4 @@ includes/config.local.php
 upload/
 class-options.txt
 data/
+timetable/

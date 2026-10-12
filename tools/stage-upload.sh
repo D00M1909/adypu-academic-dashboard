@@ -18,7 +18,8 @@ OUT=upload
 rm -rf "$OUT"
 
 if [ "${1:-}" = "--all" ]; then
-  files=$(find index.php login.php mark.php admin.php account.php stats.php api includes css js img -type f)
+  files=$(find index.php login.php mark.php admin.php account.php stats.php rooms.php api includes css js img -type f)
+  [ -f timetable/rooms.php ] && files="$files"$'\n'timetable/rooms.php
 else
   # One ref, not a range: this diffs the ref against the WORKING TREE, so a file
   # edited but not yet committed still gets staged. Uploading a file the repo
@@ -30,6 +31,9 @@ else
   # <script> tag — the page still renders, so nothing looks wrong until the
   # feature it carried quietly does nothing.
   files=$( { git diff --name-only --diff-filter=d "${1:-HEAD~1}";              git ls-files --others --exclude-standard; } | sort -u )
+  # timetable/rooms.php is gitignored (it carries faculty names), so neither
+  # list above ever names it. It is small, so it goes up every time it exists.
+  [ -f timetable/rooms.php ] && files="$files"$'\n'timetable/rooms.php
 fi
 
 n=0
@@ -42,7 +46,7 @@ while IFS= read -r f; do
   # submissions the live site itself wrote; copying a local one up would
   # overwrite real faculty accounts with whatever a dev machine had.
   case "$f" in
-    index.php|login.php|mark.php|admin.php|account.php|stats.php|api/*|includes/*|css/*|js/*|img/*) ;;
+    index.php|login.php|mark.php|admin.php|account.php|stats.php|rooms.php|timetable/rooms.php|api/*|includes/*|css/*|js/*|img/*) ;;
     *) continue ;;
   esac
   # Server-only, and gitignored, so this should never match — but staging it

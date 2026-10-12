@@ -29,6 +29,9 @@ drilled from School to Year to Branch to Division over any date range.
   their own tree (partner, year, program, division) at `?view=partners`. They
   never count toward a school tile, the university percentage or the classes
   reported pill.
+- **Room timetable.** `rooms.php` shows any room by date, ULC and classroom, period by period:
+  subject, class and teacher, with labs, breaks and outside bookings marked. It
+  is built from the official classwise timetable.
 - **Light and dark themes**, one toggle in the header of every page.
 
 ![Drilling down to a division](docs/screenshots/drilldown.png)
@@ -115,6 +118,35 @@ dashboard stays public; only writing attendance needs a login.
   `structure.php` is printed, which is how real enrolment figures find their way
   back into the structure.
 
+## Room timetable
+
+`rooms.php` is public and read-only. Pick a date, then a ULC, then a
+classroom, and it shows that room's periods on that day (the timetable repeats
+weekly, so the date only picks the weekday; a weekend says there are no
+classes). **Show whole week** gives the full grid, and **Export PDF** prints it.
+Each room draws only the time rows it is booked in, because classes keep their
+own clocks (one runs 12.30 to 1.30, another 1.00 to 2.00).
+
+For now the only ULC is ULC 1, filled from two schools' classwise timetable
+workbooks, Law and Liberal Arts (one tab per class, each period a subject,
+faculty and room row). A lecture typed on several classes' tabs, such as a
+common first-year subject, is one booking listing every class, and two
+bookings in one room at one time are outlined as a clash. This host
+cannot make outbound requests, so the page reads a file, `timetable/rooms.php`,
+built from those workbooks by a small script kept outside the repo. The script
+repairs what a hand-typed sheet gets wrong (a room typed in the faculty row, a
+missing room, "1.00 am" for 1 pm) and prints every repair so it can be checked.
+Rebuild it whenever the timetable changes, then upload it:
+
+1. Run the build script. It writes `timetable/rooms.php` and prints the
+   repairs and the class, room and booking counts.
+2. `tools/stage-upload.sh` stages `timetable/rooms.php` every time it exists,
+   with whatever else changed. Drop `upload/` on the server as usual.
+
+The file carries faculty names and this repo is public, so `timetable/` is
+gitignored. Like every file in `data/`, it is JSON behind a `<?php exit; ?>`
+guard line, so the server never hands it out.
+
 ## The two sites
 
 | Site | Branch | Purpose |
@@ -143,6 +175,7 @@ php -S localhost:8000                  # then open /index.php
 php tests/test_attendance_parser.php   # parser suite, prints OK
 php tests/test_marking.php             # store, merge, accounts, roster import
 php tests/test_partner_divisions.php   # which partner program-years the request lists
+php tests/test_timetable.php           # room timetable file and grid
 node tests/test_marking_ui.js          # the marking screen's live count
 node tests/test_theme_contrast.js      # light and dark contrast
 node tests/test_charts.js              # chart scoping suite, prints OK
@@ -171,6 +204,7 @@ mark.php                 tick the class list, or type a count
 admin.php                approve accounts, rotate join codes, reset passwords
 account.php              change your own password
 stats.php                usage page, admins only
+rooms.php                room timetable, open to everyone, read-only
 api/ingest.php           receives the pushed sheet
 api/click.php            counts footer link clicks
 api/division.php         division breakdown for the modal
@@ -180,6 +214,7 @@ includes/auth.php        accounts, sessions, join codes
 includes/store.php       reads and writes everything under data/
 includes/roster.php      student lists, one file per school
 includes/traffic.php     visitor and click counters behind the usage page
+includes/timetable.php   room timetable: reads timetable/rooms.php, builds the grid
 includes/page.php        shared header, footer and account menu
 js/dashboard.js          drill-down, range controls, modal
 js/charts.js             the four charts

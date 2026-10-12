@@ -82,6 +82,15 @@ const pairs = [
   ['#ffffff', '--header-from', null, 4.5],                // .app-header h1
   ['#ffffff', '--header-to', null, 4.5],
   ['--red-primary', '#ffffff', null, 4.5],                // .tab.active
+  ['--ink', '--lecture-tint', null, 4.5],                 // .tt-lecture (rooms.php)
+  ['--tt-class', '--lecture-tint', null, 4.5],            // .tt-class on a lecture
+  ['--cell-muted', '--lecture-tint', null, 4.5],          // .tt-faculty
+  ['--ink', '--lab-tint', '--surface-raised', 4.5],       // .tt-lab
+  ['--tt-class', '--lab-tint', '--surface-raised', 4.5],  // .tt-class on a lab
+  ['--cell-muted', '--lab-tint', '--surface-raised', 4.5],
+  ['--lab-ink', '--surface-raised', null, 4.5],           // .tt-lab .tt-tag
+  ['--break-ink', '--break-tint', null, 4.5],             // .tt-break-cell
+  ['--break-ink', '--lunch-tint', null, 4.5],
 ];
 
 let checked = 0;

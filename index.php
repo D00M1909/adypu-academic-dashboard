@@ -170,6 +170,13 @@ try {
       <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
       <path d="m9 11 3 3L22 4" />
     </symbol>
+    <symbol id="icon-rooms" viewBox="0 0 24 24">
+      <rect width="18" height="18" x="3" y="4" rx="2" />
+      <path d="M16 2v4" />
+      <path d="M8 2v4" />
+      <path d="M3 10h18" />
+      <path d="M10 10v11" />
+    </symbol>
     <symbol id="icon-mgmt" viewBox="0 0 24 24">
       <path d="M3 3v16a2 2 0 0 0 2 2h16" />
       <path d="M18 17V9" />
@@ -281,6 +288,9 @@ try {
         <svg class="theme-icon-moon" aria-hidden="true"><use href="#icon-moon"/></svg>
         <svg class="theme-icon-sun" aria-hidden="true"><use href="#icon-sun"/></svg>
       </button>
+      <a class="header-link is-compact no-print" href="rooms.php">
+        <svg aria-hidden="true"><use href="#icon-rooms"/></svg><span>Room timetable</span>
+      </a>
       <a class="header-link no-print" href="mark.php">
         <svg aria-hidden="true"><use href="#icon-mark"/></svg><span>Mark attendance</span>
       </a>

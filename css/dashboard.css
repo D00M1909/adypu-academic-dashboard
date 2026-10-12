@@ -35,6 +35,20 @@
      time. One tint, and an ink dark enough to sit on it. */
   --good-tint: rgba(21, 128, 61, 0.12);
   --good-ink: #166534;
+  /* Room timetable (rooms.php): a lecture, a lab, and the two kinds of break
+     row. --cell-muted is the faculty line: --ink-muted is only 4.76:1 on
+     white, and any tint at all takes it under AA. The edges are the 3px left
+     stripe; light mode carries colour in the tint, so a lecture has none. */
+  --lecture-tint: #eef7f1;
+  --lecture-edge: transparent;
+  --tt-class: var(--red-ink);
+  --cell-muted: #4b5563;
+  --lab-tint: rgba(37, 99, 235, 0.09);
+  --lab-edge: #2563eb;
+  --lab-ink: #1d4ed8;
+  --break-tint: #fdf6e3;
+  --lunch-tint: #fbecc0;
+  --break-ink: #854d0e;
   --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.10), 0 1px 1px rgba(15, 23, 42, 0.06);
   --shadow-md: 0 8px 20px -6px rgba(15, 23, 42, 0.18), 0 2px 6px rgba(15, 23, 42, 0.08);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -71,6 +85,18 @@
     --att-good: #4ade80;
     --att-warn: #fbbf24;
     --good-ink: #4ade80;
+    /* No green or amber washes across the week: a cell sits one step above
+       the card and the 3px edge says lecture or lab. */
+    --lecture-tint: #1f2a35;
+    --lecture-edge: #3f9e68;
+    --tt-class: #f4a3a3;
+    --cell-muted: #a9b8c8;
+    --lab-tint: #1f2a3a;
+    --lab-edge: #5b8fd6;
+    --lab-ink: #93c5fd;
+    --break-tint: #151b22;
+    --lunch-tint: #1b1f22;
+    --break-ink: #d6b26a;
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 1px rgba(0, 0, 0, 0.4);
     --shadow-md: 0 8px 20px -6px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.45);
     /* Native widgets follow this: without it the two date inputs stay white
@@ -1261,6 +1287,77 @@ input:focus-visible, select:focus-visible {
   .account-actions { margin-top: 0; flex: none; }
 }
 
+/* ---------- Room timetable (rooms.php) ----------
+   The one faculty-style page that is not a phone form: a week grid wants the
+   width, so it gets the dashboard's 1280 instead of 720, and on a phone the
+   table scrolls inside its card with the time column pinned. */
+
+.page-wide .page-main { max-width: 1280px; }
+.tt-card { padding: 16px; }
+/* Date, then ULC, then classroom: three labelled pickers in the order they
+   are chosen, the PDF button pushed to the end of the row. */
+.tt-bar { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 10px 12px; }
+.tt-pick { display: flex; flex-direction: column; gap: 5px; }
+.tt-pick label { margin: 0; }
+.page-main .tt-pick select, .page-main .tt-pick input[type="date"] { width: auto; min-width: 160px; }
+.tt-source { font-size: 13px; color: var(--ink-muted); margin: 12px 0 0; }
+.tt-bar .tt-print { margin-left: auto; min-height: 48px; padding: 9px 16px; font-size: 14px; }
+.tt-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 14px; margin: 18px 0 12px; }
+.card h2.tt-room { font-family: 'IBM Plex Mono', monospace; font-size: 26px; margin: 0; color: var(--red-ink); }
+.tt-when { font-size: 15px; font-weight: 600; color: var(--ink); }
+.tt-usage { font-size: 13px; font-weight: 600; color: var(--ink-muted); }
+.tt-toggle { margin-left: auto; font-size: 13px; font-weight: 600; color: var(--red-ink); }
+.tt-none { margin: 0; padding: 28px 16px; text-align: center; color: var(--ink-muted); border: 1px dashed var(--hairline); border-radius: 10px; }
+.tt-grid thead th.tt-on { color: var(--red-ink); box-shadow: inset 0 -2px 0 var(--red-ink); }
+
+/* relative: the sr-only "Free" labels are absolutely placed, and without a
+   positioned ancestor here they escaped the scroller and widened the page. */
+.tt-wrap { position: relative; overflow-x: auto; border: 1px solid var(--hairline); border-radius: 10px; }
+.tt-grid { width: 100%; min-width: 760px; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+/* One day is one column, so it fits a phone without scrolling. */
+.tt-grid-day { min-width: 0; }
+.tt-grid th, .tt-grid td { border: 1px solid var(--hairline); padding: 9px 8px; text-align: center; vertical-align: middle; }
+.tt-grid tr > :first-child { border-left: 0; }
+.tt-grid tr > :last-child { border-right: 0; }
+.tt-grid thead th { border-top: 0; background: var(--surface); color: var(--ink-muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 11px 8px; }
+.tt-grid tbody tr:last-child > * { border-bottom: 0; }
+.tt-grid .tt-time { width: 128px; text-align: left; font-weight: 600; white-space: nowrap; background: var(--surface-raised); position: sticky; left: 0; z-index: 1; }
+.tt-grid thead .tt-time { background: var(--surface); }
+.tt-time span { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--break-ink); margin-top: 2px; }
+
+.tt-entry { display: flex; flex-direction: column; gap: 2px; line-height: 1.3; }
+.tt-entry + .tt-entry { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--hairline); }
+.tt-entry strong { font-size: 13.5px; color: var(--ink); }
+.tt-class { font-weight: 600; color: var(--tt-class); }
+.tt-faculty { font-size: 12px; color: var(--cell-muted); }
+.tt-tag { display: inline-block; vertical-align: 1px; font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; padding: 1px 6px; border-radius: 999px; background: var(--surface-raised); color: var(--ink-muted); border: 1px solid var(--hairline); }
+
+.tt-lecture { background: var(--lecture-tint); box-shadow: inset 3px 0 0 var(--lecture-edge); }
+.tt-lab { background: var(--lab-tint); box-shadow: inset 3px 0 0 var(--lab-edge); }
+.tt-lab .tt-tag { color: var(--lab-ink); border-color: var(--lab-edge); }
+.tt-blocked { background: repeating-linear-gradient(135deg, var(--surface), var(--surface) 6px, var(--surface-raised) 6px, var(--surface-raised) 12px); }
+.tt-blocked strong { font-weight: 600; color: var(--ink-muted); }
+.tt-entry > .tt-tag { align-self: center; }
+.tt-clash { box-shadow: inset 0 0 0 2px var(--att-warn); }
+.tt-free { background: var(--surface-raised); }
+.tt-break .tt-time, .tt-break-cell { background: var(--break-tint); }
+.tt-lunch .tt-time, .tt-lunch .tt-break-cell { background: var(--lunch-tint); }
+.tt-break-cell { color: var(--break-ink); font-weight: 600; letter-spacing: 0.02em; padding: 7px 8px; }
+.tt-break .tt-break-cell { font-style: italic; }
+
+.tt-legend { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12.5px; color: var(--ink-muted); }
+.tt-legend li { display: flex; align-items: center; gap: 7px; }
+.tt-key { width: 14px; height: 14px; border-radius: 4px; border: 1px solid var(--hairline); }
+
+
+@media (max-width: 640px) {
+  .tt-card { padding: 14px 12px; }
+  .tt-grid .tt-time { width: 96px; white-space: normal; }
+  .tt-pick { flex: 1 1 140px; }
+  .page-main .tt-pick select, .page-main .tt-pick input[type="date"] { width: 100%; min-width: 0; }
+  .tt-bar .tt-print { flex: 1 1 100%; margin-left: 0; }
+}
+
 /* ---------- Footer ----------
    One quiet line on every page: who built it, where the source is, and where
    to report a problem now that faculty across the university depend on it. */
@@ -1408,4 +1505,14 @@ input:focus-visible, select:focus-visible {
     opacity: 1;
   }
   .modal-backdrop:not([hidden]).is-open .modal-actions { display: none; }
+}
+
+/* The room timetable on paper: the whole week on one sheet, no scroller. */
+@media print {
+  .page-wide .page-main { max-width: none; padding: 0; }
+  .tt-card { border: 0; box-shadow: none; padding: 0; }
+  .tt-head { margin-top: 0; }
+  .tt-wrap { overflow: visible; }
+  .tt-grid { min-width: 0; font-size: 11px; }
+  .tt-grid .tt-time { position: static; }
 }
