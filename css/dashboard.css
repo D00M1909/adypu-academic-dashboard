@@ -985,6 +985,14 @@ input[type="number"], .page-main select,
                     linear-gradient(135deg, var(--ink-muted) 50%, transparent 50%);
   background-position: right 16px center, right 11px center;
   background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; }
+/* iOS Safari draws date/time inputs natively: taller than a select, centred
+   text, and an intrinsic width that ignores the column and overlaps the next
+   field. Strip that so they line up with the selects beside them. */
+.page-main input[type="date"], .page-main input[type="time"] {
+  appearance: none; -webkit-appearance: none;
+  display: block; min-width: 0; height: 48px; line-height: 22px; text-align: left; }
+.page-main input[type="date"]::-webkit-date-and-time-value,
+.page-main input[type="time"]::-webkit-date-and-time-value { text-align: left; margin: 0; }
 input:focus-visible, select:focus-visible {
   outline: 2px solid var(--red-ink); outline-offset: 1px; border-color: transparent;
 }
@@ -1348,7 +1356,7 @@ input:focus-visible, select:focus-visible {
 @media (max-width: 640px) {
   .tt-card { padding: 14px 12px; }
   .tt-grid .tt-time { width: 96px; white-space: normal; }
-  .tt-pick { flex: 1 1 140px; }
+  .tt-pick { flex: 1 1 140px; min-width: 0; }
   .page-main .tt-pick select, .page-main .tt-pick input[type="date"] { width: 100%; min-width: 0; }
   .tt-bar .tt-print { flex: 1 1 100%; margin-left: 0; }
 }
