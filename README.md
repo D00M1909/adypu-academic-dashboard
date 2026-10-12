@@ -127,14 +127,14 @@ classes). **Show whole week** gives the full grid, and **Export PDF** prints it.
 Each room draws only the time rows it is booked in, because classes keep their
 own clocks (one runs 12.30 to 1.30, another 1.00 to 2.00).
 
-Two ULCs so far. ULC 1 is filled from Law and Liberal Arts (classwise
+Three ULCs so far: ULC 1, ULC 5 and ULC 6. ULC 1 is filled from Law and Liberal Arts (classwise
 workbooks: one tab per class, each period a subject, faculty and room row) and
 from Management, Biotechnology, Civil, Biomedical, ECE, CSE and AIDS, whose layouts (a PDF, a
 days-by-class grid, merged two-hour cells, a room-by-period master sheet) are
 first turned into data files the build script reads. ULC 6 is the School of
 Engineering First Year, from its PDF; each division keeps its own clock, so its
 periods are snapped to the hour they fall in. A room another department holds,
-and no class of ours is in, shows as booked. Rooms in a ULC the page does not offer yet (ULC 5), or in none, are left out; a room number used in two ULCs is named with its ULC. A lab or lecture
+and no class of ours is in, shows as booked. ULC 5 holds the AIDS, CSE final year and Biomedical rooms there. Rooms in no ULC are left out; a room number used in two ULCs is named with its ULC. A lab or lecture
 longer than an hour covers the rows its hours fall in, by the clock. A lecture typed on several classes' tabs, such as a
 common first-year subject, is one booking listing every class, and two
 bookings in one room at one time are outlined as a clash. This host
