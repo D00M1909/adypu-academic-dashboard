@@ -131,17 +131,33 @@ assert(array_column(timetable_room_slots($mixed, 'L'), 'time') === ['1.30 to 2.3
     'span rows found by the clock: ' . json_encode(array_column(timetable_room_slots($mixed, 'L'), 'time')));
 $g = timetable_grid(['slots' => timetable_room_slots($mixed, 'L')] + $mixed, 'L');
 assert($g['cells']['1.30 to 2.30']['Monday']['rows'] === 2 && !empty($g['covered']['2.30 to 3.30']['Monday']));
-// Drawn over every row, the lab covers every row that starts before it ends at
-// 3.30, another clock's 3.00 included (the room is busy then), and stops there.
+// Drawn over every row, the lab stretches over the rows that end by 3.30 (its
+// own 2.30, another clock's 1.30 to 3.30) and no further: another clock's 3.00
+// to 4.00 is a tail, busy until 3.30 but not part of the cell, so the cell is
+// never taller than the class.
 $g = timetable_grid($mixed, 'L');
-assert($g['cells']['1.30 to 2.30']['Monday']['rows'] === 4);
-assert(!empty($g['covered']['3.00 to 4.00']) && isset($g['cells']['3.30 to 4.30']['Monday']));
+assert($g['cells']['1.30 to 2.30']['Monday']['rows'] === 3);
+assert(empty($g['covered']['3.00 to 4.00']) && $g['tails']['3.00 to 4.00']['Monday']['until'] === '3.30');
+assert(isset($g['cells']['3.30 to 4.30']['Monday']) && empty($g['tails']['3.30 to 4.30']));
+assert(timetable_usage($mixed, $g) === [5, 5], 'a tail counts as booked');
+// The case found on a dean's week: a lab 2.30 to 4.30 and another class's
+// 3.45 row. Two rows tall, the 3.45 row its tail, and a class booked in the
+// tail's row keeps its own cell.
+$thu = ['days' => ['Thursday'], 'slots' => array_map(fn($x) => ['time' => $x, 'break' => ''],
+    ['2.30 to 3.30', '3.30 to 4.30', '3.45 to 4.45']),
+    'rooms' => ['P' => [['day' => 'Thursday', 'time' => '2.30 to 3.30', 'span' => 2, 'lab' => true] + $e('Thursday', '')]]] + $t;
+$g = timetable_grid($thu, 'P');
+assert($g['cells']['2.30 to 3.30']['Thursday']['rows'] === 2 && $g['tails']['3.45 to 4.45']['Thursday'] === ['until' => '4.30', 'lab' => true]);
+$thu['rooms']['P'][] = ['day' => 'Thursday', 'time' => '3.45 to 4.45', 'span' => 1] + $e('Thursday', '');
+$g = timetable_grid($thu, 'P');
+assert(empty($g['tails']['3.45 to 4.45']) && isset($g['cells']['3.45 to 4.45']['Thursday']));
+assert(timetable_span_label(['time' => '2.30 to 3.30', 'span' => 2]) === '2.30 to 4.30' && timetable_clock(990) === '4.30');
 assert(timetable_minutes('12.30 to 1.30') === [750, 810] && timetable_minutes('Room no.') === null);
 
 // A room number in two ULCs is stored apart but shown plain.
 assert(timetable_room_label('105 (ULC 1)') === '105' && timetable_room_label('IT Lab (S2)') === 'IT Lab (S2)' && timetable_room_label('402') === '402');
 
-assert(timetable_grid($t, 'nope') === ['cells' => [], 'covered' => []]);
+assert(timetable_grid($t, 'nope') === ['cells' => [], 'covered' => [], 'tails' => []]);
 
 // The school a booking belongs to is read off its class label: Law before BA
 // and BBA, a shared lecture belongs to every class's school, and a hold names

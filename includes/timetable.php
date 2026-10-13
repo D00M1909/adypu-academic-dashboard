@@ -184,6 +184,22 @@ function timetable_person(string $name): string {
     return $name;
 }
 
+// "2.30 to 4.30": when a booking actually runs, start to end, in the sheets'
+// own 12-hour style. A cell that stretches over several rows (a lab across
+// another class's 3.45 row) says this so it cannot be read as longer.
+function timetable_span_label(array $e): string {
+    $m = timetable_minutes($e['time']);
+    $end = timetable_end($e);
+    if (!$m || $end === null) return $e['time'];
+    return timetable_clock($m[0]) . ' to ' . timetable_clock($end);
+}
+
+// Minutes from midnight as the sheets write a time: 990 is "4.30".
+function timetable_clock(int $t): string {
+    $h = intdiv($t, 60);
+    return ($h > 12 ? $h - 12 : $h) . '.' . sprintf('%02d', $t % 60);
+}
+
 // Teaching hours in a list of bookings: each one's length by the clock, so a
 // two-hour lab is two and a 45-minute slot three quarters. A booking with no
 // readable time counts its span in hours.
@@ -333,9 +349,16 @@ function timetable_write(array $t, string $path = TIMETABLE_FILE): bool {
 }
 
 // [time][day] => ['entries' => [...], 'rows' => n] for one room, plus the cells
-// a multi-slot entry covers, so the table can skip them. A span only stretches
-// over teaching slots: a lab written across lunch ends at the break rather than
-// painting over it.
+// a multi-slot entry covers, so the table can skip them, and its 'tails'. A
+// span only stretches over teaching slots: a lab written across lunch ends at
+// the break rather than painting over it.
+//
+// A long booking stretches only over rows that end by the time it does, so a
+// cell is never taller than the class. A row it only partly overlaps (a lab
+// to 4.30 against another clock's 3.45 to 4.45 row) is a tail: drawn as its
+// own small "continues until 4.30" cell, because the room is busy then and
+// must not read as free, but stretching the class over it made a two-hour lab
+// look like three (found on a dean's week, 13 Oct 2026).
 function timetable_grid(array $t, string $room): array {
     $byCell = [];
     foreach ($t['rooms'][$room] ?? [] as $e) {
@@ -347,31 +370,39 @@ function timetable_grid(array $t, string $room): array {
     $breaks = array_column($t['slots'], 'break', 'time');
     $cells = [];
     $covered = [];
+    $tails = [];
     foreach ($times as $at => $time) {
         foreach ($byCell[$time] ?? [] as $day => $entries) {
             // Two bookings in one cell (a clash in the source) share the shorter span.
             $span = min(array_column($entries, 'span'));
-            // A long booking covers every row that starts before it ends,
-            // another clock's rows included: the room is busy then too.
             // Labels that are not times fall back to counting rows.
             $ends = array_map('timetable_end', $entries);
             $end = in_array(null, $ends, true) ? null : min($ends);
-            $within = function (int $i) use ($end, $times, $span, &$rows): bool {
-                if ($end === null) return $rows < $span;
-                $m = timetable_minutes($times[$i]);
-                return $m !== null && $m[0] < $end;
-            };
             $rows = 1;
-            for ($i = $at + 1; ($span > 1 || $end === null) && $i < count($times) && $within($i) && $breaks[$times[$i]] === ''; $i++, $rows++) {
+            $tail = false;   // past the first row it only partly overlaps
+            for ($i = $at + 1; ($span > 1 || $end === null) && $i < count($times) && $breaks[$times[$i]] === ''; $i++) {
+                $m = timetable_minutes($times[$i]);
+                if ($end === null ? $rows >= $span : ($m === null || $m[0] >= $end)) break;
                 // Something else booked in a slot this one claims: show both
                 // rather than hide the second under a tall cell.
-                if (!empty($byCell[$times[$i]][$day])) break;
+                if (!empty($byCell[$times[$i]][$day])) {
+                    if ($tail) continue;
+                    break;
+                }
+                // Once one row runs past the end, every later row it reaches
+                // is a tail too: the tall cell cannot skip a row and go on.
+                if ($tail || ($end !== null && $m[1] > $end)) {
+                    $tail = true;
+                    $tails[$times[$i]][$day] = ['until' => timetable_clock($end), 'lab' => $entries[0]['lab']];
+                    continue;
+                }
                 $covered[$times[$i]][$day] = true;
+                $rows++;
             }
             $cells[$time][$day] = ['entries' => $entries, 'rows' => $rows];
         }
     }
-    return ['cells' => $cells, 'covered' => $covered];
+    return ['cells' => $cells, 'covered' => $covered, 'tails' => $tails];
 }
 
 // Teaching periods in use against teaching periods in the week, for the line
@@ -382,7 +413,7 @@ function timetable_usage(array $t, array $grid): array {
     $used = 0;
     foreach ($teaching as $s) {
         foreach ($t['days'] as $d) {
-            if (!empty($grid['cells'][$s['time']][$d]) || !empty($grid['covered'][$s['time']][$d])) $used++;
+            if (!empty($grid['cells'][$s['time']][$d]) || !empty($grid['covered'][$s['time']][$d]) || !empty($grid['tails'][$s['time']][$d])) $used++;
         }
     }
     return [$used, $total];

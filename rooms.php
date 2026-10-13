@@ -215,8 +215,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
       <?php if ($dean): ?>
       <h2 class="tt-room tt-person"><?= $e($dean['name']) ?></h2>
       <span class="tt-when"><?= $dean['role'] !== '' ? $e($dean['role']) . ' &middot; ' : '' ?><?= $week ? 'Week of ' . $e($date->modify('monday this week')->format('j M Y')) : $e($date->format('l j M Y')) ?></span>
-      <?php if ($days): ?><span class="tt-usage"><?= $classesShown ?> class<?= $classesShown === 1 ? '' : 'es' ?><?= $week ? '' : ' on ' . $e($date->format('l')) ?></span><?php endif; ?>
-      <span class="tt-load" title="Every class they teach in the week, by its length: a two-hour lab counts as two">Weekly workload <strong><?= $hours ?></strong> hour<?= $load == 1 ? '' : 's' ?></span>
+      <?php if ($days && !$week): ?><span class="tt-usage"><?= $classesShown ?> class<?= $classesShown === 1 ? '' : 'es' ?> on <?= $e($date->format('l')) ?></span><?php endif; ?>
       <?php else: ?>
       <h2 class="tt-room"><?= $e(timetable_room_label($room)) ?></h2>
       <span class="tt-when"><?= $e($ulc) ?> &middot; <?= $week ? 'Week of ' . $e($date->modify('monday this week')->format('j M Y')) : $e($date->format('l j M Y')) ?></span>
@@ -227,6 +226,14 @@ page_head('Room timetable', 'page-wide', 'timetable');
         <button class="btn-quiet tt-print" type="button" onclick="window.print()">Export PDF</button>
       </span>
     </div>
+    <?php if ($dean): ?>
+    <?php // The dean's week in figures, the way the Usage page shows its own: label over number. ?>
+    <dl class="tt-stats">
+      <div title="Every class they teach in the week, by its length: a two-hour lab counts as two"><dt>Weekly workload</dt><dd><?= $hours ?> <small>hour<?= $load == 1 ? '' : 's' ?></small></dd></div>
+      <div><dt>Classes a week</dt><dd><?= count($teaching) ?></dd></div>
+      <div><dt>Rooms</dt><dd><?= count(array_unique(array_column($teaching, 'room'))) ?></dd></div>
+    </dl>
+    <?php endif; ?>
 
 <?php if (!$days): ?>
     <p class="tt-none">No classes on <?= $e($date->format('l')) ?>s. The timetable runs <?= $e($t['days'][0]) ?> to <?= $e(end($t['days'])) ?>.</p>
@@ -251,6 +258,10 @@ page_head('Room timetable', 'page-wide', 'timetable');
               <td class="tt-break-cell" colspan="<?= count($days) ?>"><?= $e(ucwords(strtolower($s['break']))) ?></td>
             <?php else: foreach ($days as $d):
                 if (!empty($grid['covered'][$time][$d])) continue;
+                // The end of a class that runs into this row without filling it.
+                if ($tail = $grid['tails'][$time][$d] ?? null): ?>
+              <td class="tt-cont <?= $tail['lab'] ? 'tt-lab' : 'tt-lecture' ?>"><span>Continues until <?= $e($tail['until']) ?></span></td>
+            <?php continue; endif;
                 $cell = $grid['cells'][$time][$d] ?? null;
                 if (!$cell): ?>
               <td class="tt-free"><span class="sr-only">Free</span></td>
@@ -275,6 +286,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
                       <span class="tt-tag">Booked</span>
                     <?php else: ?>
                       <strong><?= $e($x['code']) ?><?php if ($x['lab']): ?> <span class="tt-tag">Lab</span><?php endif; ?></strong>
+                      <?php if ($cell['rows'] > 1): ?><span class="tt-span"><?= $e(timetable_span_label($x)) ?></span><?php endif; ?>
                       <span class="tt-class"><?= $e($x['class']) ?></span>
                       <?php if ($dean): ?><span class="tt-faculty">Room <?= $e(timetable_room_label($x['room'])) ?>, <?= $e($x['ulc']) ?></span><?php elseif ($x['faculty'] !== ''): ?><span class="tt-faculty"><?= $e($x['faculty']) ?></span><?php endif; ?>
                       <?php if ($att): ?>
