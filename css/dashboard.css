@@ -14,6 +14,7 @@
   --total-sep: rgba(122, 16, 23, 0.5);
   --surface: #e9edf3;
   --surface-raised: #ffffff;
+  --surface-control: var(--surface);
   --hairline: #d3dae4;
   --ink: #0f172a;
   --ink-muted: #64748b;
@@ -71,28 +72,33 @@
     /* The brand red at full strength is a floodlight across a dark page, and
        the header is the largest block of it. Darkened here only; the chips and
        buttons keep --red-primary, since white text needs it. */
-    --header-from: #8c1720;
-    --header-to: #6b111a;
+    --header-from: #7e1620;
+    --header-to: #4c0d14;
     --total-bg: #3b1a1f;
     --total-text: #fecdd3;
     --total-sep: rgba(254, 205, 211, 0.5);
-    --surface: #0f141a;
-    --surface-raised: #182029;
-    --hairline: #2b3644;
+    /* Three steps of elevation, each lighter than the one under it: page,
+       card, and a booked cell or a control on the card. Shadows barely read
+       on a dark page, so the step in lightness is what says "raised". */
+    --surface: #0c1117;
+    --surface-raised: #151c25;
+    --surface-control: #1c2531;
+    --hairline: #26313f;
     --ink: #e7edf4;
     --ink-muted: #9fb0c2;
     --ink-faint: #7d8b9c;
     --att-good: #4ade80;
     --att-warn: #fbbf24;
     --good-ink: #4ade80;
-    /* No green or amber washes across the week: a cell sits one step above
-       the card and the 3px edge says lecture or lab. */
-    --lecture-tint: #1f2a35;
-    --lecture-edge: #3f9e68;
+    /* A booked cell is two steps above the card, so free slots read as gaps
+       at a glance. Each kind carries the faintest wash of its edge colour,
+       enough that a lecture and a lab differ without the stripe. */
+    --lecture-tint: #1a2a2a;
+    --lecture-edge: #3fae70;
     --tt-class: #f4a3a3;
     --cell-muted: #a9b8c8;
-    --lab-tint: #1f2a3a;
-    --lab-edge: #5b8fd6;
+    --lab-tint: #1a2638;
+    --lab-edge: #5f97e0;
     --lab-ink: #93c5fd;
     --break-tint: #151b22;
     --lunch-tint: #1b1f22;
@@ -103,6 +109,75 @@
        cards with a white calendar popup in the middle of a dark control dock. */
     color-scheme: dark;
   }
+
+  /* The few things tokens alone cannot say in the dark. */
+
+  /* A faint glow of the brand red under the header, so the page reads as lit
+     from the top rather than a flat slab. */
+  :root[data-theme="dark"] body {
+    background:
+      radial-gradient(1100px 420px at 50% -160px, rgba(194, 27, 39, 0.13), transparent 70%),
+      var(--surface);
+    background-repeat: no-repeat;
+  }
+  :root[data-theme="dark"] .app-header {
+    border-bottom-color: rgba(248, 113, 113, 0.22);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.4), 0 10px 30px -12px rgba(0, 0, 0, 0.7);
+  }
+
+  /* A 1px top highlight is the edge light catches on a raised dark surface. */
+  :root[data-theme="dark"] .card,
+  :root[data-theme="dark"] .tile,
+  :root[data-theme="dark"] .range-summary,
+  :root[data-theme="dark"] .modal {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), var(--shadow-sm);
+  }
+  :root[data-theme="dark"] .tile:hover,
+  :root[data-theme="dark"] .range-summary:hover {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), var(--shadow-md);
+  }
+  :root[data-theme="dark"] .partner-tile:hover {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), var(--shadow-sm);
+  }
+  :root[data-theme="dark"] .tile.active {
+    box-shadow: 0 0 0 1px var(--red-ink), 0 0 24px -6px rgba(248, 113, 113, 0.35);
+  }
+  :root[data-theme="dark"] .modal-backdrop { background: rgba(0, 0, 0, 0.6); }
+
+  /* Controls sit a step above the card, with a border that firms up on hover,
+     so a select reads as something to press rather than a hole in the card. */
+  :root[data-theme="dark"] input[type="text"],
+  :root[data-theme="dark"] input[type="email"],
+  :root[data-theme="dark"] input[type="password"],
+  :root[data-theme="dark"] input[type="number"],
+  :root[data-theme="dark"] .page-main select,
+  :root[data-theme="dark"] .page-main input[type="date"],
+  :root[data-theme="dark"] .page-main input[type="time"],
+  :root[data-theme="dark"] .btn-quiet {
+    background-color: var(--surface-control);
+    border-color: #2f3b4b;
+  }
+  :root[data-theme="dark"] .page-main select:hover,
+  :root[data-theme="dark"] .page-main input:hover {
+    border-color: #435266;
+  }
+  :root[data-theme="dark"] .btn-quiet:hover { background-color: var(--red-tint); border-color: rgba(248, 113, 113, 0.45); }
+
+  /* Room timetable: the grid's lines step back, the header row sinks below
+     the cells, and today's column says so in more than its label. */
+  :root[data-theme="dark"] .tt-grid th,
+  :root[data-theme="dark"] .tt-grid td { border-color: rgba(148, 163, 184, 0.12); }
+  :root[data-theme="dark"] .tt-wrap { border-color: #2f3b4b; }
+  :root[data-theme="dark"] .tt-grid thead th.tt-on { background: linear-gradient(to top, rgba(248, 113, 113, 0.12), transparent); }
+  :root[data-theme="dark"] .tt-lecture { box-shadow: inset 4px 0 0 var(--lecture-edge); }
+  :root[data-theme="dark"] .tt-lab { box-shadow: inset 4px 0 0 var(--lab-edge); }
+  :root[data-theme="dark"] .tt-clash { box-shadow: inset 0 0 0 2px var(--att-warn); }
+  :root[data-theme="dark"] .tt-entry strong { color: #f3f6fa; }
+  /* Each key shows the stripe its cells carry. Filled with the cell tint, the
+     keys were three near-identical outlines on a dark card. */
+  :root[data-theme="dark"] .tt-key { border-color: #3a4757; }
+  :root[data-theme="dark"] .tt-key.tt-lecture { background: var(--lecture-edge); border-color: var(--lecture-edge); box-shadow: none; }
+  :root[data-theme="dark"] .tt-key.tt-lab { background: var(--lab-edge); border-color: var(--lab-edge); box-shadow: none; }
 }
 
 * { box-sizing: border-box; }
