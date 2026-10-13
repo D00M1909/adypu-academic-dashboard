@@ -523,9 +523,7 @@ $export = [
     'slots' => array_map(fn($t) => ['time' => $t, 'break' => ''], array_keys($slots)),
     'buildings' => (function () use ($inBuilding) {
         $by = [];
-        // The picker names a ULC with its wing: "ULC 7 (C Wing)".
-        $wingOf = array_flip(WING);
-        foreach ($inBuilding as $room => $bld) $by[isset($wingOf[$bld]) ? "$bld ({$wingOf[$bld]} Wing)" : $bld][] = (string) $room;
+        foreach ($inBuilding as $room => $bld) $by[$bld][] = (string) $room;
         ksort($by, SORT_NATURAL);
         return $by;
     })(),
