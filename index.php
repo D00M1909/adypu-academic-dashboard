@@ -49,6 +49,17 @@ foreach ($days as $d => $classes) {
 }
 $dataDates = $days ? [min(array_keys($days)), max(array_keys($days))] : [$from, $to];
 
+// The two daily charts always show the 30 days ending on the range's last day,
+// so a single day still opens on a month of context. Same shape and the same
+// per-view filter as $rangeDays; the range itself still drives every number.
+$trendFrom = (new DateTimeImmutable($to))->modify('-29 days')->format('Y-m-d');
+$trendDays = [];
+foreach ($days as $d => $classes) {
+    if ($d < $trendFrom || $d > $to) continue;
+    $mine = array_intersect_key($classes, $classStrength);
+    if ($mine) $trendDays[$d] = $mine;
+}
+
 // Which preset chip the current range is, so the bar shows what you are
 // looking at. Date-only strings must stay date-only: parsing them in the
 // browser's local timezone used to make a 7-day click become an 8-day range.
@@ -267,37 +278,22 @@ try {
       <path d="m6.34 17.66-1.41 1.41" />
       <path d="m19.07 4.93-1.41 1.41" />
     </symbol>
+    <symbol id="icon-chart" viewBox="0 0 24 24">
+      <path d="M3 3v18h18" />
+      <path d="m19 9-5 5-4-4-3 3" />
+    </symbol>
+    <symbol id="icon-print" viewBox="0 0 24 24">
+      <path d="M6 9V2h12v7" />
+      <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+      <rect x="6" y="14" width="12" height="8" />
+    </symbol>
     <symbol id="icon-moon" viewBox="0 0 24 24">
       <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
     </symbol>
   </defs>
 </svg>
 
-<header class="app-header">
-  <div class="header-inner">
-    <div class="brand">
-      <div class="brand-logo"><img src="img/logo.png" alt="Ajeenkya D Y Patil University"></div>
-      <h1>ADYPU: Academic Dashboard</h1>
-    </div>
-    <div class="header-controls">
-      <nav class="tabs" aria-label="View">
-        <a class="tab<?= $isPartners ? '' : ' active' ?>" href="<?= htmlspecialchars($tabHref(false)) ?>"<?= $isPartners ? '' : ' aria-current="page"' ?>>ADYPU</a>
-        <a class="tab<?= $isPartners ? ' active' : '' ?>" href="<?= htmlspecialchars($tabHref(true)) ?>"<?= $isPartners ? ' aria-current="page"' : '' ?>>Knowledge Partner</a>
-      </nav>
-      <button class="theme-toggle no-print" id="theme-toggle" type="button" aria-label="Switch to dark mode" aria-pressed="false" title="Switch theme">
-        <svg class="theme-icon-moon" aria-hidden="true"><use href="#icon-moon"/></svg>
-        <svg class="theme-icon-sun" aria-hidden="true"><use href="#icon-sun"/></svg>
-      </button>
-      <a class="header-link is-compact no-print" href="rooms.php">
-        <svg aria-hidden="true"><use href="#icon-rooms"/></svg><span>Room timetable</span>
-      </a>
-      <a class="header-link no-print" href="mark.php">
-        <svg aria-hidden="true"><use href="#icon-mark"/></svg><span>Mark attendance</span>
-      </a>
-      <?= account_menu() ?>
-    </div>
-  </div>
-</header>
+<?php site_header(SITE_NAME, 'attendance'); ?>
 
 <main>
 
@@ -335,8 +331,11 @@ try {
       <input type="date" id="range-from" name="from" value="<?= htmlspecialchars($from) ?>" min="<?= htmlspecialchars($dataDates[0]) ?>" max="<?= htmlspecialchars(date('Y-m-d')) ?>">
       <label for="range-to">To</label>
       <input type="date" id="range-to" name="to" value="<?= htmlspecialchars($to) ?>" min="<?= htmlspecialchars($dataDates[0]) ?>" max="<?= htmlspecialchars(date('Y-m-d')) ?>">
-      <button class="range-apply" type="submit">Apply</button>
-      <button class="range-export no-print" id="range-export" type="button" title="In the print dialog, choose Save as PDF: the Windows Print to PDF driver ignores the page orientation and the file name.">Export PDF</button>
+      <?php /* No Apply: a date applies as soon as it is complete (js/dashboard.js).
+               This invisible one keeps Enter submitting, since a form with two
+               fields and no submit button ignores it. */ ?>
+      <button class="sr-only" type="submit" tabindex="-1">Show this range</button>
+      <button class="range-export no-print" id="range-export" type="button" title="In the print dialog, choose Save as PDF: the Windows Print to PDF driver ignores the page orientation and the file name."><svg aria-hidden="true"><use href="#icon-print"/></svg>Export PDF</button>
     </div>
     <span class="print-range">Date range: <?= htmlspecialchars($rangeLabel) ?> &middot; <?= htmlspecialchars($freshness) ?></span>
   </form>
@@ -346,7 +345,14 @@ try {
 
     <section class="tile-section" id="schools-section">
       <div class="section-title">
-        <h2><?= $isPartners ? 'Knowledge Partners' : 'Schools' ?></h2>
+        <?php /* Moved here from the header: it filters this grid and everything
+                 under it, and in the header it read as a page of its own. Links,
+                 so switching keeps the range on screen. */ ?>
+        <nav class="scope-tabs" aria-label="View">
+          <h2 class="sr-only"><?= $isPartners ? 'Knowledge partners' : 'Schools' ?></h2>
+          <a href="<?= htmlspecialchars($tabHref(false)) ?>"<?= $isPartners ? '' : ' aria-current="page"' ?>>Schools</a>
+          <a href="<?= htmlspecialchars($tabHref(true)) ?>"<?= $isPartners ? ' aria-current="page"' : '' ?>>Knowledge partners</a>
+        </nav>
         <?php /* How many schools filed anything, not just how many exist. Eight
                  "Not reported" tiles beside one real number made the page read
                  as empty when it was not; the heading now says which it is. */ ?>
@@ -421,15 +427,11 @@ try {
           <div class="chart-body" id="chart-donut"></div>
         </figure>
         <figure class="chart-card">
-          <figcaption>Attendance by day</figcaption>
+          <figcaption>Attendance by day <span class="chart-caption-note">Last 30 days</span></figcaption>
           <div class="chart-body" id="chart-trend"></div>
         </figure>
         <figure class="chart-card">
-          <figcaption id="chart-bars-caption">Attendance by school</figcaption>
-          <div class="chart-body" id="chart-bars"></div>
-        </figure>
-        <figure class="chart-card">
-          <figcaption>Classes reporting each day</figcaption>
+          <figcaption>Classes reporting each day <span class="chart-caption-note">Last 30 days</span></figcaption>
           <div class="chart-body" id="chart-compliance"></div>
         </figure>
       </div>
@@ -528,6 +530,9 @@ try {
   // without another request.
   window.ATTENDANCE_DAYS = <?= json_encode((object) $rangeDays) ?>;
   window.CLASS_STRENGTH = <?= json_encode($classStrength) ?>;
+  // The last 30 days to the range's end, for Attendance by day and Classes
+  // reporting each day only.
+  window.TREND_DAYS = <?= json_encode((object) $trendDays) ?>;
 </script>
 <script src="js/theme.js?v=<?= filemtime(__DIR__ . '/js/theme.js') ?>"></script>
 <script src="js/charts.js?v=<?= filemtime(__DIR__ . '/js/charts.js') ?>"></script>

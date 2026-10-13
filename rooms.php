@@ -40,7 +40,7 @@ $when = function (string $stamp): string {
 };
 $link = fn(array $over): string => 'rooms.php?' . http_build_query($over + ['date' => $date->format('Y-m-d'), 'ulc' => $ulc, 'room' => $room]);
 
-page_head('Room timetable', 'page-wide');
+page_head('Room timetable', 'page-wide', 'timetable');
 ?>
 <?php if (empty($t['rooms'])): ?>
   <section class="card tt-empty">

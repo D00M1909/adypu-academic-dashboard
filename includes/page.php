@@ -8,30 +8,30 @@
 
 require_once __DIR__ . '/attendance.php';
 
-// The account control both headers carry in their top right. One function, so
-// the dashboard and the faculty pages cannot drift apart — the dashboard is
-// where everyone lands, and it had no way to reach an account at all.
+// The account control in the top right of every header. Signed out, it is the
+// one way in for faculty; signed in, an initial that opens the account panel.
+// Mark attendance is not in the panel: the header carries it as its own button.
 function account_menu(): string {
     $u = function_exists('auth_user') ? auth_user() : null;
 
     if ($u === null) {
-        return '<a class="header-link is-compact no-print" href="login.php">'
-             . '<svg aria-hidden="true"><use href="#icon-user"/></svg><span>Sign in</span></a>';
+        return '<a class="header-link no-print" href="login.php">'
+             . '<svg aria-hidden="true"><use href="#icon-user"/></svg><span>Faculty sign in</span></a>';
     }
 
     $name = trim((string) ($u['name'] ?? '')) ?: 'Account';
     $email = (string) ($u['email'] ?? '');
     $e = fn(string $v): string => htmlspecialchars($v);
+    $initial = mb_strtoupper(mb_substr($name, 0, 1));
 
-    $links = '<a href="mark.php">Mark attendance</a>';
+    $links = '';
     if (!empty($u['admin'])) $links .= '<a href="admin.php">Faculty accounts</a><a href="stats.php">Usage</a>';
     $links .= '<a href="account.php">Your account</a>'
             . '<a class="account-panel-out" href="login.php?logout=1">Sign out</a>';
 
     return '<details class="account-menu no-print">'
-         . '<summary class="account-trigger">'
-         . '<svg aria-hidden="true"><use href="#icon-user"/></svg>'
-         . '<span class="account-trigger-name">' . $e($name) . '</span>'
+         . '<summary class="account-trigger" aria-label="Account: ' . $e($name) . '">'
+         . '<span class="account-avatar" aria-hidden="true">' . $e($initial) . '</span>'
          . '<svg class="account-caret" aria-hidden="true"><use href="#icon-caret"/></svg>'
          . '</summary>'
          . '<div class="account-panel">'
@@ -40,7 +40,45 @@ function account_menu(): string {
          . '</div></details>';
 }
 
-function page_head(string $title, string $bodyClass = ''): void {
+// The header every page shares. Where to go on the left (Attendance and
+// Timetable, the two pages anyone opens), then the one action, the theme and
+// the account on the right. $current names the page so its link is marked;
+// 'mark' hides the Mark attendance button on the page it would lead to.
+// The icons it uses must be in each page's sprite: chart, rooms, mark, user,
+// caret, sun, moon.
+function site_header(string $title, string $current = ''): void {
+    $signedIn = function_exists('auth_user') && auth_user() !== null;
+    $nav = ['attendance' => ['index.php', 'chart', 'Attendance'], 'timetable' => ['rooms.php', 'rooms', 'Timetable']];
+    ?>
+<header class="app-header">
+  <div class="header-inner">
+    <a class="brand" href="index.php">
+      <span class="brand-logo"><img src="img/logo.png" alt="Ajeenkya D Y Patil University"></span>
+      <h1><?= htmlspecialchars($title) ?></h1>
+    </a>
+    <nav class="site-nav no-print" aria-label="Pages">
+      <?php foreach ($nav as $id => [$href, $icon, $label]): ?>
+      <a href="<?= $href ?>"<?= $current === $id ? ' aria-current="page"' : '' ?>><svg aria-hidden="true"><use href="#icon-<?= $icon ?>"/></svg><?= $label ?></a>
+      <?php endforeach; ?>
+    </nav>
+    <div class="header-controls">
+      <?php if ($signedIn && $current !== 'mark'): ?>
+      <a class="header-cta no-print" href="mark.php"><svg aria-hidden="true"><use href="#icon-mark"/></svg><span>Mark attendance</span></a>
+      <?php endif; ?>
+      <button class="theme-toggle no-print" id="theme-toggle" type="button" aria-label="Switch theme" aria-pressed="false" title="Switch theme">
+        <svg class="theme-icon-moon" aria-hidden="true"><use href="#icon-moon"/></svg>
+        <svg class="theme-icon-sun" aria-hidden="true"><use href="#icon-sun"/></svg>
+      </button>
+      <?= account_menu() ?>
+    </div>
+  </div>
+</header>
+<?php
+}
+
+// $nav is the header link this page is ('timetable'), or '' for a page with no
+// link of its own, which then keeps its own name as the header's title.
+function page_head(string $title, string $bodyClass = '', string $nav = ''): void {
     $root = __DIR__ . '/..';
     ?><!DOCTYPE html>
 <html lang="en">
@@ -51,7 +89,7 @@ function page_head(string $title, string $bodyClass = ''): void {
 <link rel="icon" href="img/favicon.png?v=<?= filemtime("$root/img/favicon.png") ?>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/dashboard.css?v=<?= filemtime("$root/css/dashboard.css") ?>">
 <meta name="theme-color" content="#7f1420">
 <script>
@@ -77,23 +115,11 @@ try {
   <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
   <symbol id="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol>
   <symbol id="icon-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
+  <symbol id="icon-chart" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></symbol>
+  <symbol id="icon-rooms" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/><path d="M10 10v11"/></symbol>
+  <symbol id="icon-mark" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="m9 11 3 3L22 4"/></symbol>
 </defs></svg>
-<header class="app-header">
-  <div class="header-inner">
-    <div class="brand">
-      <div class="brand-logo"><img src="img/logo.png" alt="Ajeenkya D Y Patil University"></div>
-      <h1><?= htmlspecialchars($title) ?></h1>
-    </div>
-    <div class="header-controls">
-      <a class="header-link is-compact" href="index.php"><svg aria-hidden="true"><use href="#icon-back"/></svg><span>Dashboard</span></a>
-      <button class="theme-toggle no-print" id="theme-toggle" type="button" aria-label="Switch theme" aria-pressed="false" title="Switch theme">
-        <svg class="theme-icon-moon" aria-hidden="true"><use href="#icon-moon"/></svg>
-        <svg class="theme-icon-sun" aria-hidden="true"><use href="#icon-sun"/></svg>
-      </button>
-      <?= account_menu() ?>
-    </div>
-  </div>
-</header>
+<?php site_header($nav ? SITE_NAME : $title, $nav ?: (str_contains($bodyClass, 'page-marking') ? 'mark' : '')); ?>
 <main class="page-main">
 <?php
 }
@@ -108,13 +134,14 @@ function page_foot(): void {
 // One line at the foot of every page. The GitHub mark is inline rather than in
 // a sprite because the dashboard and the faculty pages carry different sprites,
 // and this is the one icon both need.
+const SITE_NAME = 'ADYPU Academic Dashboard';
 const SITE_REPO = 'https://github.com/D00M1909/adypu-academic-dashboard';
 
 function site_footer(): void {
     ?>
 <footer class="site-footer no-print">
   <div class="footer-inner">
-    <span class="footer-brand">ADYPU Academic Dashboard</span>
+    <span class="footer-brand"><?= SITE_NAME ?></span>
     <span class="footer-links">
       <span>Built by <a href="https://github.com/D00M1909" data-link="author" target="_blank" rel="noopener noreferrer">Advait</a></span>
       <a class="footer-gh" href="<?= SITE_REPO ?>" data-link="repo" target="_blank" rel="noopener noreferrer">

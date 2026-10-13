@@ -62,12 +62,6 @@ assert(els['chart-donut'].innerHTML.includes('>85<'), 'donut legend should show 
 assert(els['chart-trend'].innerHTML.includes('70% (2 classes)'), 'trend day 1 wrong');
 assert(els['chart-trend'].innerHTML.includes('77% (3 classes)'), 'trend day 2 wrong');
 
-// Ranked, so the school in front comes first.
-const bars = els['chart-bars'].innerHTML;
-assert(bars.indexOf('Law') < bars.indexOf('Engineering'), 'bars should be ranked, best first');
-assert(bars.includes('85%') && bars.includes('65%'), 'bar percentages wrong: ' + bars);
-assert(els['chart-bars-caption'].textContent === 'Attendance by school', 'bar caption wrong');
-
 assert(els['chart-compliance'].innerHTML.includes('3 of 4 classes reported'),
   'compliance should count the classes in scope');
 
@@ -79,7 +73,6 @@ window.Charts.render({ school: 'eng', year: null, branch: null },
 assert(els['chart-trend'].innerHTML.includes('50% (1 classes)'), 'eng day 1 should be 50/100');
 assert(els['chart-trend'].innerHTML.includes('75% (2 classes)'), 'eng day 2 should be 150/200');
 assert(els['chart-compliance'].innerHTML.includes('2 of 2 classes reported'), 'eng has 2 classes, not 4');
-assert(els['chart-bars-caption'].textContent === 'Attendance by year', 'drilling should change the ranking');
 
 // A branchless school keys on an empty branch segment: 'law|1st Year|' has to
 // match 'law|1st Year||A' or the whole school vanishes from its own charts.
@@ -87,14 +80,6 @@ window.Charts.render({ school: 'law', year: '1st Year', branch: null },
   { present: 85, strengthReported: 100, reported: 1, classes: 2 });
 assert(els['chart-trend'].innerHTML.includes('90% (1 classes)'), 'branchless scope lost its classes');
 assert(els['chart-compliance'].innerHTML.includes('1 of 2 classes reported'), 'law scope wrong');
-
-// A class nobody reported must not be drawn as a zero, which reads as total
-// absence rather than a missing form. It states the enrolment it does have
-// instead, which is the one number that is known without a submission.
-window.Charts.render({ school: 'law', year: '1st Year', branch: '' },
-  { present: 85, strengthReported: 100, reported: 1, classes: 2 });
-assert(els['chart-bars'].innerHTML.includes('100 students'), 'unreported division should state its enrolment');
-assert(!els['chart-bars'].innerHTML.includes('>0%<'), 'unreported division drawn as a 0% reading');
 
 // One division selected: the scope is a whole class key, and a trailing
 // separator on it would match nothing and empty every chart.
@@ -235,17 +220,6 @@ window.Charts.render({ school: 'eng', year: '1st Year', branch: 'Core' },
   { present: 0, strengthReported: 0, reported: 0, classes: 2 });
 assert(els['chart-donut'].innerHTML.includes('has reported'), 'empty donut should explain itself');
 
-// --- A school whose strengths are invented states no enrolment -------------
-// Law's divisions are the A=30/B=60 scheduling default, not a roll count, so an
-// unreported row there must not print "100 students" as though someone counted.
-window.SCHOOLS.law.placeholder = true;
-window.Charts.render({ school: 'law', year: '1st Year', branch: '' },
-  { present: 85, strengthReported: 100, reported: 1, classes: 2 });
-const placeheld = els['chart-bars'].innerHTML;
-assert(placeheld.includes('Not reported'), 'a placeholder school should say only that: ' + placeheld);
-assert(!placeheld.includes('students'), 'a placeholder school stated an invented enrolment: ' + placeheld);
-delete window.SCHOOLS.law.placeholder;
-
 // --- A count above the class's strength is capped -------------------------
 // Real case, 3 Sep 2026: 59 present filed against 4th Year CS division A, which
 // the school says holds 28. Uncapped, the day drew 211% and "Absent -31". The
@@ -259,5 +233,24 @@ const capped = els['daybyday-rows'].innerHTML;
 assert(capped.includes('>100<'), 'a day over strength should cap at it: ' + capped);
 assert(!capped.includes('180'), 'the raw over-count reached the chart: ' + capped);
 assert(!/\b(1[0-9][0-9]|[2-9][0-9][0-9])%/.test(capped), 'a day percentage exceeded 100: ' + capped);
+
+// --- The two daily charts draw the last 30 days, not the range -------------
+// TREND_DAYS is the month ending on the range's last day. The trend and the
+// reporting chart read it; the day-by-day table, like every number on the
+// page, stays on the range.
+window.ATTENDANCE_DAYS = {
+  '2026-08-28': { 'eng|1st Year|Core|A': { '09:30': 60 } },
+};
+window.TREND_DAYS = {
+  '2026-08-20': { 'eng|1st Year|Core|A': { '09:30': 40 }, 'eng|1st Year|Core|B': { '09:30': 30 } },
+  '2026-08-28': { 'eng|1st Year|Core|A': { '09:30': 60 } },
+};
+window.Charts.render({ school: 'eng', year: null, branch: null },
+  { present: 60, strengthReported: 100, reported: 1, classes: 2 });
+assert(els['chart-trend'].innerHTML.includes('35% (2 classes)'), 'trend should reach back into the month: ' + els['chart-trend'].innerHTML);
+assert(els['chart-trend'].innerHTML.includes('60% (1 classes)'), 'trend lost the range day');
+assert(els['chart-compliance'].innerHTML.includes('2 of 2 classes reported'), 'reporting chart should cover the month');
+assert(els['daybyday-section'].hidden === true, 'the day-by-day table must stay on the one-day range');
+delete window.TREND_DAYS;
 
 console.log('OK');

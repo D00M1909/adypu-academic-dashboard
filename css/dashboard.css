@@ -238,7 +238,33 @@ button {
   flex-wrap: wrap;
 }
 
-.brand { display: flex; align-items: center; gap: 12px; }
+.brand { display: flex; align-items: center; gap: 12px; color: #fff; text-decoration: none; }
+
+/* Where to go, beside the title: plain links with an underline on the page
+   you are on. Kept apart from the buttons on the right, which do things. */
+.site-nav { display: flex; align-items: center; gap: 22px; margin-right: auto; margin-left: 12px; align-self: stretch; }
+.site-nav a {
+  display: inline-flex; align-items: center; gap: 7px;
+  color: rgba(255, 255, 255, 0.72); text-decoration: none;
+  font-size: 14px; font-weight: 600; white-space: nowrap;
+  padding-block: 7px;
+  box-shadow: inset 0 -2px 0 transparent;
+  transition: color 0.15s var(--ease-out), box-shadow 0.15s var(--ease-out);
+}
+.site-nav a:hover { color: #fff; }
+.site-nav a[aria-current="page"] { color: #fff; box-shadow: inset 0 -2px 0 #fff; }
+.site-nav svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* The one solid button in the header: what a faculty member came here to do. */
+.header-cta {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: #fff; color: var(--red-secondary); text-decoration: none;
+  font-size: 13.5px; font-weight: 700; padding: 8px 13px; border-radius: 10px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.12);
+  transition: transform 0.12s var(--ease-out), box-shadow 0.12s var(--ease-out);
+}
+.header-cta:hover { transform: translateY(-1px); box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.4); }
+.header-cta svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 .brand-logo {
   background: #fff;
@@ -267,6 +293,7 @@ button {
    change it; nothing else uses it. */
 .app-header h1 {
   margin: 0;
+  white-space: nowrap;
   color: #fff;
   font-family: "Playfair Display", Georgia, "Times New Roman", serif;
   font-size: 20px;
@@ -322,44 +349,20 @@ button {
 }
 .range-summary:hover .range-summary-icon { stroke: var(--red-ink); }
 
-.tabs {
-  display: flex;
-  gap: 4px;
-  background: rgba(0, 0, 0, 0.15);
-  padding: 4px;
-  border-radius: 11px;
-  width: fit-content;
-}
-
-.tab {
-  background: transparent;
-  color: rgba(255, 255, 255, 0.75);
-  border: none;
-  padding: 7px 16px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 13.5px;
-  font-weight: 600;
-  text-decoration: none;
-  transition: background 0.15s var(--ease-out), color 0.15s var(--ease-out);
-}
-.tab:hover { color: #fff; }
-.tab.active { background: #fff; color: var(--red-primary); }
-
 /* Tabs and the theme toggle travel together, so a wrapped phone header puts
    them on one row instead of two. */
 /* Wraps, because the row grew a "Mark attendance" link and a phone's header is
    the one place on this page with no room to spare. Without it the tabs, the
    link and the theme toggle push each other off the right edge and the whole
    page gains a horizontal scroll. */
-.header-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.header-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 .theme-toggle {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   flex-shrink: 0;
   background: rgba(0, 0, 0, 0.15);
   border: none;
@@ -425,6 +428,15 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
   margin-bottom: 14px;
 }
 .section-title h2 { margin: 0; font-size: 15px; font-weight: 700; }
+.scope-tabs { display: flex; gap: 20px; border-bottom: 1px solid var(--hairline); }
+.scope-tabs a {
+  padding-bottom: 8px; margin-bottom: -1px;
+  font-size: 15px; font-weight: 700; color: var(--ink-faint); text-decoration: none;
+  box-shadow: inset 0 -2px 0 transparent;
+  transition: color 0.12s var(--ease-out), box-shadow 0.12s var(--ease-out);
+}
+.scope-tabs a:hover { color: var(--ink-muted); }
+.scope-tabs a[aria-current="page"] { color: var(--ink); box-shadow: inset 0 -2px 0 var(--red-ink); }
 .section-meta { font-size: 12.5px; color: var(--ink-muted); font-weight: 500; }
 
 .tile-grid { display: grid; gap: 10px; }
@@ -623,7 +635,12 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
   .app-header { position: static; }
   .schools-grid, .partners-grid, .years-grid, .branches-grid, .divisions-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .division-grid { grid-template-columns: minmax(0, 1fr); }
-  .header-inner { flex-direction: column; align-items: flex-start; }
+  .header-inner { flex-direction: row; flex-wrap: wrap; align-items: center; row-gap: 10px; }
+  .app-header { padding-inline: 16px; }
+  .brand { flex-basis: 100%; }
+  .app-header h1 { white-space: normal; font-size: 18px; }
+  .site-nav { margin-left: 0; gap: 18px; min-height: 36px; }
+  .header-controls { margin-left: auto; }
   /* A column flex item sizes to its content, and its content here is a heading
      long enough to push past the phone it is being read on. */
   .header-inner > * { max-width: 100%; }
@@ -686,21 +703,26 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
   box-shadow: 0 0 0 100vmax var(--surface), 0 1px 0 100vmax var(--hairline);
   clip-path: inset(-2px -100vmax -1px -100vmax);
 }
-.range-presets { display: flex; flex-wrap: wrap; gap: 8px; }
+/* One segmented control: four answers to one question. */
+.range-presets {
+  display: flex; flex-wrap: wrap; gap: 2px; padding: 3px;
+  background: var(--surface-raised); border: 1px solid var(--hairline); border-radius: 11px;
+  box-shadow: var(--shadow-sm);
+}
 .range-preset {
   font: inherit;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--ink-muted);
-  background: var(--surface-raised);
-  border: 1px solid var(--hairline);
-  border-radius: 999px;
-  padding: 7px 14px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 6px 13px;
   cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  transition: color 0.12s var(--ease-out), border-color 0.12s var(--ease-out);
+  white-space: nowrap;
+  transition: color 0.12s var(--ease-out), background 0.12s var(--ease-out);
 }
-.range-preset:hover { color: var(--red-ink); border-color: var(--red-tint-strong); }
+.range-preset:hover { color: var(--ink); }
 .chip-narrow { display: none; }
 .range-preset.is-active {
   color: #fff;
@@ -728,31 +750,21 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
   padding: 6px 10px;
   box-shadow: var(--shadow-sm);
 }
-.range-apply {
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  color: #fff;
-  background: var(--red-primary);
-  border: 0;
-  border-radius: 10px;
-  padding: 7px 16px;
-  cursor: pointer;
-}
-.range-apply:hover { background: var(--red-secondary); }
 .range-export {
+  display: inline-flex; align-items: center; gap: 7px;
   font: inherit;
   font-size: 13px;
   font-weight: 600;
-  color: var(--red-ink);
-  background: var(--surface-raised);
-  border: 1px solid var(--red-tint-strong);
+  color: var(--ink);
+  background: var(--surface-control);
+  border: 1px solid var(--hairline);
   border-radius: 10px;
-  padding: 7px 12px;
+  padding: 6px 12px;
   cursor: pointer;
   white-space: nowrap;
 }
-.range-export:hover { background: var(--red-tint); }
+.range-export:hover { background: var(--red-tint); color: var(--red-ink); border-color: var(--red-tint-strong); }
+.range-export svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 /* Desktop has the room for the inputs themselves; this is the phone's handle. */
 .range-more { display: none; }
 /* Whether the page is showing this morning's push or Friday's. The edge caches
@@ -780,8 +792,8 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
   .range-more { display: inline-flex; align-items: center; }
   /* Tight enough that all five chips hold one row at 375px. Two rows here cost
      40px of a viewport this bar is already pinning a fifth of. */
-  .range-presets { gap: 6px; }
-  .range-preset { font-size: 12.5px; padding: 7px 11px; }
+  .range-presets { gap: 2px; }
+  .range-preset { font-size: 12.5px; padding: 6px 10px; }
   .chip-wide { display: none; }
   .chip-narrow { display: inline; }
   .range-more[aria-expanded="true"] { color: #fff; background: var(--red-primary); border-color: var(--red-primary); }
@@ -792,8 +804,8 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
    to FOLLOW that block, not precede it: same specificity, so source order is
    what decides, and placed earlier it was simply overruled. */
 @media (max-width: 400px) {
-  .range-presets { gap: 5px; }
-  .range-preset { padding: 7px 8px; font-size: 12px; }
+  .range-presets { gap: 1px; }
+  .range-preset { padding: 6px 7px; font-size: 12px; }
 }
 
 /* An average over several days has to say so, or two days out of seven reads
@@ -892,12 +904,14 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
   gap: 12px;
 }
 .chart-card figcaption {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
   font-size: 12.5px;
   font-weight: 600;
   color: var(--ink-muted);
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
+.chart-caption-note { font-size: 11.5px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--ink-faint); }
 .chart-body { flex: 1; display: flex; flex-direction: column; justify-content: center; min-height: 150px; }
 .chart-empty, .chart-note, .chart-single {
   margin: 0;
@@ -911,15 +925,12 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
 
 /* Donut: one ring, one hole, and the number that matters inside it. */
 .donut { width: 140px; height: 140px; margin: 0 auto; display: block; }
-.donut-track { fill: none; stroke: var(--hairline); stroke-width: 16; }
-.donut-value { fill: none; stroke-width: 16; stroke-linecap: round; transition: stroke-dasharray 0.4s var(--ease-out); }
+.donut-track { fill: none; stroke: var(--hairline); stroke-width: 11; }
+.donut-value { fill: none; stroke-width: 11; stroke-linecap: round; transition: stroke-dasharray 0.4s var(--ease-out); }
 .donut-value.att-good { stroke: var(--att-good); }
 .donut-value.att-warn { stroke: var(--att-warn); }
 .donut-value.att-low { stroke: var(--att-low); }
-.donut-pct { text-anchor: middle; font-size: 28px; font-weight: 700; fill: currentColor; }
-.donut-pct.att-good { fill: var(--att-good); }
-.donut-pct.att-warn { fill: var(--att-warn); }
-.donut-pct.att-low { fill: var(--att-low); }
+.donut-pct { text-anchor: middle; font-family: "IBM Plex Mono", monospace; font-size: 26px; font-weight: 700; fill: var(--ink); }
 .donut-sub { text-anchor: middle; font-size: 11px; fill: var(--ink-muted); }
 .chart-legend {
   list-style: none;
@@ -943,45 +954,17 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
 .trend { width: 100%; height: auto; display: block; }
 .trend-line { fill: none; stroke: var(--red-ink); stroke-width: 2; stroke-linejoin: round; }
 .trend-area { fill: var(--red-tint); stroke: none; }
-.trend-dot { fill: var(--surface-raised); stroke: var(--red-ink); stroke-width: 2; }
-.trend-grid { stroke: var(--ink-faint); stroke-width: 1; stroke-dasharray: 3 4; }
-.chart-axis {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 11.5px;
-  color: var(--ink-muted);
-}
-.chart-axis-note { color: var(--ink-faint); }
-
-/* Ranked bars: the same bar the tiles and the modal use. */
-.bar-rows { display: flex; flex-direction: column; gap: 10px; }
-.bar-row {
-  display: grid;
-  grid-template-columns: minmax(94px, 1.1fr) 1.7fr auto;
-  align-items: center;
-  gap: 10px;
-  font-size: 12.5px;
-}
-.bar-name { color: var(--ink); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bar-value { font-weight: 600; text-align: right; min-width: 42px; }
-
-/* Reporting compliance, one column per day. */
-.compliance { display: flex; align-items: flex-end; justify-content: center; gap: 4px; height: 120px; }
-/* max-width so one day is a column, not a billboard. */
-.compliance-day { flex: 1; max-width: 56px; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; cursor: help; }
-.compliance-bar {
-  flex: 1;
-  width: 100%;
-  min-width: 6px;
-  background: var(--hairline);
-  border-radius: 4px;
-  display: flex;
-  align-items: flex-end;
-  overflow: hidden;
-}
-.compliance-fill { width: 100%; background: var(--red-ink); border-radius: 4px; }
-.compliance-label { font-size: 10.5px; color: var(--ink-faint); }
+.trend-dot { fill: var(--surface-raised); stroke: var(--red-ink); stroke-width: 1.5; }
+.trend-dot.is-now { fill: var(--red-ink); stroke-width: 2; }
+/* Shared by both daily charts. */
+.chart-gridline { stroke: var(--hairline); stroke-width: 1; }
+.chart-gridline.is-rule { stroke-dasharray: 4 4; }
+.chart-tick { font-size: 11px; fill: var(--ink-faint); }
+.chart-tick.is-now { fill: var(--ink); }
+.chart-callout { font-size: 12px; font-weight: 700; fill: var(--ink); }
+.chart-callout.is-quiet { fill: var(--ink-muted); }
+.compliance-bar { fill: var(--ink-faint); fill-opacity: 0.55; }
+.compliance-bar.is-now { fill: var(--ink); fill-opacity: 1; }
 
 /* ---------- Faculty pages: login, mark, admin ----------
    Mobile first, and that is not a slogan here: these three are used on a phone,
@@ -1224,19 +1207,22 @@ input:focus-visible, select:focus-visible {
 
 .account-menu { position: relative; }
 .account-trigger {
-  display: flex; align-items: center; gap: 7px;
-  padding: 7px 10px; border-radius: 999px;
+  display: flex; align-items: center; gap: 5px;
+  height: 36px; padding: 0 8px; border-radius: 10px;
   font-size: 13px; font-weight: 600; color: #fff;
-  background: rgba(255, 255, 255, 0.16);
+  background: rgba(0, 0, 0, 0.15);
   cursor: pointer; list-style: none;
   user-select: none; -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
 /* Safari draws its own triangle on a summary and ignores list-style. */
 .account-trigger::-webkit-details-marker { display: none; }
-.account-trigger:hover { background: rgba(255, 255, 255, 0.26); }
+.account-trigger:hover { background: rgba(0, 0, 0, 0.28); }
+.account-avatar {
+  width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
+  background: #fff; color: var(--red-secondary); font-size: 11.5px; font-weight: 700; line-height: 1;
+}
 .account-trigger svg { width: 15px; height: 15px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.account-trigger-name { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .account-caret { width: 13px; height: 13px; opacity: 0.75; transition: transform 0.15s var(--ease-out); }
 .account-menu[open] .account-caret { transform: rotate(180deg); }
 
@@ -1266,12 +1252,16 @@ input:focus-visible, select:focus-visible {
 .account-panel a:hover { background: var(--red-tint); color: var(--red-ink); }
 .account-panel-out { color: var(--red-ink); }
 
-/* On a phone the trigger is the icon alone; the panel still names whoever it
-   belongs to, so nothing is lost. */
+/* On a phone the trigger is the initial alone; the panel still names whoever
+   it belongs to, so nothing is lost. */
 @media (max-width: 480px) {
-  .account-trigger-name, .account-caret { display: none; }
-  .account-trigger { padding: 8px; }
+  .account-caret { display: none; }
+  .account-trigger { padding: 0 7px; }
   .account-panel { min-width: 200px; }
+  /* The links drop their icons before Mark attendance drops its label: the
+     button is why a faculty member opens this on a phone at all. */
+  .site-nav svg { display: none; }
+  .site-nav { gap: 16px; }
 }
 
 /* ---------- Accounts ---------- */
@@ -1497,7 +1487,8 @@ input:focus-visible, select:focus-visible {
   .brand-logo { box-shadow: none; padding: 3px 5px; }
   .brand-logo img { height: 34px; }
   .app-header h1 { color: var(--ink); font-size: 18px; }
-  .tabs { display: none; }
+  .site-nav, .scope-tabs a:not([aria-current]) { display: none; }
+  .scope-tabs { border: 0; }
 
   main { max-width: none; padding: 12px 0 0; }
   .range-bar {

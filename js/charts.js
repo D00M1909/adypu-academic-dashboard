@@ -1,10 +1,12 @@
-// The four charts under "Insights". No chart library: three of these are a
-// handful of divs and the fourth is one <circle>, and a CDN dependency is not
-// worth the page weight on a host that already fights to serve PHP.
+// The three charts under "Insights". No chart library: each is one small SVG,
+// and a CDN dependency is not worth the page weight on a host that already
+// fights to serve PHP.
 //
 // Everything is drawn from what index.php already put on the page:
-//   ATTENDANCE_DATA  the range's tree, for the donut and the ranking
+//   ATTENDANCE_DATA  the range's tree, for the donut
 //   ATTENDANCE_DAYS  date -> class key -> time -> present, per-day and per-lecture
+//   TREND_DAYS       the same, for the 30 days ending on the range's last day,
+//                    which the two daily charts draw whatever the range is
 //   CLASS_STRENGTH   class key -> strength, the denominator for those days
 // so a drill-down rescopes every chart without another request.
 // A division is normally a letter, and reads best as "Division A". Some schools
@@ -140,8 +142,8 @@ window.Charts = (function () {
   // inside the scope: present, the strength of just those classes, and how
   // many of the scope's classes they were. A day nobody reported is left out
   // rather than drawn as a zero, which would read as total absence.
-  function dailySeries(inScope) {
-    var days = window.ATTENDANCE_DAYS || {};
+  function dailySeries(inScope, days) {
+    days = days || window.ATTENDANCE_DAYS || {};
     var strengths = window.CLASS_STRENGTH || {};
     return Object.keys(days).sort().map(function (date) {
       var present = 0, strength = 0, reported = 0;
@@ -156,6 +158,18 @@ window.Charts = (function () {
       });
       return { date: date, present: present, strength: strength, reported: reported };
     }).filter(function (d) { return d.reported > 0; });
+  }
+
+  // The month the two daily charts draw. Falls back to the range's own days
+  // where a page (or a test) supplies no separate month.
+  function trendDays() {
+    return window.TREND_DAYS || window.ATTENDANCE_DAYS || {};
+  }
+
+  // A y-axis gridline with its label, shared by both daily charts.
+  function gridline(x1, x2, y, label, dashed) {
+    return '<line class="chart-gridline' + (dashed ? ' is-rule' : '') + '" x1="' + x1 + '" x2="' + x2 + '" y1="' + y.toFixed(1) + '" y2="' + y.toFixed(1) + '"/>' +
+      '<text class="chart-tick" x="' + (x1 - 6) + '" y="' + (y + 4).toFixed(1) + '" text-anchor="end">' + label + '</text>';
   }
 
   function classesInScope(inScope) {
@@ -192,181 +206,63 @@ window.Charts = (function () {
       '</ul>';
   }
 
-  // Attendance percentage per day. The one chart the date range exists for:
-  // a single number can only say where a school is, this says which way it is
-  // going.
+  // Attendance percentage per day, over the last 30 days. A single number can
+  // only say where a school is; this says which way it is going.
   function renderTrend(el, inScope) {
-    var series = dailySeries(inScope);
+    var series = dailySeries(inScope, trendDays());
     if (!series.length) {
-      empty(el, 'No days reported in this range.');
+      empty(el, 'No days reported in the last 30 days.');
       return;
     }
     if (series.length === 1) {
       var only = pct(series[0].present, series[0].strength);
-      el.innerHTML = '<p class="chart-single"><b class="att-pct ' + attClass(only) + '">' +
-        only + '%</b>' + esc(shortDate(series[0].date)) +
-        '<span>Pick a wider range to see a trend.</span></p>';
+      el.innerHTML = '<p class="chart-single"><b class="att-pct ' + attClass(only) + '" title="' +
+        esc(shortDate(series[0].date)) + ': ' + only + '% (' + series[0].reported + ' classes)">' +
+        only + '%</b>' + esc(shortDate(series[0].date)) + '</p>';
       return;
     }
 
-    var w = 300, h = 120, pad = 8;
+    var w = 400, h = 230, padL = 38, padR = 14, padT = 16, padB = 28, n = series.length;
+    function x(i) { return padL + (i * (w - padL - padR)) / (n - 1); }
+    function y(v) { return padT + ((100 - Math.min(v, 100)) * (h - padT - padB)) / 100; }
     var pts = series.map(function (d, i) {
-      var x = pad + (i * (w - pad * 2)) / (series.length - 1);
-      var y = h - pad - (pct(d.present, d.strength) / 100) * (h - pad * 2);
-      return { x: x, y: y, d: d };
+      return { x: x(i), y: y(pct(d.present, d.strength)), d: d };
     });
     var line = pts.map(function (p) { return p.x.toFixed(1) + ',' + p.y.toFixed(1); }).join(' ');
-    var area = pad + ',' + (h - pad) + ' ' + line + ' ' + (w - pad) + ',' + (h - pad);
+    var area = x(0).toFixed(1) + ',' + y(0).toFixed(1) + ' ' + line + ' ' + x(n - 1).toFixed(1) + ',' + y(0).toFixed(1);
+    // Three dates are enough to place a month: its ends and the middle.
+    var labelled = {};
+    labelled[0] = 'start';
+    labelled[Math.floor((n - 1) / 2)] = 'middle';
+    labelled[n - 1] = 'end';
+    var last = pts[n - 1], lastPct = pct(last.d.present, last.d.strength);
 
     el.innerHTML =
-      '<svg class="trend" viewBox="0 0 ' + w + ' ' + h + '" role="img" aria-label="Attendance percentage by day">' +
+      '<svg class="trend" viewBox="0 0 ' + w + ' ' + h + '" role="img" aria-label="Attendance percentage by day, last 30 days">' +
+        [0, 25, 50, 75, 100].map(function (v) { return gridline(padL, w - padR, y(v), v + '%', v === 75); }).join('') +
         '<polygon class="trend-area" points="' + area + '"/>' +
         '<polyline class="trend-line" points="' + line + '"/>' +
-        // After the area, not before it: SVG paints in document order, so a
-        // 75% line drawn first is buried by the fill for every day at or above
-        // 75% — exactly the days you are checking the rule against.
-        '<line class="trend-grid" x1="' + pad + '" x2="' + (w - pad) + '" y1="' + (h - pad - 0.75 * (h - pad * 2)) + '" y2="' + (h - pad - 0.75 * (h - pad * 2)) + '"/>' +
-        pts.map(function (p) {
+        pts.map(function (p, i) {
           var v = pct(p.d.present, p.d.strength);
-          return '<circle class="trend-dot" cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="3">' +
-            '<title>' + esc(shortDate(p.d.date)) + ': ' + v + '% (' + p.d.reported + ' classes)</title></circle>';
+          var tick = labelled[i] === undefined ? '' :
+            '<text class="chart-tick' + (i === n - 1 ? ' is-now' : '') + '" x="' + p.x.toFixed(1) + '" y="' + (h - 8) + '" text-anchor="' + labelled[i] + '">' + esc(shortDate(p.d.date)) + '</text>';
+          return '<circle class="trend-dot' + (i === n - 1 ? ' is-now' : '') + '" cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="' + (i === n - 1 ? 4.5 : 2.5) + '">' +
+            '<title>' + esc(shortDate(p.d.date)) + ': ' + v + '% (' + p.d.reported + ' classes)</title></circle>' + tick;
         }).join('') +
-      '</svg>' +
-      '<div class="chart-axis"><span>' + esc(shortDate(series[0].date)) + '</span>' +
-        '<span class="chart-axis-note">dashed line is the 75% rule</span>' +
-        '<span>' + esc(shortDate(series[series.length - 1].date)) + '</span></div>';
+        // Above the last point, unless that would run off the top of the chart.
+        '<text class="chart-callout" x="' + (last.x - 8).toFixed(1) + '" y="' + (last.y - 10 < padT ? last.y + 18 : last.y - 10).toFixed(1) + '" text-anchor="end">' + lastPct + '%</text>' +
+      '</svg>';
   }
 
-  // Whatever sits one level below the current selection, ranked. At the top
-  // that is the nine schools; inside a school it becomes years, then branches,
-  // then divisions, which is the comparison you actually want at each step.
-  function childTotals(state) {
-    var data = window.ATTENDANCE_DATA || {};
-    var out = [];
-
-    // strength is every division's, reported or not; strengthReported is only
-     // the ones that filed. The first is what an unreported tile states instead
-     // of nothing, the second is the only honest denominator for a percentage.
-    function totalsOf(divisions) {
-      var t = { present: 0, strength: 0, strengthReported: 0, reported: 0, classes: 0 };
-      divisions.forEach(function (d) {
-        t.classes++;
-        t.strength += d.strength;
-        if (d.reported) {
-          t.reported++;
-          t.present += d.present;
-          t.strengthReported += d.strength;
-        }
-      });
-      return t;
-    }
-
-    function walk(node, acc) {
-      if (Array.isArray(node)) return totalsOf(node);
-      Object.keys(node).forEach(function (k) { walk(node[k], acc); });
-      return acc;
-    }
-
-    function sum(node) {
-      if (Array.isArray(node)) return totalsOf(node);
-      var t = { present: 0, strength: 0, strengthReported: 0, reported: 0, classes: 0 };
-      Object.keys(node).forEach(function (k) {
-        var s = sum(node[k]);
-        t.present += s.present;
-        t.strength += s.strength;
-        t.strengthReported += s.strengthReported;
-        t.reported += s.reported;
-        t.classes += s.classes;
-      });
-      return t;
-    }
-
-    // A program-first school ranks what its drill-down shows next: its
-    // programs, then one program's years. Neither is a node of the tree (a
-    // program lives inside every year), so they are gathered across years.
-    if (state.school && programFirstSchool(state.school) && !state.year) {
-      var school = data[state.school] || {};
-      var hasBranch = state.branch !== null && state.branch !== undefined;
-      var gathered = {};
-      Object.keys(school).forEach(function (year) {
-        Object.keys(school[year]).forEach(function (program) {
-          if (hasBranch && program !== state.branch) return;
-          var key = hasBranch ? year : program;
-          (gathered[key] = gathered[key] || {})[year + '|' + program] = school[year][program];
-        });
-      });
-      return {
-        rows: Object.keys(gathered).map(function (k) {
-          return { name: k, school: state.school, totals: sum(gathered[k]) };
-        }),
-        label: hasBranch ? 'year' : 'program'
-      };
-    }
-
-    var node = data, label = (window.DASHBOARD_VIEW || {}).noun || 'school';
-    if (state.school) { node = (data[state.school] || {}); label = 'year'; }
-    if (state.school && state.year) { node = (node[state.year] || {}); label = (window.DASHBOARD_VIEW || {}).noun === 'partner' ? 'program' : 'branch'; }
-    if (state.school && state.year && state.branch !== null && state.branch !== undefined) {
-      node = node[state.branch] || [];
-      label = 'division';
-    }
-
-    if (Array.isArray(node)) {
-      node.forEach(function (d) {
-        out.push({
-          name: divisionLabel(d.division),
-          school: state.school,
-          totals: totalsOf([d])
-        });
-      });
-    } else {
-      Object.keys(node).forEach(function (k) {
-        out.push({
-          name: !state.school ? (window.SCHOOLS[k] ? window.SCHOOLS[k].name.replace(/^School of /, '') : k) : (k || 'General'),
-          school: !state.school ? k : state.school,
-          totals: sum(node[k])
-        });
-      });
-    }
-    return { rows: out, label: label };
-  }
-
-  function renderBars(el, caption, state) {
-    var children = childTotals(state);
-    var rows = children.rows.filter(function (r) { return r.totals.classes > 0; });
-    caption.textContent = 'Attendance by ' + children.label;
-    if (!rows.length) {
-      empty(el, 'Nothing to compare here.');
-      return;
-    }
-
-    rows.sort(function (a, b) {
-      return pct(b.totals.present, b.totals.strengthReported) - pct(a.totals.present, a.totals.strengthReported);
-    });
-
-    el.innerHTML = '<div class="bar-rows">' + rows.map(function (r) {
-      var v = pct(r.totals.present, r.totals.strengthReported);
-      var readout = r.totals.reported
-        ? '<span class="att-pct ' + attClass(v) + '">' + v + '%</span>'
-        : '<span class="tile-unreported">' + (placeholderSchool(r.school)
-            ? 'Not reported' : r.totals.strength + ' students') + '</span>';
-      return '<div class="bar-row">' +
-        '<span class="bar-name">' + esc(r.name) + '</span>' +
-        '<span class="division-bar"><span class="division-bar-fill ' +
-          (r.totals.reported ? attClass(v) : '') + '" style="width:' + (r.totals.reported ? v : 0) + '%"></span></span>' +
-        '<span class="bar-value">' + readout + '</span>' +
-      '</div>';
-    }).join('') + '</div>';
-  }
-
-  // How many of the scope's classes filled the form in, per day. The honesty
-  // chart: a 95% attendance figure resting on 6 of 136 classes should be
-  // visible as exactly that.
+  // How many of the scope's classes filled the form in, per day, over the last
+  // 30 days. While the tool is being rolled out this is the number that moves.
+  // A 95% attendance figure resting on 6 of 136 classes should be visible as
+  // exactly that; the count for each day is in its tooltip.
   function renderCompliance(el, inScope) {
-    // Every day in the range, not just the ones with submissions: a day nobody
-    // reported is the whole point of this chart, and dropping it let a class
-    // that reported twice in a week look like perfect compliance.
-    var days = window.ATTENDANCE_DAYS || {};
+    // Every day with a submission anywhere in the view, not just in the scope:
+    // a day this scope missed is the whole point of the chart, and dropping it
+    // let a class that reported twice in a week look like perfect compliance.
+    var days = trendDays();
     var total = classesInScope(inScope);
     var series = Object.keys(days).sort().map(function (date) {
       var reported = 0;
@@ -376,20 +272,36 @@ window.Charts = (function () {
       return { date: date, reported: reported };
     });
     if (!series.length || !total) {
-      empty(el, 'No submissions in this range.');
+      empty(el, 'No submissions in the last 30 days.');
       return;
     }
 
-    el.innerHTML = '<div class="compliance">' + series.map(function (d) {
-      var share = Math.round((d.reported / total) * 100);
-      return '<div class="compliance-day" title="' + esc(shortDate(d.date)) + ': ' +
-        d.reported + ' of ' + total + ' classes reported">' +
-        '<div class="compliance-bar"><div class="compliance-fill" style="height:' + share + '%"></div></div>' +
-        '<span class="compliance-label">' + esc(shortDate(d.date).split(' ')[0]) + '</span>' +
-      '</div>';
-    }).join('') + '</div>' +
-    '<p class="chart-note">' + series[series.length - 1].reported + ' of ' + total +
-      ' classes reported on ' + esc(shortDate(series[series.length - 1].date)) + '</p>';
+    // The axis tops out at a round number just above the busiest day, so the
+    // bars use the height instead of hugging the floor of a 143-class scale.
+    var peak = 0, peakAt = -1;
+    series.forEach(function (d, i) { if (d.reported > peak) { peak = d.reported; peakAt = i; } });
+    var step = peak <= 4 ? 1 : peak <= 10 ? 5 : peak <= 40 ? 10 : 20;
+    var top = Math.max(step, Math.ceil(peak / step) * step);
+    var w = 400, h = 230, padL = 30, padR = 6, padT = 22, padB = 28, n = series.length;
+    var slot = (w - padL - padR) / n, bw = Math.min(slot * 0.62, 28);
+    function y(v) { return padT + ((top - v) * (h - padT - padB)) / top; }
+    // About four dates under the bars; more than that and they run together.
+    var every = Math.max(1, Math.ceil(n / 4));
+
+    el.innerHTML =
+      '<svg class="trend" viewBox="0 0 ' + w + ' ' + h + '" role="img" aria-label="Classes reporting each day, last 30 days">' +
+        [0, top / 2, top].map(function (v) { return gridline(padL, w - padR, y(v), String(v)); }).join('') +
+        series.map(function (d, i) {
+          var now = i === n - 1, bx = padL + i * slot + (slot - bw) / 2, cx = (bx + bw / 2).toFixed(1);
+          return '<rect class="compliance-bar' + (now ? ' is-now' : '') + '" x="' + bx.toFixed(1) + '" y="' + y(d.reported).toFixed(1) +
+              '" width="' + bw.toFixed(1) + '" height="' + (y(0) - y(d.reported)).toFixed(1) + '" rx="3">' +
+              '<title>' + esc(shortDate(d.date)) + ': ' + d.reported + ' of ' + total + ' classes reported</title></rect>' +
+            ((i % every === 0 && n - 1 - i >= every / 2) || now
+              ? '<text class="chart-tick' + (now ? ' is-now' : '') + '" x="' + cx + '" y="' + (h - 8) + '" text-anchor="middle">' + esc(shortDate(d.date)) + '</text>' : '') +
+            (now || i === peakAt
+              ? '<text class="chart-callout' + (now ? '' : ' is-quiet') + '" x="' + cx + '" y="' + (y(d.reported) - 6).toFixed(1) + '" text-anchor="middle">' + d.reported + '</text>' : '');
+        }).join('') +
+      '</svg>';
   }
 
   // Every class under the current selection, flattened to one row each, with
@@ -520,7 +432,6 @@ window.Charts = (function () {
     var inScope = scopeTest(state);
     renderDonut(document.getElementById('chart-donut'), totals);
     renderTrend(document.getElementById('chart-trend'), inScope);
-    renderBars(document.getElementById('chart-bars'), document.getElementById('chart-bars-caption'), state);
     renderCompliance(document.getElementById('chart-compliance'), inScope);
     renderBreakdown(
       document.getElementById('breakdown-section'),

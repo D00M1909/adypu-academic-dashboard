@@ -774,12 +774,28 @@
   // Editing either native date input turns the selection into a custom range.
   // The server can still light a matching preset as a fallback, but a stale
   // intent from an earlier click must never force the wrong chip active.
+  //
+  // There is no Apply button: a complete, ordered pair of dates applies itself.
+  // The short wait lets someone typing a date finish the year before the page
+  // reloads under them; picking from the calendar lands well inside it.
+  var applyTimer = null;
   document.querySelectorAll('#range-from, #range-to').forEach(function (input) {
     function clearPresetIntent() {
       document.getElementById('range-preset').value = '';
     }
     input.addEventListener('input', clearPresetIntent);
-    input.addEventListener('change', clearPresetIntent);
+    input.addEventListener('change', function () {
+      clearPresetIntent();
+      clearTimeout(applyTimer);
+      var from = document.getElementById('range-from').value;
+      var to = document.getElementById('range-to').value;
+      if (!from || !to || from > to) return;
+      if (from === window.ATTENDANCE_RANGE.from && to === window.ATTENDANCE_RANGE.to) return;
+      applyTimer = setTimeout(function () {
+        rememberScroll();
+        document.getElementById('range-form').submit();
+      }, 700);
+    });
   });
 
   document.getElementById('stat-summary').addEventListener('click', function () { openDivisionModal(); });
