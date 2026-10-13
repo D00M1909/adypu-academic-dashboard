@@ -231,3 +231,50 @@ function timetable_usage(array $t, array $grid): array {
     }
     return [$used, $total];
 }
+
+// Which schools a booking belongs to, as SCHOOLS keys. Read off the class
+// label the build writes, since the export carries no school: a lecture shared
+// by several classes ("MA Counselling Psychology; MA Politics & IR") belongs to
+// each of theirs, and a "Booked" hold names its department ("SOE CSE/AIDS").
+// Law before BA and BBA, or "BA LLB" would be Liberal Arts.
+function timetable_schools(array $e): array {
+    if ($e['blocked'] !== '') return preg_match('/^SOE\b/i', $e['blocked']) ? ['eng'] : [];
+    $out = [];
+    foreach (explode(';', $e['class']) as $c) {
+        $c = trim($c);
+        $s = match (true) {
+            (bool) preg_match('/^[BM]\.\s?Tech\b/i', $c) => 'eng',
+            (bool) preg_match('/^(BA LLB|BBA LLB|LLB|LLM)\b/i', $c) => 'law',
+            (bool) preg_match('/^(BBA|MBA)\b/i', $c) => 'mgmt',
+            (bool) preg_match('/^(BA|MA)\b/i', $c) => 'lib',
+            default => '',
+        };
+        if ($s !== '' && !in_array($s, $out, true)) $out[] = $s;
+    }
+    return $out;
+}
+
+// The timetable as one school sees it: only the rooms that school teaches in,
+// and in those rooms another school's class becomes a plain "Booked" hold, so
+// the slot reads as taken without listing someone else's class as if it were
+// the school's own. Drawing it as free would send a teacher to an occupied room.
+function timetable_for_school(array $t, string $school): array {
+    $rooms = [];
+    foreach ($t['rooms'] as $room => $entries) {
+        $mine = false;
+        foreach ($entries as $i => $e) {
+            if (in_array($school, timetable_schools($e), true)) {
+                $mine = $mine || $e['blocked'] === '';
+                continue;
+            }
+            $entries[$i] = ['code' => '', 'class' => '', 'faculty' => '', 'lab' => false, 'blocked' => 'Other school'] + $e;
+        }
+        if ($mine) $rooms[$room] = $entries;
+    }
+    $buildings = [];
+    foreach ($t['buildings'] as $b => $list) {
+        $in = array_values(array_filter($list, fn($r) => isset($rooms[$r])));
+        if ($in) $buildings[$b] = $in;
+    }
+    return ['rooms' => $rooms, 'buildings' => $buildings] + $t;
+}

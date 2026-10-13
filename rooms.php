@@ -1,6 +1,6 @@
 <?php
 // One room on one day (or its whole week): which class, subject and teacher is
-// in it each period. Picked by date, then ULC, then classroom.
+// in it each period. Picked by school, then date, then ULC, then classroom.
 // The same view as By Room on the timetable generator, drawn from
 // timetable/rooms.php (see includes/timetable.php for why it is a file).
 // Open to everyone and read-only, like the dashboard.
@@ -14,6 +14,17 @@ auth_boot();
 traffic_hit('rooms');
 
 $t = timetable_read();
+// The school picker lists only schools the timetable has classes for, in
+// SCHOOLS order. Picking one narrows the ULCs and rooms to where that school
+// teaches; no school (the default) is every room.
+$schools = [];
+foreach ($t['rooms'] ?? [] as $entries) {
+    foreach ($entries as $x) foreach (timetable_schools($x) as $k) $schools[$k] = true;
+}
+$schools = array_filter(SCHOOLS, fn($k) => isset($schools[$k]), ARRAY_FILTER_USE_KEY);
+$school = (string) ($_GET['school'] ?? '');
+if (!isset($schools[$school])) $school = '';
+if ($t && $school !== '') $t = timetable_for_school($t, $school);
 $buildings = $t['buildings'] ?? [];
 // Pick order is the one the request asked for: date, then ULC, then room. Each
 // falls back to the first valid choice, so changing the ULC with a room from
@@ -38,7 +49,7 @@ $when = function (string $stamp): string {
     $d = DateTimeImmutable::createFromFormat('Y-m-d H:i', $stamp);
     return $d ? $d->format('j M Y') : $stamp;
 };
-$link = fn(array $over): string => 'rooms.php?' . http_build_query($over + ['date' => $date->format('Y-m-d'), 'ulc' => $ulc, 'room' => $room]);
+$link = fn(array $over): string => 'rooms.php?' . http_build_query($over + ['school' => $school, 'date' => $date->format('Y-m-d'), 'ulc' => $ulc, 'room' => $room]);
 
 page_head('Room timetable', 'page-wide', 'timetable');
 ?>
@@ -59,6 +70,15 @@ page_head('Room timetable', 'page-wide', 'timetable');
 ?>
   <section class="card tt-card">
     <form class="tt-bar no-print" method="get">
+      <div class="tt-pick">
+        <label for="tt-school">School</label>
+        <select id="tt-school" name="school" onchange="this.form.submit()">
+          <option value="">All schools</option>
+          <?php foreach ($schools as $k => $s): ?>
+            <option value="<?= $e($k) ?>"<?= $k === $school ? ' selected' : '' ?>><?= $e($s['name']) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
       <div class="tt-pick">
         <label for="tt-date">Date</label>
         <input id="tt-date" type="date" name="date" value="<?= $date->format('Y-m-d') ?>" onchange="this.form.submit()">
@@ -148,7 +168,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
     <ul class="tt-legend">
       <li><i class="tt-key tt-lecture"></i>Lecture</li>
       <li><i class="tt-key tt-lab"></i>Lab</li>
-      <?php if ($hasBlocked): ?><li><i class="tt-key tt-blocked"></i>Booked by another department</li><?php endif; ?>
+      <?php if ($hasBlocked): ?><li><i class="tt-key tt-blocked"></i>Booked by <?= $school === '' ? 'another department' : 'another school or department' ?></li><?php endif; ?>
       <li><i class="tt-key tt-free"></i>Free</li>
       <?php if ($hasClash): ?><li><i class="tt-key tt-clash"></i>Two bookings in one slot</li><?php endif; ?>
     </ul>

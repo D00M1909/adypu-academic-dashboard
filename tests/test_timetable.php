@@ -129,4 +129,30 @@ assert(timetable_room_label('105 (ULC 1)') === '105' && timetable_room_label('IT
 
 assert(timetable_grid($t, 'nope') === ['cells' => [], 'covered' => []]);
 
+// The school a booking belongs to is read off its class label: Law before BA
+// and BBA, a shared lecture belongs to every class's school, and a hold names
+// its department.
+$x = fn($class, $blocked = '') => ['class' => $class, 'blocked' => $blocked];
+assert(timetable_schools($x('BA LLB Sem III')) === ['law'] && timetable_schools($x('BBA LLB Sem I')) === ['law']);
+assert(timetable_schools($x('BBA Sem I Div A')) === ['mgmt'] && timetable_schools($x('MBA Sem III')) === ['mgmt']);
+assert(timetable_schools($x('BA Economics Sem V')) === ['lib'] && timetable_schools($x('LLM Corporate')) === ['law']);
+assert(timetable_schools($x('B.Tech First Year Div F')) === ['eng'] && timetable_schools($x('M.Tech BT Sem I')) === ['eng']);
+assert(timetable_schools($x('MA Industrial Psychology; BBA Sem I')) === ['lib', 'mgmt']);
+assert(timetable_schools($x('', 'SOE CSE/AIDS')) === ['eng'] && timetable_schools($x('', 'BBA Seminar')) === [] && timetable_schools($x('Guest')) === []);
+
+// One school's view keeps only the rooms it teaches in, and shows another
+// school's class there as a bare hold rather than a free slot.
+$s = ['day' => 'Monday', 'time' => '9.30 to 10.30', 'span' => 1, 'code' => 'Torts', 'faculty' => 'Dr. Test', 'lab' => false, 'blocked' => ''];
+$both = ['days' => ['Monday'], 'slots' => [], 'buildings' => ['ULC 1' => ['301', '302'], 'ULC 6' => ['001']], 'rooms' => [
+    '301' => [['class' => 'BA LLB Sem I'] + $s, ['class' => 'BBA Sem I', 'time' => '10.30 to 11.30'] + $s],
+    '302' => [['class' => 'BBA Sem III'] + $s],
+    '001' => [['class' => '', 'blocked' => 'SOE CSE/AIDS'] + $s],
+]];
+$law = timetable_for_school($both, 'law');
+assert(array_keys($law['rooms']) === [301] && $law['buildings'] === ['ULC 1' => ['301']]);
+assert($law['rooms']['301'][0]['code'] === 'Torts' && $law['rooms']['301'][1]['blocked'] === 'Other school');
+assert($law['rooms']['301'][1]['class'] === '' && $law['rooms']['301'][1]['faculty'] === '' && $law['rooms']['301'][1]['time'] === '10.30 to 11.30');
+// A hold alone does not put a room in the school's list.
+assert(timetable_for_school($both, 'eng')['rooms'] === []);
+
 echo "OK\n";
