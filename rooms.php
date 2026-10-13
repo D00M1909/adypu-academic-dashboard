@@ -239,7 +239,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
 <?php if (!$days): ?>
     <p class="tt-none">No classes on <?= $e($date->format('l')) ?>s. The timetable runs <?= $e($t['days'][0]) ?> to <?= $e(end($t['days'])) ?>.</p>
 <?php elseif ($dean && !$teaching): ?>
-    <p class="tt-none">No classes for <?= $e($dean['name']) ?> in the timetable yet. They will show here once their school's timetable lists them.</p>
+    <p class="tt-none">Timetable not available yet.</p>
 <?php elseif ($dean && !$classesShown): ?>
     <p class="tt-none">No classes for <?= $e($dean['name']) ?> on <?= $e($date->format('l')) ?>s.</p>
 <?php else: ?>
