@@ -1489,6 +1489,9 @@ input:focus-visible, select:focus-visible {
   .app-header h1 { color: var(--ink); font-size: 18px; }
   .site-nav, .scope-tabs a:not([aria-current]) { display: none; }
   .scope-tabs { border: 0; }
+  /* On paper the one tab left is the section's heading, not a control: no
+     underline, and no focus ring if it was the last thing clicked. */
+  .scope-tabs a[aria-current] { box-shadow: none; outline: none; padding-bottom: 0; }
 
   main { max-width: none; padding: 12px 0 0; }
   .range-bar {
