@@ -90,8 +90,8 @@ Two rules hold the numbers together:
 
 ## Faculty marking
 
-Everything here lives on the dev site, on the `faculty-marking` branch. The
-dashboard stays public; only writing attendance needs a login.
+Everything here lives on the main site, on `main`. The dashboard stays public;
+only writing attendance needs a login.
 
 - **Sign up** at `/login.php`. A school's join code activates the account
   instantly; a wrong or missing code queues it for an admin rather than
@@ -120,8 +120,20 @@ dashboard stays public; only writing attendance needs a login.
 
 ## Room timetable
 
-`rooms.php` is public and read-only. Pick a date, then a ULC, then a
-classroom, and it shows that room's whole week, the date's day marked.
+`rooms.php` is public and read-only. Pick a school (or all of them), a date,
+then a ULC, then a classroom, and it shows that room's whole week, the date's
+day marked. A picked school narrows the ULCs and rooms to where it teaches; in
+its rooms another school's class shows only as booked.
+
+Tap a class to open its panel: the attendance filed for that lecture on that
+date, and every document the class is written in, with the tab and cell (or the
+PDF page) and how it was read. **Open at this class** (`source.php`) shows the
+school's own sheet with those cells marked, or the PDF at that page;
+**Download original** is the file as the school sent it. Engineering and
+whole-year BBA/MBA classes also show their attendance in the cell ("48/60
+present", or "Not marked" once the lecture has started). Law and Liberal Arts
+timetable by programme while their attendance is kept by division, so they show
+none rather than a guess.
 **Show one day** narrows it to the date's day (the timetable repeats weekly, so
 the date only picks the weekday; a weekend says there are no classes), and
 **Export PDF** prints whichever is on screen.
@@ -150,10 +162,14 @@ missing room, "1.00 am" for 1 pm) and prints every repair so it can be checked.
 Rebuild it whenever the timetable changes, then upload it:
 
 1. `php tools/timetable/build.php > tools/timetable/data/last-build.txt`. It
-   writes `timetable/rooms.php` and prints the repairs, the clashes and the
-   class, room and booking counts.
+   writes `timetable/rooms.php` and a copy of each school's document under
+   `timetable/docs/`, and prints the repairs, the clashes, any booking whose
+   cell in its document it could not find, and the class, room and booking
+   counts. A new school's file needs an entry in `SOURCE_DOCS`
+   (`tools/timetable/sources.php`) or its classes show no source.
 2. `tools/stage-upload.sh` stages `timetable/rooms.php` every time it exists,
-   with whatever else changed. Drop `upload/` on the server as usual.
+   and any document the build rewrote, with whatever else changed. Drop
+   `upload/` on the server as usual.
 
 Law and Liberal Arts are read straight from their workbooks. Every other
 school is first turned into a `.json` by one of the `convert-*` scripts beside
@@ -172,11 +188,13 @@ gitignored. Like every file in `data/`, the output is JSON behind a
 
 | Site | Branch | Purpose |
 | --- | --- | --- |
-| <https://adypu-academic-dashboard.fast-page.org/> | `main` | Production: the dashboard and the Form pipeline |
-| <https://adypu-daybook.fast-page.org/> | `faculty-marking` | Dev: everything above, tried out before it goes live |
+| <https://adypu-daybook.fast-page.org/> | `main` | The main site: everything above |
+| <https://adypu-academic-dashboard.fast-page.org/> | `old-main` | The original dashboard and Form pipeline, kept as it was |
 
-Never upload a `faculty-marking` file to production: `main` has no `auth.php`,
-`page.php` or `roster.php`, so a branch `index.php` there is a blank HTTP 500.
+`main` was the `faculty-marking` branch until 13 Oct 2026, when it became the
+main site; the original `main` is kept as `old-main`. Never upload a `main` file
+to the old site: `old-main` has no `auth.php`, `page.php` or `roster.php`, so an
+`index.php` from `main` there is a blank HTTP 500.
 Give each site its own `includes/config.local.php` with a different
 `INGEST_SECRET` and `ADMIN_HASH`.
 
