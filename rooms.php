@@ -28,7 +28,9 @@ if (!in_array($room, $rooms, true)) $room = $rooms[0] ?? '';
 // door wants. The timetable repeats weekly, so only the weekday is used.
 $tz = new DateTimeZone('Asia/Kolkata');
 $date = DateTimeImmutable::createFromFormat('!Y-m-d', (string) ($_GET['date'] ?? ''), $tz) ?: new DateTimeImmutable('today', $tz);
-$week = !empty($_GET['week']);
+// The whole week unless week=0 asks for one day: a room's week is what most
+// people open it for.
+$week = ($_GET['week'] ?? '1') !== '0';
 $day = $t ? timetable_day($t, $date) : '';
 
 $e = fn(string $v): string => htmlspecialchars($v);
@@ -78,7 +80,7 @@ page_head('Room timetable', 'page-wide');
           <?php endforeach; ?>
         </select>
       </div>
-      <?php if ($week): ?><input type="hidden" name="week" value="1"><?php endif; ?>
+      <input type="hidden" name="week" value="<?= $week ? '1' : '0' ?>">
       <noscript><button class="btn-quiet" type="submit">Show</button></noscript>
       <button class="btn-quiet tt-print" type="button" onclick="window.print()">Export PDF</button>
     </form>
@@ -90,7 +92,7 @@ page_head('Room timetable', 'page-wide');
       <h2 class="tt-room"><?= $e(timetable_room_label($room)) ?></h2>
       <span class="tt-when"><?= $e($ulc) ?> &middot; <?= $week ? 'Week of ' . $e($date->modify('monday this week')->format('j M Y')) : $e($date->format('l j M Y')) ?></span>
       <?php if ($days): ?><span class="tt-usage"><?= $used ?> of <?= $total ?> periods booked</span><?php endif; ?>
-      <a class="tt-toggle no-print" href="<?= $e($week ? $link([]) : $link(['week' => 1])) ?>"><?= $week ? 'Show one day' : 'Show whole week' ?></a>
+      <a class="tt-toggle no-print" href="<?= $e($week ? $link(['week' => 0]) : $link([])) ?>"><?= $week ? 'Show one day' : 'Show whole week' ?></a>
     </div>
 
 <?php if (!$days): ?>

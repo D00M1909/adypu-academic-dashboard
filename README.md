@@ -121,9 +121,10 @@ dashboard stays public; only writing attendance needs a login.
 ## Room timetable
 
 `rooms.php` is public and read-only. Pick a date, then a ULC, then a
-classroom, and it shows that room's periods on that day (the timetable repeats
-weekly, so the date only picks the weekday; a weekend says there are no
-classes). **Show whole week** gives the full grid, and **Export PDF** prints it.
+classroom, and it shows that room's whole week, the date's day marked.
+**Show one day** narrows it to the date's day (the timetable repeats weekly, so
+the date only picks the weekday; a weekend says there are no classes), and
+**Export PDF** prints whichever is on screen.
 Each room draws only the time rows it is booked in, because classes keep their
 own clocks (one runs 12.30 to 1.30, another 1.00 to 2.00).
 
