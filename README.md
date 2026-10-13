@@ -135,7 +135,7 @@ days-by-class grid, merged two-hour cells, a room-by-period master sheet) are
 first turned into data files the build script reads. ULC 6 is the School of
 Engineering First Year, from its PDF; each division keeps its own clock, so its
 periods are snapped to the hour they fall in. A room another department holds,
-and no class of ours is in, shows as booked. ULC 5 holds a Biomedical room. The sheets'
+and no class of ours is in, shows as booked. ULC 5 holds Biomedical and Mechanical rooms. The sheets'
 "ULC 5B" and "ULC 5C" rooms are ULC 6 and ULC 7, numbered
 012 like the rest (AIDS and CSE final year), and
 every lab is one room whatever a sheet calls it (Mac Lab is the
