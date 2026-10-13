@@ -25,6 +25,9 @@ foreach ($t['rooms'] ?? [] as $entries) {
 $schools = array_filter(SCHOOLS, fn($k) => isset($schools[$k]), ARRAY_FILTER_USE_KEY);
 $school = (string) ($_GET['school'] ?? '');
 if (!isset($schools[$school])) $school = '';
+// Every class's lectures across every room, taken before a school is picked
+// (which hides other schools' classes), for matching attendance to lectures.
+$lectures = $t ? timetable_lectures($t) : [];
 if ($t && $school !== '') $t = timetable_for_school($t, $school);
 $buildings = $t['buildings'] ?? [];
 // Pick order is the one the request asked for: date, then ULC, then room. Each
@@ -78,7 +81,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
     $attRows = class_rows();
     $monday = $date->modify('monday this week');
     $now = new DateTimeImmutable('now', $tz);
-    $attendance = function (array $x, string $d) use ($attDays, $attRows, $week, $monday, $date, $now, $t): ?array {
+    $attendance = function (array $x, string $d) use ($attDays, $attRows, $week, $monday, $date, $now, $t, $lectures): ?array {
         $on = $week ? $monday->modify('+' . (int) array_search($d, $t['days'], true) . ' days') : $date;
         $m = timetable_minutes($x['time']);
         if (!$m || $on->setTime(intdiv($m[0], 60), $m[0] % 60) > $now) return null;
@@ -88,7 +91,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
                 $key = class_key($r);
                 $list[$key] ??= [
                     'name' => trim("{$r['year']} {$r['branch']} {$r['division']}"),
-                    'present' => timetable_reading($attDays, $on->format('Y-m-d'), $key, $x),
+                    'present' => timetable_reading($attDays, $on->format('Y-m-d'), $key, $x, $lectures[$label][$d] ?? []),
                     'strength' => (int) $r['strength'],
                 ];
             }

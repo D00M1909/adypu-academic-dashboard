@@ -203,6 +203,19 @@ assert(timetable_reading($days, '2026-10-12', 'k', $lec) === 52);
 assert(timetable_reading($days, '2026-10-12', 'k', ['time' => '10.30 to 11.30', 'span' => 1]) === 40);
 assert(timetable_reading($days, '2026-10-12', 'k', ['time' => '8.30 to 9.30', 'span' => 1]) === null);
 assert(timetable_reading($days, '2026-10-13', 'k', $lec) === null && timetable_reading($days, '2026-10-12', 'old', $lec) === null);
+// Up to 30 minutes early counts (the Form's 13:15 for First Year's 1.30)...
+$days = ['d' => ['k' => ['13:15' => 37]]];
+$at130 = ['time' => '1.30 to 2.30', 'span' => 1];
+assert(timetable_reading($days, 'd', 'k', $at130) === 37);
+assert(timetable_reading($days, 'd', 'k', ['time' => '1.45 to 2.45', 'span' => 1]) === 37);
+assert(timetable_reading($days, 'd', 'k', ['time' => '2.00 to 3.00', 'span' => 1]) === null);
+// ...but not when the class is in another lecture then: it is that one's.
+assert(timetable_reading($days, 'd', 'k', $at130, [[750, 810]]) === null);
+assert(timetable_reading($days, 'd', 'k', ['time' => '12.30 to 1.30', 'span' => 1], [[810, 870]]) === 37);
+// One filed during the lecture beats an early one.
+assert(timetable_reading(['d' => ['k' => ['13:15' => 37, '13:40' => 40]]], 'd', 'k', $at130) === 40);
+$lt = timetable_lectures(['rooms' => ['1' => [['day' => 'Monday', 'time' => '1.30 to 2.30', 'span' => 2, 'classes' => ['A', 'B']]]]]);
+assert($lt['A']['Monday'] === [[810, 930]] && $lt['B']['Monday'] === [[810, 930]]);
 
 // Finding a class in a school's sheet, in each of the three layouts.
 require_once __DIR__ . '/../tools/timetable/sources.php';

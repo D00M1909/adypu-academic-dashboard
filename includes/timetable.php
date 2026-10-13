@@ -362,20 +362,51 @@ function timetable_attendance_classes(string $label, array $rows): array {
         && in_array($r['branch'], $branches, true) && ($division === null || $r['division'] === $division)));
 }
 
+// How early a reading may be filed and still count for the next lecture. The
+// Form offers fixed times (1:15, 2:15) where First Year's divisions start at
+// 1.30 and 2.30, so a reading for the 1.30 lecture arrives as 13:15.
+const TIMETABLE_EARLY = 30;
+
 // The reading a class filed for one lecture: the latest on that date whose
-// time falls between the lecture's start and end. Null when none did. $days
-// is get_attendance_days(): date => class key => time => present.
-function timetable_reading(array $days, string $date, string $key, array $entry): ?int {
+// time falls between the lecture's start and end, or up to TIMETABLE_EARLY
+// minutes before its start. An early one counts only if the class has no other
+// lecture running then ($busy: [start, end) minutes of that class's other
+// lectures that day), so one reading never shows on two lectures. Null when
+// none did. $days is get_attendance_days(): date => class key => time => present.
+function timetable_reading(array $days, string $date, string $key, array $entry, array $busy = []): ?int {
     $m = timetable_minutes($entry['time']);
     $end = timetable_end($entry);
     if (!$m || $end === null) return null;
     $found = null;
+    $during = null;
     foreach ((array) ($days[$date][$key] ?? []) as $time => $present) {
         if (!preg_match('/^(\d{2}):(\d{2})$/', (string) $time, $t)) continue;
         $at = (int) $t[1] * 60 + (int) $t[2];
-        if ($at >= $m[0] && $at < $end) $found = (int) $present;
+        if ($at >= $m[0] && $at < $end) {
+            $during = (int) $present;
+        } elseif ($at >= $m[0] - TIMETABLE_EARLY && $at < $m[0]) {
+            $taken = false;
+            foreach ($busy as [$a, $z]) if ($at >= $a && $at < $z) $taken = true;
+            if (!$taken) $found = (int) $present;
+        }
     }
-    return $found;
+    // One filed during the lecture beats one filed before it.
+    return $during ?? $found;
+}
+
+// For timetable_reading()'s $busy: every class's lectures as
+// class label => day => [[start, end], ...] in minutes, across all rooms.
+function timetable_lectures(array $t): array {
+    $out = [];
+    foreach ($t['rooms'] as $entries) {
+        foreach ($entries as $e) {
+            $m = timetable_minutes($e['time']);
+            $end = timetable_end($e);
+            if (!$m || $end === null) continue;
+            foreach ($e['classes'] as $c) $out[$c][$e['day']][] = [$m[0], $end];
+        }
+    }
+    return $out;
 }
 
 // "B11:B12", the cells a citation points at as Excel names them.
