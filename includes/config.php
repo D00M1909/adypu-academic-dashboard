@@ -31,6 +31,13 @@ defined('INGEST_SECRET') || define('INGEST_SECRET', getenv('INGEST_SECRET') ?: '
 defined('ADMIN_EMAIL') || define('ADMIN_EMAIL', getenv('ADMIN_EMAIL') ?: '');
 defined('ADMIN_HASH') || define('ADMIN_HASH', getenv('ADMIN_HASH') ?: '');
 
+// The room timetable's source documents: source.php and the Source part of a
+// class's panel on rooms.php. Off unless config.local.php turns it on, so the
+// live site never serves the schools' own files; for now they are shown on a
+// local copy only (the user's call, 13 Oct 2026). Attendance in the timetable
+// does not depend on it.
+defined('TIMETABLE_SOURCES') || define('TIMETABLE_SOURCES', false);
+
 function get_db(): mysqli {
     static $conn = null;
     if ($conn === null) {

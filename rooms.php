@@ -112,9 +112,11 @@ page_head('Room timetable', 'page-wide', 'timetable');
         'hand' => 'Typed in by hand from this document, then checked.',
     ];
     $panel = [];
+    // The Source part only where TIMETABLE_SOURCES is on (config.php): null
+    // tells js/rooms.js to leave it out, where [] says no document is on file.
     $describe = function (array $x, string $d, ?array $att) use (&$panel, $t, $how, $room, $ulc): int {
-        $src = [];
-        foreach ($x['src'] as $s) {
+        $src = TIMETABLE_SOURCES ? [] : null;
+        foreach (TIMETABLE_SOURCES ? $x['src'] : [] as $s) {
             $doc = $t['docs'][$s['doc']];
             $pdf = $doc['kind'] === 'pdf';
             $src[] = [
@@ -215,9 +217,10 @@ page_head('Room timetable', 'page-wide', 'timetable');
             ?>
               <td class="<?= $cls ?>"<?= $clash ? ' title="Two bookings in this slot"' : '' ?><?= $cell['rows'] > 1 ? ' rowspan="' . $cell['rows'] . '"' : '' ?>>
                 <?php foreach ($cell['entries'] as $x):
-                    // Another school's class (school view) has nothing to show.
-                    $open = $x['src'] || $x['classes'];
+                    // A class opens its panel when there is something to show
+                    // in it: its attendance, or (where enabled) its sources.
                     $att = $x['blocked'] === '' ? $attendance($x, $d) : null;
+                    $open = $att || (TIMETABLE_SOURCES && $x['src']);
                     $tag = $open ? 'button' : 'div';
                 ?>
                   <<?= $tag ?> class="tt-entry"<?= $open ? ' type="button" data-i="' . $describe($x, $d, $att) . '" aria-haspopup="dialog"' : '' ?>>
@@ -250,7 +253,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
       <?php if ($hasClash): ?><li><i class="tt-key tt-clash"></i>Two bookings in one slot</li><?php endif; ?>
     </ul>
 <?php endif; endif; ?>
-    <p class="tt-hint no-print">Tap a class to see its attendance and the document it comes from.</p>
+    <p class="tt-hint no-print"><?= TIMETABLE_SOURCES ? 'Tap a class to see its attendance and the document it comes from.' : 'Tap a class with attendance to see it division by division.' ?></p>
     <p class="tt-source">Official timetable<?= $t['exported_at'] !== '' ? ' &middot; updated ' . $e($when($t['exported_at'])) : '' ?></p>
   </section>
 <?php endif; ?>

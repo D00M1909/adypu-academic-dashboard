@@ -21,7 +21,9 @@ traffic_hit('source');
 
 $t = timetable_read();
 $id = (string) ($_GET['doc'] ?? '');
-$doc = $t['docs'][$id] ?? null;
+// Off on the live site (TIMETABLE_SOURCES, config.php): every document is
+// then "not found", the same answer as a wrong id.
+$doc = TIMETABLE_SOURCES ? ($t['docs'][$id] ?? null) : null;
 $e = fn(string $v): string => htmlspecialchars($v);
 
 if (!$doc) {

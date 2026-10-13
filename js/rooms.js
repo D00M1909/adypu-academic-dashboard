@@ -49,6 +49,11 @@
       body.appendChild(att);
     }
 
+    // null: sources are switched off on this site (TIMETABLE_SOURCES).
+    if (!x.src) {
+      if (dialog.showModal) dialog.showModal(); else dialog.setAttribute('open', '');
+      return;
+    }
     var src = el('section', 'tt-panel-part');
     src.appendChild(el('h3', null, x.src.length > 1 ? 'Sources' : 'Source'));
     if (!x.src.length) src.appendChild(el('p', 'tt-panel-meta', 'No source document is on file for this class.'));

@@ -20,7 +20,6 @@ rm -rf "$OUT"
 if [ "${1:-}" = "--all" ]; then
   files=$(find index.php login.php mark.php admin.php account.php stats.php rooms.php source.php api includes css js img -type f)
   [ -f timetable/rooms.php ] && files="$files"$'\n'timetable/rooms.php
-  [ -d timetable/docs ] && files="$files"$'\n'"$(find timetable/docs -type f)"
 else
   # One ref, not a range: this diffs the ref against the WORKING TREE, so a file
   # edited but not yet committed still gets staged. Uploading a file the repo
@@ -35,15 +34,6 @@ else
   # timetable/rooms.php is gitignored (it carries faculty names), so neither
   # list above ever names it. It is small, so it goes up every time it exists.
   [ -f timetable/rooms.php ] && files="$files"$'\n'timetable/rooms.php
-  # timetable/docs/ (the schools' documents behind the source panel) is
-  # gitignored too, but a few MB, so only what the build rewrote since the
-  # ref: build.php leaves a document's file alone unless it changed.
-  if [ -d timetable/docs ]; then
-    since=$(git log -1 --format=%ct "${1:-HEAD~1}" 2>/dev/null || echo 0)
-    while IFS= read -r d; do
-      [ "$(stat -c %Y "$d")" -gt "$since" ] && files="$files"$'\n'"$d"
-    done < <(find timetable/docs -type f)
-  fi
 fi
 
 n=0
@@ -55,8 +45,12 @@ while IFS= read -r f; do
   # data/ is deliberately absent. It holds the accounts, the rosters and the
   # submissions the live site itself wrote; copying a local one up would
   # overwrite real faculty accounts with whatever a dev machine had.
+  #
+  # So is timetable/docs/, the schools' own documents: the source panel is on
+  # a local copy only for now (TIMETABLE_SOURCES in config.php), so the server
+  # gets neither the switch nor the files.
   case "$f" in
-    index.php|login.php|mark.php|admin.php|account.php|stats.php|rooms.php|source.php|timetable/rooms.php|timetable/docs/*|api/*|includes/*|css/*|js/*|img/*) ;;
+    index.php|login.php|mark.php|admin.php|account.php|stats.php|rooms.php|source.php|timetable/rooms.php|api/*|includes/*|css/*|js/*|img/*) ;;
     *) continue ;;
   esac
   # Server-only, and gitignored, so this should never match — but staging it
