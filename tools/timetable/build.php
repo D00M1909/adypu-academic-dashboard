@@ -589,6 +589,8 @@ $export = [
     })(),
     'rooms' => $rooms,
     'docs' => array_map(fn($d) => array_intersect_key($d, array_flip(['name', 'file', 'kind', 'how'])), $docs),
+    // The Dean picker's people, kept with the data rather than in the repo.
+    'deans' => json_decode((string) @file_get_contents("$data/deans.json"), true)['deans'] ?? [],
 ];
 
 $t = timetable_parse(json_encode($export));

@@ -115,7 +115,56 @@ function timetable_parse(string $json): array|string {
         'buildings' => $buildings,
         'rooms' => $rooms,
         'docs' => $docs,
+        'deans' => timetable_parse_deans($raw['deans'] ?? []),
     ];
+}
+
+// The people the Dean picker offers: name and role as the university lists
+// them, an id for the URL, and every spelling the timetable uses for them
+// ('as', the name itself included), compared by timetable_person().
+function timetable_parse_deans(mixed $list): array {
+    $out = [];
+    foreach ((array) $list as $d) {
+        $name = is_array($d) && is_scalar($d['name'] ?? null) ? trim((string) $d['name']) : '';
+        $id = trim(preg_replace('/[^a-z0-9]+/', '-', strtolower(timetable_person($name))), '-');
+        if ($name === '' || $id === '' || isset($out[$id])) continue;
+        $as = array_filter(array_map(fn($a) => is_scalar($a) ? timetable_person((string) $a) : '', (array) ($d['as'] ?? [])), 'strlen');
+        $out[$id] = [
+            'name' => $name,
+            'role' => is_scalar($d['role'] ?? null) ? trim((string) $d['role']) : '',
+            'as' => array_values(array_unique([timetable_person($name), ...$as])),
+        ];
+    }
+    return $out;
+}
+
+// Who a name is, titles and spacing aside: "Adv. Dr. Abhilasha Mane" and
+// "Dr. Abhilasha Mane" are both "abhilasha mane".
+function timetable_person(string $name): string {
+    $name = strtolower(trim(preg_replace('/\s+/', ' ', $name)));
+    while (preg_match('/^(dr|prof|mr|mrs|ms|adv|ar)\b\.?\s*/', $name, $m)) $name = substr($name, strlen($m[0]));
+    return $name;
+}
+
+// A person's own week: every booking they teach, from every room, each with
+// the room and ULC it is in, ready for timetable_grid() as one "room". A
+// booking taught by two ("Prof. A / Prof. B") is each of theirs.
+function timetable_teaching(array $t, array $person): array {
+    $ulcOf = [];
+    foreach ($t['buildings'] as $b => $list) foreach ($list as $r) $ulcOf[(string) $r] = (string) $b;
+    $mine = [];
+    foreach ($t['rooms'] as $room => $entries) {
+        foreach ($entries as $e) {
+            if ($e['blocked'] !== '') continue;
+            foreach (preg_split('#\s*/\s*#', $e['faculty']) as $f) {
+                if (in_array(timetable_person($f), $person['as'], true)) {
+                    $mine[] = ['room' => (string) $room, 'ulc' => $ulcOf[(string) $room] ?? ''] + $e;
+                    break;
+                }
+            }
+        }
+    }
+    return $mine;
 }
 
 // One booking's citations, each a document it is written in and where: the

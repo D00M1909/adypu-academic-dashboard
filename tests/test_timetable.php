@@ -217,6 +217,29 @@ assert(timetable_reading(['d' => ['k' => ['13:15' => 37, '13:40' => 40]]], 'd', 
 $lt = timetable_lectures(['rooms' => ['1' => [['day' => 'Monday', 'time' => '1.30 to 2.30', 'span' => 2, 'classes' => ['A', 'B']]]]]);
 assert($lt['A']['Monday'] === [[810, 930]] && $lt['B']['Monday'] === [[810, 930]]);
 
+// Deans: a name matches with titles ignored, through every spelling in 'as',
+// and a booking taught by two belongs to each.
+assert(timetable_person('Adv. Dr.  Abhilasha Mane') === 'abhilasha mane' && timetable_person('Prof Bindiya Naik') === 'bindiya naik');
+$ds = timetable_parse_deans([
+    ['name' => 'Dr. Deepa Joshi', 'role' => 'Dean', 'as' => ['DAJ']],
+    ['name' => 'Bindiya Naik'],
+    ['name' => 'Dr. Deepa Joshi'],   // a repeat is dropped
+    ['role' => 'no name'],
+    'junk',
+]);
+assert(array_keys($ds) === ['deepa-joshi', 'bindiya-naik'] && $ds['deepa-joshi']['as'] === ['deepa joshi', 'daj'] && $ds['bindiya-naik']['role'] === '');
+$p = ['days' => ['Monday'], 'buildings' => ['ULC 1' => ['201', '301']], 'rooms' => [
+    '201' => [['faculty' => 'DAJ', 'blocked' => '', 'day' => 'Monday', 'time' => '1.30 to 2.30']],
+    '301' => [['faculty' => 'Prof. Bindiya Naik / Prof. Eden Lobo', 'blocked' => '', 'day' => 'Monday', 'time' => '9.00 to 10.00'],
+        ['faculty' => '', 'blocked' => 'Bindiya Naik', 'day' => 'Monday', 'time' => '1.30 to 2.30']],
+]];
+$dj = timetable_teaching($p, $ds['deepa-joshi']);
+assert(count($dj) === 1 && $dj[0]['room'] === '201' && $dj[0]['ulc'] === 'ULC 1');
+$bn = timetable_teaching($p, $ds['bindiya-naik']);
+assert(count($bn) === 1 && $bn[0]['time'] === '9.00 to 10.00');
+assert(timetable_teaching($p, ['as' => ['nobody']]) === []);
+assert(timetable_parse(json_encode($export))['deans'] === []);
+
 // Finding a class in a school's sheet, in each of the three layouts.
 require_once __DIR__ . '/../tools/timetable/sources.php';
 // Days across, times down, three rows a period: the period's rows under the day.

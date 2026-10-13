@@ -1403,6 +1403,8 @@ input:focus-visible, select:focus-visible {
 .tt-bar .tt-print { margin-left: auto; min-height: 48px; padding: 9px 16px; font-size: 14px; }
 .tt-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 14px; margin: 18px 0 12px; }
 .card h2.tt-room { font-family: 'IBM Plex Mono', monospace; font-size: 26px; margin: 0; color: var(--red-ink); }
+/* A dean's name rather than a room number: the page font, not the mono one. */
+.card h2.tt-person { font-family: inherit; font-size: 22px; }
 .tt-when { font-size: 15px; font-weight: 600; color: var(--ink); }
 .tt-usage { font-size: 13px; font-weight: 600; color: var(--ink-muted); }
 .tt-toggle { margin-left: auto; font-size: 13px; font-weight: 600; color: var(--red-ink); }

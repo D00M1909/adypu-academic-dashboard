@@ -1,6 +1,7 @@
 <?php
 // One room on one day (or its whole week): which class, subject and teacher is
 // in it each period. Picked by school, then date, then ULC, then classroom.
+// Or one dean's week instead: every class they teach, in whichever room.
 // The same view as By Room on the timetable generator, drawn from
 // timetable/rooms.php (see includes/timetable.php for why it is a file).
 // Open to everyone and read-only, like the dashboard.
@@ -28,6 +29,15 @@ if (!isset($schools[$school])) $school = '';
 // Every class's lectures across every room, taken before a school is picked
 // (which hides other schools' classes), for matching attendance to lectures.
 $lectures = $t ? timetable_lectures($t) : [];
+// A dean is a person, not a place: their week spans rooms and schools, so the
+// school, ULC and room pickers stand aside while one is picked. A dean with
+// no classes in the timetable is still a choice and shows an empty week.
+$deans = $t['deans'] ?? [];
+$deanId = (string) ($_GET['dean'] ?? '');
+$dean = $deans[$deanId] ?? null;
+if (!$dean) $deanId = '';
+$teaching = $dean ? timetable_teaching($t, $dean) : [];
+if ($dean) $school = '';
 if ($t && $school !== '') $t = timetable_for_school($t, $school);
 $buildings = $t['buildings'] ?? [];
 // Pick order is the one the request asked for: date, then ULC, then room. Each
@@ -53,7 +63,7 @@ $when = function (string $stamp): string {
     $d = DateTimeImmutable::createFromFormat('Y-m-d H:i', $stamp);
     return $d ? $d->format('j M Y') : $stamp;
 };
-$link = fn(array $over): string => 'rooms.php?' . http_build_query($over + ['school' => $school, 'date' => $date->format('Y-m-d'), 'ulc' => $ulc, 'room' => $room]);
+$link = fn(array $over): string => 'rooms.php?' . http_build_query($over + ($dean ? ['dean' => $deanId] : ['school' => $school, 'ulc' => $ulc, 'room' => $room]) + ['date' => $date->format('Y-m-d')]);
 
 page_head('Room timetable', 'page-wide', 'timetable');
 ?>
@@ -66,9 +76,14 @@ page_head('Room timetable', 'page-wide', 'timetable');
     // The day view is the week view with one column: the grid, the spans and
     // the usage count all work per day already.
     $days = $week ? $t['days'] : ($day !== '' ? [$day] : []);
-    $shown = ['days' => $days, 'slots' => timetable_room_slots($t, $room)] + $t;
-    $grid = timetable_grid($shown, $room);
+    // A dean's week is drawn as one room holding all their classes, so the
+    // grid, the spans and the clash outline (two classes at once) all apply.
+    $key = $dean ? '@dean' : $room;
+    $from = $dean ? ['rooms' => [$key => $teaching]] + $t : $t;
+    $shown = ['days' => $days, 'slots' => timetable_room_slots($from, $key)] + $from;
+    $grid = timetable_grid($shown, $key);
     [$used, $total] = timetable_usage($shown, $grid);
+    $classesShown = count(array_filter($teaching, fn($x) => in_array($x['day'], $days, true)));
     $hasClash = false;
     $hasBlocked = false;
 
@@ -135,7 +150,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
             'title' => $x['blocked'] !== '' ? $x['blocked'] . ' (booked)' : $x['code'],
             'class' => $x['class'],
             'faculty' => $x['faculty'],
-            'when' => "$d, {$x['time']}" . ($x['span'] > 1 ? " ({$x['span']} hours)" : '') . ' in ' . timetable_room_label($room) . ", $ulc",
+            'when' => "$d, {$x['time']}" . ($x['span'] > 1 ? " ({$x['span']} hours)" : '') . ' in ' . timetable_room_label($x['room'] ?? $room) . ', ' . ($x['ulc'] ?? $ulc),
             'att' => $att,
             'src' => $src,
         ];
@@ -146,20 +161,31 @@ page_head('Room timetable', 'page-wide', 'timetable');
     <form class="tt-bar no-print" method="get">
       <div class="tt-pick">
         <label for="tt-school">School</label>
-        <select id="tt-school" name="school" onchange="this.form.submit()">
+        <select id="tt-school" name="school" onchange="this.form.submit()"<?= $dean ? ' disabled' : '' ?>>
           <option value="">All schools</option>
           <?php foreach ($schools as $k => $s): ?>
             <option value="<?= $e($k) ?>"<?= $k === $school ? ' selected' : '' ?>><?= $e($s['name']) ?></option>
           <?php endforeach; ?>
         </select>
       </div>
+      <?php if ($deans): ?>
+      <div class="tt-pick">
+        <label for="tt-dean">Dean</label>
+        <select id="tt-dean" name="dean" onchange="this.form.submit()">
+          <option value="">None</option>
+          <?php foreach ($deans as $id => $p): ?>
+            <option value="<?= $e($id) ?>"<?= $id === $deanId ? ' selected' : '' ?>><?= $e($p['name']) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <?php endif; ?>
       <div class="tt-pick">
         <label for="tt-date">Date</label>
         <input id="tt-date" type="date" name="date" value="<?= $date->format('Y-m-d') ?>" onchange="this.form.submit()">
       </div>
       <div class="tt-pick">
         <label for="tt-ulc">ULC</label>
-        <select id="tt-ulc" name="ulc" onchange="this.form.submit()">
+        <select id="tt-ulc" name="ulc" onchange="this.form.submit()"<?= $dean ? ' disabled' : '' ?>>
           <?php foreach (array_keys($buildings) as $b): $b = (string) $b; ?>
             <option value="<?= $e($b) ?>"<?= $b === $ulc ? ' selected' : '' ?>><?= $e($b) ?></option>
           <?php endforeach; ?>
@@ -167,7 +193,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
       </div>
       <div class="tt-pick">
         <label for="tt-room">Classroom</label>
-        <select id="tt-room" name="room" onchange="this.form.submit()"<?= $rooms ? '' : ' disabled' ?>>
+        <select id="tt-room" name="room" onchange="this.form.submit()"<?= $rooms && !$dean ? '' : ' disabled' ?>>
           <?php if (!$rooms): ?><option>None yet</option><?php endif; ?>
           <?php foreach ($rooms as $r): ?>
             <option value="<?= $e($r) ?>"<?= $r === $room ? ' selected' : '' ?>><?= $e(timetable_room_label($r)) ?></option>
@@ -179,18 +205,28 @@ page_head('Room timetable', 'page-wide', 'timetable');
       <button class="btn-quiet tt-print" type="button" onclick="window.print()">Export PDF</button>
     </form>
 
-<?php if (!$rooms): ?>
+<?php if (!$rooms && !$dean): ?>
     <p class="tt-none">No classrooms listed for <?= $e($ulc) ?> yet. They come with the next timetable update.</p>
 <?php else: ?>
     <div class="tt-head">
+      <?php if ($dean): ?>
+      <h2 class="tt-room tt-person"><?= $e($dean['name']) ?></h2>
+      <span class="tt-when"><?= $dean['role'] !== '' ? $e($dean['role']) . ' &middot; ' : '' ?><?= $week ? 'Week of ' . $e($date->modify('monday this week')->format('j M Y')) : $e($date->format('l j M Y')) ?></span>
+      <?php if ($days): ?><span class="tt-usage"><?= $classesShown ?> class<?= $classesShown === 1 ? '' : 'es' ?></span><?php endif; ?>
+      <?php else: ?>
       <h2 class="tt-room"><?= $e(timetable_room_label($room)) ?></h2>
       <span class="tt-when"><?= $e($ulc) ?> &middot; <?= $week ? 'Week of ' . $e($date->modify('monday this week')->format('j M Y')) : $e($date->format('l j M Y')) ?></span>
       <?php if ($days): ?><span class="tt-usage"><?= $used ?> of <?= $total ?> periods booked</span><?php endif; ?>
+      <?php endif; ?>
       <a class="tt-toggle no-print" href="<?= $e($week ? $link(['week' => 0]) : $link([])) ?>"><?= $week ? 'Show one day' : 'Show whole week' ?></a>
     </div>
 
 <?php if (!$days): ?>
     <p class="tt-none">No classes on <?= $e($date->format('l')) ?>s. The timetable runs <?= $e($t['days'][0]) ?> to <?= $e(end($t['days'])) ?>.</p>
+<?php elseif ($dean && !$teaching): ?>
+    <p class="tt-none">No classes for <?= $e($dean['name']) ?> in the timetable yet. They will show here once their school's timetable lists them.</p>
+<?php elseif ($dean && !$classesShown): ?>
+    <p class="tt-none">No classes for <?= $e($dean['name']) ?> on <?= $e($date->format('l')) ?>s.</p>
 <?php else: ?>
     <div class="tt-wrap">
       <table class="tt-grid<?= $week ? '' : ' tt-grid-day' ?>">
@@ -233,7 +269,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
                     <?php else: ?>
                       <strong><?= $e($x['code']) ?><?php if ($x['lab']): ?> <span class="tt-tag">Lab</span><?php endif; ?></strong>
                       <span class="tt-class"><?= $e($x['class']) ?></span>
-                      <?php if ($x['faculty'] !== ''): ?><span class="tt-faculty"><?= $e($x['faculty']) ?></span><?php endif; ?>
+                      <?php if ($dean): ?><span class="tt-faculty">Room <?= $e(timetable_room_label($x['room'])) ?>, <?= $e($x['ulc']) ?></span><?php elseif ($x['faculty'] !== ''): ?><span class="tt-faculty"><?= $e($x['faculty']) ?></span><?php endif; ?>
                       <?php if ($att): ?>
                         <span class="tt-att<?= $att['marked'] ? '' : ' tt-att-none' ?>"><?= $att['marked'] ? $att['present'] . '/' . $att['strength'] . ' present' . ($att['marked'] < count($att['classes']) ? " &middot; {$att['marked']} of " . count($att['classes']) . ' marked' : '') : 'Not marked' ?></span>
                       <?php endif; ?>
@@ -269,10 +305,10 @@ page_head('Room timetable', 'page-wide', 'timetable');
 <script type="application/json" id="tt-panel-data"><?= json_encode($panel, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?></script>
 <script src="js/rooms.js?v=<?= filemtime(__DIR__ . '/js/rooms.js') ?>"></script>
 <?php endif; ?>
-<?php if ($room !== ''): ?>
+<?php if ($room !== '' || $dean): ?>
 <script>
-  // The saved PDF is named after document.title, so name it after the room and day.
-  document.title = <?= json_encode('Room ' . timetable_room_label($room) . ' ' . $ulc . ' ' . ($week ? 'week of ' . $date->modify('monday this week')->format('j M Y') : $date->format('l j M Y')), JSON_HEX_TAG) ?>;
+  // The saved PDF is named after document.title, so name it after the room (or the dean) and day.
+  document.title = <?= json_encode(($dean ? 'Timetable ' . $dean['name'] : 'Room ' . timetable_room_label($room) . ' ' . $ulc) . ' ' . ($week ? 'week of ' . $date->modify('monday this week')->format('j M Y') : $date->format('l j M Y')), JSON_HEX_TAG) ?>;
 </script>
 <?php endif; ?>
 <?php page_foot(); ?>
