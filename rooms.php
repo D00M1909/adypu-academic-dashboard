@@ -84,6 +84,10 @@ page_head('Room timetable', 'page-wide', 'timetable');
     $grid = timetable_grid($shown, $key);
     [$used, $total] = timetable_usage($shown, $grid);
     $classesShown = count(array_filter($teaching, fn($x) => in_array($x['day'], $days, true)));
+    // A dean's workload is always the whole week's teaching hours, even on
+    // the one-day view: it is a weekly figure, and a day's would read as one.
+    $load = timetable_hours($teaching);
+    $hours = $load == round($load) ? (string) (int) $load : number_format($load, 1);
     $hasClash = false;
     $hasBlocked = false;
 
@@ -211,7 +215,8 @@ page_head('Room timetable', 'page-wide', 'timetable');
       <?php if ($dean): ?>
       <h2 class="tt-room tt-person"><?= $e($dean['name']) ?></h2>
       <span class="tt-when"><?= $dean['role'] !== '' ? $e($dean['role']) . ' &middot; ' : '' ?><?= $week ? 'Week of ' . $e($date->modify('monday this week')->format('j M Y')) : $e($date->format('l j M Y')) ?></span>
-      <?php if ($days): ?><span class="tt-usage"><?= $classesShown ?> class<?= $classesShown === 1 ? '' : 'es' ?></span><?php endif; ?>
+      <?php if ($days): ?><span class="tt-usage"><?= $classesShown ?> class<?= $classesShown === 1 ? '' : 'es' ?><?= $week ? '' : ' on ' . $e($date->format('l')) ?></span><?php endif; ?>
+      <span class="tt-load" title="Every class they teach in the week, by its length: a two-hour lab counts as two">Weekly workload <strong><?= $hours ?></strong> hour<?= $load == 1 ? '' : 's' ?></span>
       <?php else: ?>
       <h2 class="tt-room"><?= $e(timetable_room_label($room)) ?></h2>
       <span class="tt-when"><?= $e($ulc) ?> &middot; <?= $week ? 'Week of ' . $e($date->modify('monday this week')->format('j M Y')) : $e($date->format('l j M Y')) ?></span>

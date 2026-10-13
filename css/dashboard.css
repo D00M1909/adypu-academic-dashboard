@@ -1410,6 +1410,9 @@ input:focus-visible, select:focus-visible {
 .card h2.tt-person { font-family: inherit; font-size: 22px; }
 .tt-when { font-size: 15px; font-weight: 600; color: var(--ink); }
 .tt-usage { font-size: 13px; font-weight: 600; color: var(--ink-muted); }
+/* A dean's weekly teaching hours, the one number on their view. */
+.tt-load { align-self: center; font-size: 13px; font-weight: 600; color: var(--ink); background: var(--surface); border: 1px solid var(--hairline); border-radius: 999px; padding: 3px 12px; }
+.tt-load strong { font-size: 16px; color: var(--red-ink); }
 /* Show one day and Export PDF stay together at the end of the heading line,
    wrapping as a pair on a phone rather than one at a time. */
 .tt-actions { margin-left: auto; display: flex; align-items: center; gap: 14px; }

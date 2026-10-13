@@ -184,6 +184,19 @@ function timetable_person(string $name): string {
     return $name;
 }
 
+// Teaching hours in a list of bookings: each one's length by the clock, so a
+// two-hour lab is two and a 45-minute slot three quarters. A booking with no
+// readable time counts its span in hours.
+function timetable_hours(array $entries): float {
+    $min = 0;
+    foreach ($entries as $e) {
+        $m = timetable_minutes($e['time']);
+        $end = timetable_end($e);
+        $min += $m && $end !== null ? max(0, $end - $m[0]) : 60 * ($e['span'] ?? 1);
+    }
+    return $min / 60;
+}
+
 // A person's own week: every booking they teach, from every room, each with
 // the room and ULC it is in, ready for timetable_grid() as one "room". A
 // booking taught by two ("Prof. A / Prof. B") is each of theirs.

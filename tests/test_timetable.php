@@ -252,6 +252,10 @@ assert(count($dj) === 1 && $dj[0]['room'] === '201' && $dj[0]['ulc'] === 'ULC 1'
 $bn = timetable_teaching($p, $ds['bindiya-naik']);
 assert(count($bn) === 1 && $bn[0]['time'] === '9.00 to 10.00');
 assert(timetable_teaching($p, ['as' => ['nobody']]) === []);
+// Workload is hours by the clock: a two-hour lab is two, a 45-minute slot 0.75.
+assert(timetable_hours([['time' => '9.30 to 10.30', 'span' => 1], ['time' => '1.30 to 2.30', 'span' => 2],
+    ['time' => '12.30 to 1.15', 'span' => 1]]) === 3.75);
+assert(timetable_hours([]) === 0.0 && timetable_hours([['time' => 'Lec 1', 'span' => 2]]) === 2.0);
 assert(timetable_parse(json_encode($export))['deans'] === []);
 
 // Finding a class in a school's sheet, in each of the three layouts.
