@@ -126,10 +126,13 @@ day marked. A picked school narrows the ULCs and rooms to where it teaches; in
 its rooms another school's class shows only as booked.
 
 Tap a class to open its panel: the attendance filed for that lecture on that
-date, and every document the class is written in, with the tab and cell (or the
-PDF page) and how it was read. **Open at this class** (`source.php`) shows the
-school's own sheet with those cells marked, or the PDF at that page;
-**Download original** is the file as the school sent it. Engineering and
+date, division by division. On a local copy with `TIMETABLE_SOURCES` set in
+`config.local.php`, the panel also lists every document the class is written
+in, with the tab and cell (or the PDF page) and how it was read; **Open at this
+class** (`source.php`) shows the school's own sheet with those cells marked, or
+the PDF at that page, and **Download original** is the file as the school sent
+it. The live site has the switch off and never gets the documents
+(`timetable/docs/`, which stage-upload leaves out). Engineering and
 whole-year BBA/MBA classes also show their attendance in the cell ("48/60
 present", or "Not marked" once the lecture has started). Law and Liberal Arts
 timetable by programme while their attendance is kept by division, so they show
