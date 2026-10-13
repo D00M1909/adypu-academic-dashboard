@@ -202,7 +202,6 @@ page_head('Room timetable', 'page-wide', 'timetable');
       </div>
       <input type="hidden" name="week" value="<?= $week ? '1' : '0' ?>">
       <noscript><button class="btn-quiet" type="submit">Show</button></noscript>
-      <button class="btn-quiet tt-print" type="button" onclick="window.print()">Export PDF</button>
     </form>
 
 <?php if (!$rooms && !$dean): ?>
@@ -218,7 +217,10 @@ page_head('Room timetable', 'page-wide', 'timetable');
       <span class="tt-when"><?= $e($ulc) ?> &middot; <?= $week ? 'Week of ' . $e($date->modify('monday this week')->format('j M Y')) : $e($date->format('l j M Y')) ?></span>
       <?php if ($days): ?><span class="tt-usage"><?= $used ?> of <?= $total ?> periods booked</span><?php endif; ?>
       <?php endif; ?>
-      <a class="tt-toggle no-print" href="<?= $e($week ? $link(['week' => 0]) : $link([])) ?>"><?= $week ? 'Show one day' : 'Show whole week' ?></a>
+      <span class="tt-actions no-print">
+        <a class="tt-toggle" href="<?= $e($week ? $link(['week' => 0]) : $link([])) ?>"><?= $week ? 'Show one day' : 'Show whole week' ?></a>
+        <button class="btn-quiet tt-print" type="button" onclick="window.print()">Export PDF</button>
+      </span>
     </div>
 
 <?php if (!$days): ?>
