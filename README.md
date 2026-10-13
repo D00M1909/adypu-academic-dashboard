@@ -143,19 +143,29 @@ longer than an hour covers the rows its hours fall in, by the clock. A lecture t
 common first-year subject, is one booking listing every class, and two
 bookings in one room at one time are outlined as a clash. This host
 cannot make outbound requests, so the page reads a file, `timetable/rooms.php`,
-built from those workbooks by a small script kept outside the repo. The script
+built from those workbooks by `tools/timetable/build.php`. The script
 repairs what a hand-typed sheet gets wrong (a room typed in the faculty row, a
 missing room, "1.00 am" for 1 pm) and prints every repair so it can be checked.
 Rebuild it whenever the timetable changes, then upload it:
 
-1. Run the build script. It writes `timetable/rooms.php` and prints the
-   repairs and the class, room and booking counts.
+1. `php tools/timetable/build.php > tools/timetable/data/last-build.txt`. It
+   writes `timetable/rooms.php` and prints the repairs, the clashes and the
+   class, room and booking counts.
 2. `tools/stage-upload.sh` stages `timetable/rooms.php` every time it exists,
    with whatever else changed. Drop `upload/` on the server as usual.
 
-The file carries faculty names and this repo is public, so `timetable/` is
-gitignored. Like every file in `data/`, it is JSON behind a `<?php exit; ?>`
-guard line, so the server never hands it out.
+Law and Liberal Arts are read straight from their workbooks. Every other
+school is first turned into a `.json` by one of the `convert-*` scripts beside
+the build (`dump-grid.py` feeds `convert-cse.php`; the Python ones need
+openpyxl; `convert-aids.php` and `convert-cse.php` read the timetable
+generator repo, checked out beside this one, without changing it). First Year,
+Biotechnology, Civil and ECE are typed by hand from their PDFs and sheets.
+
+The sources, those `.json` files and the output all carry faculty names and
+this repo is public, so `tools/timetable/data/` (the workbooks under
+`sources/`, the transcriptions, `last-build.txt`) and `timetable/` are
+gitignored. Like every file in `data/`, the output is JSON behind a
+`<?php exit; ?>` guard line, so the server never hands it out.
 
 ## The two sites
 
