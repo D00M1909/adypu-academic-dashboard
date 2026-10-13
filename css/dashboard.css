@@ -53,6 +53,10 @@
   --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.10), 0 1px 1px rgba(15, 23, 42, 0.06);
   --shadow-md: 0 8px 20px -6px rgba(15, 23, 42, 0.18), 0 2px 6px rgba(15, 23, 42, 0.08);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  /* The page-load bar. Gold, the logo's other colour: it has to read on the
+     red header and, on a phone where the header scrolls away, on the page. */
+  --progress: #fbbf24;
+  --progress-glow: rgba(251, 191, 36, 0.55);
   color-scheme: light;
 }
 
@@ -219,6 +223,33 @@ button {
 /* Sticky, so the headline number and the reporting coverage stay on screen
    while you scroll the tiles and the charts. That is only worth the space it
    costs if the bar is short, hence the trimmed padding and smaller crest. */
+/* A thin bar across the top while the next page loads (js/theme.js). Every
+   range change, tab and room pick is a full page load, and this host takes a
+   second or two to answer: without it the click looks ignored. Grown with
+   scaleX, not width, so it never triggers a layout. */
+.nav-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  height: 3px;
+  background: var(--progress);
+  box-shadow: 0 0 10px var(--progress-glow), 0 0 4px var(--progress-glow);
+  border-radius: 0 2px 2px 0;
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.4s var(--ease-out), opacity 0.2s ease;
+}
+.nav-progress.is-active { opacity: 1; }
+/* Run to the end, then fade: for the navigation that never left the page. */
+.nav-progress.is-done { opacity: 0; transition: transform 0.2s ease, opacity 0.3s ease 0.2s; }
+@media (prefers-reduced-motion: reduce) {
+  .nav-progress { transition: opacity 0.2s ease; }
+}
+
 .app-header {
   position: sticky;
   top: 0;
@@ -1581,6 +1612,7 @@ input:focus-visible, select:focus-visible {
 
 /* The room timetable on paper: the whole week on one sheet, no scroller. */
 @media print {
+  .nav-progress { display: none; }
   .page-wide .page-main { max-width: none; padding: 0; }
   .tt-card { border: 0; box-shadow: none; padding: 0; }
   .tt-head { margin-top: 0; }
