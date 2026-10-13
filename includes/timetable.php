@@ -16,10 +16,48 @@ require_once __DIR__ . '/store.php';
 
 const TIMETABLE_FORMAT = 'adypu-room-timetable';
 defined('TIMETABLE_FILE') || define('TIMETABLE_FILE', __DIR__ . '/../timetable/rooms.php');
+// Where each booking came from (the source panel) is kept in a second file,
+// local only: carrying it, rooms.php grew to 1.3MB, and the host deleted that
+// file from the server twice within the hour on 13 Oct 2026. The live site has
+// the source panel off, so it never needs this file and never gets it.
+defined('TIMETABLE_SOURCES_FILE') || define('TIMETABLE_SOURCES_FILE', __DIR__ . '/../timetable/sources.php');
 
 function timetable_read(): array {
     $raw = @file_get_contents(TIMETABLE_FILE);
-    return $raw === false ? [] : (store_decode($raw) ?? []);
+    $t = $raw === false ? [] : (store_decode($raw) ?? []);
+    if (!$t) return [];
+    // Every entry has a 'src' and the timetable a 'docs', filled from the
+    // sources file only where the source panel is on (TIMETABLE_SOURCES).
+    $src = [];
+    if (defined('TIMETABLE_SOURCES') && TIMETABLE_SOURCES) {
+        $s = store_decode((string) @file_get_contents(TIMETABLE_SOURCES_FILE)) ?? [];
+        $t['docs'] = $s['docs'] ?? [];
+        $src = $s['src'] ?? [];
+    }
+    $t['docs'] ??= [];
+    foreach ($t['rooms'] as $room => $entries) {
+        foreach ($entries as $i => $e) $t['rooms'][$room][$i]['src'] = $src[$room][$i] ?? $e['src'] ?? [];
+    }
+    return $t;
+}
+
+// Splits a parsed timetable into what the server needs and what only the
+// source panel does, and writes both: rooms.php without any 'src' or 'docs',
+// sources.php with them, indexed by room and position so timetable_read()
+// can put them back.
+function timetable_write_split(array $t, string $path = TIMETABLE_FILE, string $sources = TIMETABLE_SOURCES_FILE): bool {
+    $src = [];
+    foreach ($t['rooms'] as $room => $entries) {
+        foreach ($entries as $i => $e) {
+            if (!empty($e['src'])) $src[$room][$i] = $e['src'];
+            unset($t['rooms'][$room][$i]['src']);
+        }
+    }
+    $side = ['docs' => $t['docs'] ?? [], 'src' => $src];
+    unset($t['docs']);
+    $json = json_encode($side, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    return timetable_write($t, $path) && $json !== false
+        && file_put_contents($sources, STORE_GUARD . $json . "\n", LOCK_EX) !== false;
 }
 
 // Returns the cleaned timetable, or a message saying what is wrong with the file.
@@ -260,10 +298,22 @@ function timetable_day(array $t, DateTimeImmutable $date): string {
     return in_array($day, $t['days'], true) ? $day : '';
 }
 
-// Pretty printed, one room's bookings per block, so two builds can be diffed.
+// One booking per line, so two builds can still be diffed line by line, at
+// half the size of pretty printing: a large file here is one the host may
+// delete (see TIMETABLE_SOURCES_FILE).
 function timetable_write(array $t, string $path = TIMETABLE_FILE): bool {
-    $json = json_encode($t, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-    if ($json === false) return false;
+    $flags = JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
+    $head = $t;
+    unset($head['rooms']);
+    $rooms = [];
+    foreach ($t['rooms'] ?? [] as $room => $entries) {
+        $lines = array_map(fn($e) => json_encode($e, $flags), $entries);
+        if (in_array(false, $lines, true)) return false;
+        $rooms[] = json_encode((string) $room, $flags) . ": [\n" . implode(",\n", $lines) . "\n]";
+    }
+    $top = json_encode($head ?: new stdClass(), $flags);
+    if ($top === false) return false;
+    $json = substr($top, 0, -1) . ($head ? ',' : '') . "\n\"rooms\": {\n" . implode(",\n", $rooms) . "\n}}";
     $dir = dirname($path);
     if (!is_dir($dir) && !@mkdir($dir, 0775, true)) return false;
     return file_put_contents($path, STORE_GUARD . $json . "\n", LOCK_EX) !== false;

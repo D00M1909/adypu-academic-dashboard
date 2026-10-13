@@ -596,7 +596,8 @@ $export = [
 $t = timetable_parse(json_encode($export));
 if (is_string($t)) { fwrite(STDERR, "$t\n"); exit(1); }
 $out = "$dash/timetable/rooms.php";
-if (!timetable_write($t, $out)) { fwrite(STDERR, "could not write $out\n"); exit(1); }
+// The sources go beside it in timetable/sources.php, which is never uploaded.
+if (!timetable_write_split($t, $out, "$dash/timetable/sources.php")) { fwrite(STDERR, "could not write $out\n"); exit(1); }
 
 foreach ($hidden as $bld => $n) echo "$bld: $n booking(s) not shown, the page does not offer $bld yet\n";
 echo "Repairs:\n";

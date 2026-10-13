@@ -59,8 +59,22 @@ assert($t['source'] === 'test.xls' && $t['exported_at'] === '2026-10-09 17:30');
 assert(timetable_read() === [], 'no file yet reads as no timetable');
 assert(timetable_write($t), 'creates timetable/ when it is missing');
 assert(str_starts_with(file_get_contents(TIMETABLE_FILE), STORE_GUARD), 'faculty names stay behind the guard');
-assert(timetable_read() === $t, 'reads back exactly what was written');
+// == not ===: the file writes 'rooms' last, so only the key order differs.
+assert(timetable_read() == $t, 'reads back exactly what was written');
 assert(timetable_read()['rooms']['001'][0]['blocked'] === 'BBA Seminar');
+
+// The split write: the server's file carries no sources at all; they go to the
+// side file, read back only where TIMETABLE_SOURCES is on (off in this test).
+$withSrc = $t;
+$withSrc['docs'] = ['law' => ['name' => 'Law.xlsx', 'file' => 'docs/law.xlsx', 'kind' => 'sheet', 'how' => 'direct']];
+$withSrc['rooms']['102'][0]['src'] = [['doc' => 'law', 'tab' => 'A', 'page' => 0, 'cell' => [1, 1, 1, 1], 'fix' => '']];
+$side = dirname(TIMETABLE_FILE) . '/sources.php';
+assert(timetable_write_split($withSrc, TIMETABLE_FILE, $side));
+$main = file_get_contents(TIMETABLE_FILE);
+assert(!str_contains($main, '"src"') && !str_contains($main, 'Law.xlsx'), 'no sources in the uploaded file');
+assert(store_decode(file_get_contents($side))['src']['102'][0][0]['tab'] === 'A');
+assert(timetable_read()['rooms']['102'][0]['src'] === [] && timetable_read()['docs'] === []);
+@unlink($side);
 
 // --- ULC grouping ------------------------------------------------------------
 assert($t['buildings'] === ['All rooms' => ['001', '2', '102']], 'no buildings: one group, nothing lost');
