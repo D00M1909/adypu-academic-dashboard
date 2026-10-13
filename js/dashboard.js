@@ -459,6 +459,16 @@
   }
 
   function selectSchool(schoolId, selectedYear, selectedBranch, selectedDivision) {
+    // Picking a school shows the whole school, every year in the summary card
+    // and the charts, with its years waiting to be picked. It used to open on
+    // the first year that reported, so the card read "Engineering · 1st Year"
+    // when the school's own number was asked for. A drill-down saved across a
+    // range change still walks back down to where it was.
+    if (!selectedYear && !selectedBranch) {
+      orderSections(schoolId);
+      showSchoolLevel(schoolId);
+      return;
+    }
     markSchool(schoolId);
     orderSections(schoolId);
     state.school = schoolId;
