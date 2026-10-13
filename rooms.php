@@ -172,17 +172,6 @@ page_head('Room timetable', 'page-wide', 'timetable');
           <?php endforeach; ?>
         </select>
       </div>
-      <?php if ($deans): ?>
-      <div class="tt-pick">
-        <label for="tt-dean">Dean</label>
-        <select id="tt-dean" name="dean" onchange="this.form.submit()">
-          <option value="">None</option>
-          <?php foreach ($deans as $id => $p): ?>
-            <option value="<?= $e($id) ?>"<?= $id === $deanId ? ' selected' : '' ?>><?= $e($p['name']) ?></option>
-          <?php endforeach; ?>
-        </select>
-      </div>
-      <?php endif; ?>
       <div class="tt-pick">
         <label for="tt-date">Date</label>
         <input id="tt-date" type="date" name="date" value="<?= $date->format('Y-m-d') ?>" onchange="this.form.submit()">
@@ -204,6 +193,18 @@ page_head('Room timetable', 'page-wide', 'timetable');
           <?php endforeach; ?>
         </select>
       </div>
+      <?php // Last: it sets the room pickers aside, so it reads as the other way in. ?>
+      <?php if ($deans): ?>
+      <div class="tt-pick">
+        <label for="tt-dean">Dean workload</label>
+        <select id="tt-dean" name="dean" onchange="this.form.submit()">
+          <option value="">None</option>
+          <?php foreach ($deans as $id => $p): ?>
+            <option value="<?= $e($id) ?>"<?= $id === $deanId ? ' selected' : '' ?>><?= $e($p['name']) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <?php endif; ?>
       <input type="hidden" name="week" value="<?= $week ? '1' : '0' ?>">
       <noscript><button class="btn-quiet" type="submit">Show</button></noscript>
     </form>
