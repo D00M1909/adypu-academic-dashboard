@@ -258,9 +258,11 @@ page_head('Room timetable', 'page-wide', 'timetable');
               <td class="tt-break-cell" colspan="<?= count($days) ?>"><?= $e(ucwords(strtolower($s['break']))) ?></td>
             <?php else: foreach ($days as $d):
                 if (!empty($grid['covered'][$time][$d])) continue;
-                // The end of a class that runs into this row without filling it.
+                // The end of a class that runs into this row without filling
+                // it: left blank in the class's colour, so it reads as taken,
+                // with the end time only on hover (the user's call).
                 if ($tail = $grid['tails'][$time][$d] ?? null): ?>
-              <td class="tt-cont <?= $tail['lab'] ? 'tt-lab' : 'tt-lecture' ?>"><span>Continues until <?= $e($tail['until']) ?></span></td>
+              <td class="tt-cont <?= $tail['lab'] ? 'tt-lab' : 'tt-lecture' ?>" title="Continues until <?= $e($tail['until']) ?>"><span class="sr-only">Continues until <?= $e($tail['until']) ?></span></td>
             <?php continue; endif;
                 $cell = $grid['cells'][$time][$d] ?? null;
                 if (!$cell): ?>
