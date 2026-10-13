@@ -39,7 +39,7 @@ for ws in wb.worksheets:
         if 'Course Name' in ' '.join(str(ws.cell(r, c).value or '') for c in range(1, ws.max_column + 1)):
             stop = r
             break
-        m = re.match(r'(\d{1,2})\.(\d{2})\s*to\s*(\d{1,2})\.(\d{2})', label)
+        m = re.match(r'(\d{1,2})[.:](\d{2})\s*to\s*(\d{1,2})[.:](\d{2})', label)
         if m:
             periods.append({'label': f'{int(m.group(1))}.{m.group(2)} to {int(m.group(3))}.{m.group(4)}', 'rows': [r]})
         elif periods:

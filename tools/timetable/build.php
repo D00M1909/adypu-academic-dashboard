@@ -45,6 +45,7 @@ $sources = array_slice($argv, 1) ?: [
     "$data/ty-cse-2026-09-28.json",
     "$data/btech-cse-2026-09-28.json",
     "$data/aids-2026-08-03.json",
+    "$data/mechanical-2026-09-30.json",
 ];
 
 require_once "$dash/tools/xlsx.php";
