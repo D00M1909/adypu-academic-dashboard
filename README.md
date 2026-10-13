@@ -138,8 +138,8 @@ periods are snapped to the hour they fall in. A room another department holds,
 and no class of ours is in, shows as booked. ULC 5 holds Biomedical and Mechanical rooms. The sheets'
 "ULC 5B" and "ULC 5C" rooms are ULC 6 and ULC 7, numbered
 012 like the rest (AIDS and CSE final year), and
-every lab is one room whatever a sheet calls it (Mac Lab is the
-Animation Lab, DL Lab is the Digital Lab). Rooms in no ULC are left out; a room number used in two ULCs is named with its ULC. A lab or lecture
+every lab is one room whatever a sheet calls it, named by its number where it has one (Mac Lab is the
+Animation Lab; Psy Lab is "305 (Psy Lab)", and the Digital Library, DL Lab and 105 are one room, "105 (Digital Library / Digital Lab)"). Rooms in no ULC are left out; a room number used in two ULCs is named with its ULC. A lab or lecture
 longer than an hour covers the rows its hours fall in, by the clock. A lecture typed on several classes' tabs, such as a
 common first-year subject, is one booking listing every class, and two
 bookings in one room at one time are outlined as a clash. This host

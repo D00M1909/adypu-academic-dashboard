@@ -347,12 +347,21 @@ $blocks = array_map($letter, $blocks);
 // The sheets' "ULC 5B" and "ULC 5C" are not wings of ULC 5: B is ULC 6 and C
 // is ULC 7, so the letter only ever said the building ("ULC 5C 16" is room 16
 // in ULC 7, numbered 016 like ULC 6's rooms). One room per lab, whatever a
-// sheet calls it: CSE's Animation Lab is Biotechnology's Mac Lab, and DL Lab is
-// the Digital Lab (not the Digital Library). ULC 6's 104 and 105 are labs
+// sheet calls it: CSE's Animation Lab is Biotechnology's Mac Lab. ULC 1's
+// named labs go by their room number first, the name after ("305 (Psy Lab)"),
+// and the Digital Library, the Digital Lab (DL Lab) and room 105 are one room,
+// as are the Food Lab and Food Tech Lab (502). ULC 6's 104 and 105 are labs
 // (First Year's CPL and CMET), and AIDS's "B 104/105 Lab" is the two together,
 // so it books both.
 const WING = ['B' => 'ULC 6', 'C' => 'ULC 7'];
-const SAME_ROOM = ['Mac Lab' => 'Animation Lab', 'DL Lab' => 'Digital Lab'];
+const SAME_ROOM = ['Mac Lab' => 'Animation Lab'];
+const ULC1_ROOMS = [
+    'Psy Lab' => '305 (Psy Lab)',
+    'DST Lab' => '501 (DST Lab)',
+    'Food Lab' => '502 (Food Lab / Food Tech Lab)', 'Food Tech Lab' => '502 (Food Lab / Food Tech Lab)',
+    'Digital Library' => '105 (Digital Library / Digital Lab)', 'DL Lab' => '105 (Digital Library / Digital Lab)',
+    '105' => '105 (Digital Library / Digital Lab)',
+];
 const ULC6_LABS = ['104' => '104 Lab', '105' => '105 Lab'];
 $place = function (array $b): array {
     $bld = $b['building'] ?? 'ULC 1';
@@ -360,6 +369,7 @@ $place = function (array $b): array {
     if ($bld === 'ULC 7' && preg_match('/^\d{1,2}$/', $b['room'])) $b['room'] = str_pad($b['room'], 3, '0', STR_PAD_LEFT);
     $b['building'] = $bld;
     $b['room'] = SAME_ROOM[$b['room']] ?? $b['room'];
+    if ($bld === 'ULC 1') $b['room'] = ULC1_ROOMS[$b['room']] ?? $b['room'];
     if ($bld !== 'ULC 6') return [$b];
     $each = preg_match('/^(\d{3})\/(\d{3})\s*lab$/i', $b['room'], $pm) ? [$pm[1], $pm[2]] : [$b['room']];
     return array_map(fn($r) => ['room' => ULC6_LABS[$r] ?? $r] + $b, $each);
