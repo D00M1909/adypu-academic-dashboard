@@ -9,6 +9,7 @@ require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/page.php';
 require_once __DIR__ . '/includes/traffic.php';
 require_once __DIR__ . '/includes/timetable.php';
+require_once __DIR__ . '/includes/structure.php';
 
 auth_boot();
 traffic_hit('rooms');
@@ -67,6 +68,74 @@ page_head('Room timetable', 'page-wide', 'timetable');
     [$used, $total] = timetable_usage($shown, $grid);
     $hasClash = false;
     $hasBlocked = false;
+
+    // Attendance for each class in each cell, on the real date that column
+    // stands for: the week's Monday plus the weekday, or the one day picked.
+    // Only classes timetable_attendance_classes() can name get a line, and a
+    // lecture that has not started yet gets none, so "Not marked" always means
+    // the lecture happened and nobody filed it.
+    $attDays = get_attendance_days();
+    $attRows = class_rows();
+    $monday = $date->modify('monday this week');
+    $now = new DateTimeImmutable('now', $tz);
+    $attendance = function (array $x, string $d) use ($attDays, $attRows, $week, $monday, $date, $now, $t): ?array {
+        $on = $week ? $monday->modify('+' . (int) array_search($d, $t['days'], true) . ' days') : $date;
+        $m = timetable_minutes($x['time']);
+        if (!$m || $on->setTime(intdiv($m[0], 60), $m[0] % 60) > $now) return null;
+        $list = [];
+        foreach ($x['classes'] as $label) {
+            foreach (timetable_attendance_classes($label, $attRows) as $r) {
+                $key = class_key($r);
+                $list[$key] ??= [
+                    'name' => trim("{$r['year']} {$r['branch']} {$r['division']}"),
+                    'present' => timetable_reading($attDays, $on->format('Y-m-d'), $key, $x),
+                    'strength' => (int) $r['strength'],
+                ];
+            }
+        }
+        if (!$list) return null;
+        $in = array_filter($list, fn($c) => $c['present'] !== null);
+        return [
+            'date' => $on->format('l j M Y'),
+            'classes' => array_values($list),
+            'present' => array_sum(array_column($in, 'present')),
+            'strength' => array_sum(array_column($in, 'strength')),
+            'marked' => count($in),
+        ];
+    };
+
+    // What the panel opened from a class shows, one entry per booking drawn:
+    // the class, its attendance, and where in which document it is written.
+    $how = [
+        'direct' => 'Read straight from this sheet when the timetable was built.',
+        'script' => 'Read from this sheet by a converter script, then checked.',
+        'hand' => 'Typed in by hand from this document, then checked.',
+    ];
+    $panel = [];
+    $describe = function (array $x, string $d, ?array $att) use (&$panel, $t, $how, $room, $ulc): int {
+        $src = [];
+        foreach ($x['src'] as $s) {
+            $doc = $t['docs'][$s['doc']];
+            $pdf = $doc['kind'] === 'pdf';
+            $src[] = [
+                'name' => $doc['name'],
+                'where' => $pdf ? "Page {$s['page']}" : ($s['tab'] !== '' ? "Tab \"{$s['tab']}\"" . ($s['cell'] ? ', cell ' . timetable_cell_name($s['cell']) : '') : ''),
+                'how' => $how[$doc['how']],
+                'fix' => $s['fix'],
+                'open' => 'source.php?' . http_build_query(['doc' => $s['doc']] + ($pdf ? ['page' => $s['page']] : ['tab' => $s['tab']] + ($s['cell'] ? ['cell' => implode(',', $s['cell'])] : []))),
+                'file' => 'timetable/' . $doc['file'],
+            ];
+        }
+        $panel[] = [
+            'title' => $x['blocked'] !== '' ? $x['blocked'] . ' (booked)' : $x['code'],
+            'class' => $x['class'],
+            'faculty' => $x['faculty'],
+            'when' => "$d, {$x['time']}" . ($x['span'] > 1 ? " ({$x['span']} hours)" : '') . ' in ' . timetable_room_label($room) . ", $ulc",
+            'att' => $att,
+            'src' => $src,
+        ];
+        return count($panel) - 1;
+    };
 ?>
   <section class="card tt-card">
     <form class="tt-bar no-print" method="get">
@@ -145,8 +214,13 @@ page_head('Room timetable', 'page-wide', 'timetable');
                 foreach ($cell['entries'] as $x) if ($x['blocked'] !== '') $hasBlocked = true;
             ?>
               <td class="<?= $cls ?>"<?= $clash ? ' title="Two bookings in this slot"' : '' ?><?= $cell['rows'] > 1 ? ' rowspan="' . $cell['rows'] . '"' : '' ?>>
-                <?php foreach ($cell['entries'] as $x): ?>
-                  <div class="tt-entry">
+                <?php foreach ($cell['entries'] as $x):
+                    // Another school's class (school view) has nothing to show.
+                    $open = $x['src'] || $x['classes'];
+                    $att = $x['blocked'] === '' ? $attendance($x, $d) : null;
+                    $tag = $open ? 'button' : 'div';
+                ?>
+                  <<?= $tag ?> class="tt-entry"<?= $open ? ' type="button" data-i="' . $describe($x, $d, $att) . '" aria-haspopup="dialog"' : '' ?>>
                     <?php if ($x['blocked'] !== ''): ?>
                       <strong><?= $e($x['blocked']) ?></strong>
                       <span class="tt-tag">Booked</span>
@@ -154,8 +228,11 @@ page_head('Room timetable', 'page-wide', 'timetable');
                       <strong><?= $e($x['code']) ?><?php if ($x['lab']): ?> <span class="tt-tag">Lab</span><?php endif; ?></strong>
                       <span class="tt-class"><?= $e($x['class']) ?></span>
                       <?php if ($x['faculty'] !== ''): ?><span class="tt-faculty"><?= $e($x['faculty']) ?></span><?php endif; ?>
+                      <?php if ($att): ?>
+                        <span class="tt-att<?= $att['marked'] ? '' : ' tt-att-none' ?>"><?= $att['marked'] ? $att['present'] . '/' . $att['strength'] . ' present' . ($att['marked'] < count($att['classes']) ? " &middot; {$att['marked']} of " . count($att['classes']) . ' marked' : '') : 'Not marked' ?></span>
+                      <?php endif; ?>
                     <?php endif; ?>
-                  </div>
+                  </<?= $tag ?>>
                 <?php endforeach; ?>
               </td>
             <?php endif; endforeach; endif; ?>
@@ -173,10 +250,19 @@ page_head('Room timetable', 'page-wide', 'timetable');
       <?php if ($hasClash): ?><li><i class="tt-key tt-clash"></i>Two bookings in one slot</li><?php endif; ?>
     </ul>
 <?php endif; endif; ?>
+    <p class="tt-hint no-print">Tap a class to see its attendance and the document it comes from.</p>
     <p class="tt-source">Official timetable<?= $t['exported_at'] !== '' ? ' &middot; updated ' . $e($when($t['exported_at'])) : '' ?></p>
   </section>
 <?php endif; ?>
 
+<?php if (!empty($panel)): ?>
+<dialog class="tt-panel" id="tt-panel" aria-labelledby="tt-panel-title">
+  <div class="tt-panel-body"></div>
+  <form method="dialog"><button class="btn-quiet tt-panel-close">Close</button></form>
+</dialog>
+<script type="application/json" id="tt-panel-data"><?= json_encode($panel, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?></script>
+<script src="js/rooms.js?v=<?= filemtime(__DIR__ . '/js/rooms.js') ?>"></script>
+<?php endif; ?>
 <?php if ($room !== ''): ?>
 <script>
   // The saved PDF is named after document.title, so name it after the room and day.

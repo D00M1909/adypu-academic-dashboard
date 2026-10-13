@@ -50,6 +50,7 @@ $sources = array_slice($argv, 1) ?: [
 
 require_once "$dash/tools/xlsx.php";
 require_once "$dash/includes/timetable.php";
+require_once __DIR__ . '/sources.php';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 const ROMAN = [1 => 'I', 2 => 'II', 3 => 'III', 4 => 'IV', 5 => 'V', 6 => 'VI', 7 => 'VII', 8 => 'VIII', 9 => 'IX', 10 => 'X'];
@@ -128,6 +129,7 @@ $home = [];
 $inFile = [];     // file => person keys seen in it
 $blocks = [];     // outside bookings, added to the rooms as they are
 $classes = 0;
+$docs = [];       // id => the document a source came from (sources.php)
 foreach ($sources as $src) {
     // A timetable that only came as a PDF (Biotechnology) is transcribed by
     // hand into a .json beside this script: [day, start, hours, subject code,
@@ -135,6 +137,10 @@ foreach ($sources as $src) {
     if (str_ends_with(strtolower($src), '.json')) {
         $tx = json_decode((string) file_get_contents($src), true);
         if (!is_array($tx)) { fwrite(STDERR, "Could not read $src\n"); exit(1); }
+        // How the school's document became this file: typed in by hand, or
+        // read by a converter script. The transcription's own note says which.
+        $doc = source_doc($src, $data, "$dash/timetable/docs", stripos($tx['note'] ?? '', 'by hand') !== false ? 'hand' : 'script');
+        if ($doc) $docs[$doc['id']] = $doc;
         foreach ($tx['classes'] as $c) {
             $classes++;
             foreach ($c['entries'] as [$day, $start, $hours, $code, $room, $who, $lab, $extra]) {
@@ -144,11 +150,15 @@ foreach ($sources as $src) {
                 $subj = $name . ($lab && !preg_match('/\blab$/i', $name) ? ' Lab' : '') . ($extra !== '' ? " ($extra)" : '');
                 // The file's own building, unless a room names another ("ULC 1 306").
                 $building = $tx['building'] ?? 'ULC 1';
+                $raw = $room;
                 if (preg_match('/^ULC \s*(\d+)\s+(.+)$/i', $room, $bm)) [$building, $room] = ['ULC ' . $bm[1], $bm[2]];
                 $split[] = [
                     'file' => $tx['source'], 'tab' => "page {$c['page']}", 'class' => $c['class'], 'day' => $day,
                     'subj' => $subj, 'fac' => $tx['faculty'][$who] ?? $who, 'room' => $room, 'building' => $building,
                     'slot' => slot_from($at, $at + 60), 'span' => (int) $hours, 'lab' => (bool) $lab, 'r' => 0,
+                    'src' => ['doc' => $doc['id'] ?? '', 'page' => (string) $c['page'], 'day' => $day, 'start' => $at,
+                        'room' => $raw, 'words' => [substr((string) strrchr("|$code", '|'), 1), $name]],
+                    'fix' => [],
                 ];
             }
         }
@@ -158,13 +168,17 @@ foreach ($sources as $src) {
             [$h, $m] = array_map('intval', explode('.', $start));
             $at = ($h < 8 ? $h + 12 : $h) * 60 + $m;
             $blocks[] = ['day' => $day, 'slot' => slot_from($at, $at + 60), 'span' => (int) $hours,
-                'room' => $room, 'building' => $tx['building'] ?? 'ULC 1', 'by' => $by];
+                'room' => $room, 'building' => $tx['building'] ?? 'ULC 1', 'by' => $by,
+                'src' => ['doc' => $doc['id'] ?? '', 'page' => (string) ($tx['classes'][0]['page'] ?? ''), 'day' => $day,
+                    'start' => $at, 'room' => $room, 'words' => [$by], 'fix' => []]];
         }
         continue;
     }
     $sheets = read_xlsx($src);
     if (!$sheets) { fwrite(STDERR, "Could not read $src\n"); exit(1); }
     $file = basename($src);
+    $doc = source_doc($src, $data, "$dash/timetable/docs", 'direct');
+    if ($doc) $docs[$doc['id']] = $doc;
 
     $raw = [];
     foreach ($sheets as $tab => $rows) {
@@ -223,9 +237,11 @@ foreach ($sources as $src) {
                 $subj = $p['subj'][$c] ?? '';
                 $fac = $p['fac'][$c] ?? '';
                 $room = $p['room'][$c] ?? '';
+                $fix = [];
                 if (is_room($fac) && !is_room($room) && $room !== '') {
                     [$fac, $room] = [$room, $fac];
                     $note("$file / $tab row {$p['r']} $day: faculty and room were swapped");
+                    $fix[] = 'The sheet has the room in the faculty row and the name in the room row; they were swapped back.';
                 }
                 if ($subj === '' && strcasecmp($fac, 'Minor') === 0) [$subj, $fac] = ['Minor', ''];
                 if ($subj === '') continue;
@@ -235,7 +251,9 @@ foreach ($sources as $src) {
                     $subj = $m[1];
                     if ($fac !== '' && !preg_match('/^(Dr|Mr|Ms|Mrs|Prof)\b/i', $fac)) $fac = "{$m[2]}. $fac";
                 }
-                $raw[] = compact('tab', 'class', 'day', 'subj', 'fac', 'room') + ['slot' => $p['slot'], 'r' => $p['r']];
+                $raw[] = compact('tab', 'class', 'day', 'subj', 'fac', 'room', 'fix') + ['slot' => $p['slot'], 'r' => $p['r'],
+                    'src' => ['doc' => $doc['id'] ?? '', 'page' => $tab, 'day' => $day, 'start' => $p['slot'][1], 'room' => '', 'words' => [],
+                        'at' => [$p['r'] - 1, $c]]];
             }
         }
     }
@@ -257,6 +275,7 @@ foreach ($sources as $src) {
         }
         if ($n > 1) {
             $note("$file / {$x['tab']} row {$x['r']} {$x['day']}: \"{$x['room']}\" for one class, used {$rooms[0]}");
+            $x['fix'][] = "The sheet gives \"{$x['room']}\" for this one class; the first, {$rooms[0]}, was used.";
             $x['room'] = $rooms[0];
         }
         $split[] = $x;
@@ -301,6 +320,7 @@ foreach ($split as &$x) {
             $guess = (string) (array_key_first($mine) ?? '');
             if ($guess === '') { $note("{$x['tab']} row {$x['r']} {$x['day']}: no room, dropped ({$x['subj']})"); continue; }
             $note("{$x['tab']} row {$x['r']} {$x['day']}: no room, guessed $guess ({$x['subj']})");
+            $x['fix'][] = "The sheet gives no room for this period; the class's usual room, $guess, was used.";
             $x['room'] = $guess;
         }
         $fac = implode(' / ', array_map(fn($f) => $spell[$who($x['file'], $f)] ?? $f, array_filter(array_map('trim', explode('/', $x['fac'])), 'strlen')));
@@ -393,11 +413,13 @@ $blocks = array_map($qualify, $blocks);
 $merged = [];
 foreach ($bookings as $b) {
     $key = implode('|', [$b['room'], $b['day'], $b['slot'][0], lecture_key($b['subj'])]);
-    if (!isset($merged[$key])) { $merged[$key] = $b + ['classes' => [$b['class']], 'facs' => [$b['fac']]]; continue; }
+    $from = ['fix' => $b['fix']] + $b['src'];
+    if (!isset($merged[$key])) { $merged[$key] = $b + ['classes' => [$b['class']], 'facs' => [$b['fac']], 'srcs' => [$from]]; continue; }
     // Keep the most specific name: "Minor: Sociology" over "Minor :Sociology/PIR/Eco".
     if (str_contains($merged[$key]['subj'], '/') && !str_contains($b['subj'], '/')) $merged[$key]['subj'] = $b['subj'];
     $merged[$key]['classes'][] = $b['class'];
     $merged[$key]['facs'][] = $b['fac'];
+    $merged[$key]['srcs'][] = $from;
 }
 
 // One teacher in one room at one hour is one session, even when two tabs give
@@ -414,6 +436,7 @@ foreach ($merged as $key => $b) {
     if (lecture_key($into['subj']) !== lecture_key($b['subj'])) $into['subj'] .= ' / ' . $b['subj'];
     array_push($into['classes'], ...$b['classes']);
     array_push($into['facs'], ...$b['facs']);
+    array_push($into['srcs'], ...$b['srcs']);
     unset($into, $merged[$key]);
 }
 
@@ -430,6 +453,31 @@ function classes_label(array $list): string {
     }
     return implode('; ', array_map(fn($g, $subs) => $subs ? "$g: " . implode(', ', $subs) : $g, array_keys($groups), $groups));
 }
+
+// Where in its document each class of a booking is written: the tab and the
+// cells for a workbook, the page for a PDF, and what the build had to repair.
+// One entry per class, so a lecture shared by three classes cites three tabs.
+$unplaced = [];
+$cite = function (array $list) use ($docs, &$unplaced): array {
+    $out = [];
+    foreach ($list as $s) {
+        $doc = $docs[$s['doc']] ?? null;
+        if (!$doc) continue;
+        $c = ['doc' => $doc['id'], 'tab' => '', 'page' => 0, 'cell' => null, 'fix' => implode(' ', $s['fix'] ?? [])];
+        if ($doc['kind'] === 'pdf') {
+            $c['page'] = (int) $s['page'];
+        } else {
+            $c['tab'] = source_tab($doc, $s['page']) ?? '';
+            if ($c['tab'] !== '') $c['cell'] = source_cell($doc['grid'][$c['tab']], $doc['merges'][$c['tab']] ?? [], $s['day'], $s['start'], $s['room'], $s['words']);
+            // A sheet read here directly knows the subject's own cell, which
+            // is all there is when the period has no time label to find.
+            if ($c['tab'] !== '' && $c['cell'] === null && isset($s['at'])) $c['cell'] = [$s['at'][0], $s['at'][1], $s['at'][0], $s['at'][1]];
+            if ($c['cell'] === null) $unplaced[] = "{$doc['name']} / " . ($c['tab'] ?: "no tab \"{$s['page']}\"") . " {$s['day']} " . slot_from($s['start'], $s['start'] + 60)[0];
+        }
+        if (!in_array($c, $out, true)) $out[] = $c;
+    }
+    return $out;
+};
 
 $rooms = [];
 $slots = [];
@@ -453,7 +501,9 @@ foreach ($merged as $b) {
     $rooms[$b['room']][] = [
         'day' => $b['day'], 'time' => $label, 'span' => $span,
         'code' => $b['subj'], 'class' => classes_label($b['classes']), 'faculty' => implode(' / ', $facs),
+        'classes' => array_values(array_unique($b['classes'])),
         'lab' => !empty($b['lab']) || (bool) preg_match('/\b(lab|practical)\b/i', $b['subj']), 'blocked' => '',
+        'src' => $cite($b['srcs']),
     ];
 }
 
@@ -502,7 +552,7 @@ foreach ($blocks as $k) {
         $slots[$l] = [$x, $y];
     }
     $rooms[$k['room']][] = ['day' => $k['day'], 'time' => $label, 'span' => $k['span'], 'code' => '', 'class' => '',
-        'faculty' => '', 'lab' => false, 'blocked' => $k['by']];
+        'faculty' => '', 'lab' => false, 'blocked' => $k['by'], 'src' => $cite([$k['src']])];
 }
 
 // Overlaps that are not the same lecture: same room, same day, times crossing.
@@ -538,6 +588,7 @@ $export = [
         return $by;
     })(),
     'rooms' => $rooms,
+    'docs' => array_map(fn($d) => array_intersect_key($d, array_flip(['name', 'file', 'kind', 'how'])), $docs),
 ];
 
 $t = timetable_parse(json_encode($export));
@@ -548,6 +599,8 @@ if (!timetable_write($t, $out)) { fwrite(STDERR, "could not write $out\n"); exit
 foreach ($hidden as $bld => $n) echo "$bld: $n booking(s) not shown, the page does not offer $bld yet\n";
 echo "Repairs:\n";
 foreach ($notes as $n) echo "  $n\n";
+echo "\nBookings whose cell in the source could not be found (" . count($unplaced) . "):\n";
+foreach (array_unique($unplaced) as $u) echo "  $u\n";
 echo "\nClashes (" . count($clashes) . "):\n";
 foreach ($clashes as $c) echo "  $c\n";
 printf("\n%d classes, %d rooms, %d bookings (%d before merging shared lectures), %d time slots -> %s\n",

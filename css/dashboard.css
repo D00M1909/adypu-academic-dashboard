@@ -1448,6 +1448,59 @@ input:focus-visible, select:focus-visible {
 .tt-legend li { display: flex; align-items: center; gap: 7px; }
 .tt-key { width: 14px; height: 14px; border-radius: 4px; border: 1px solid var(--hairline); }
 
+/* A class is a button that opens its panel; it keeps the cell's look. */
+button.tt-entry { width: 100%; margin: 0; padding: 4px; border: 0; border-radius: 6px; background: none; font: inherit; color: inherit; text-align: inherit; align-items: center; cursor: pointer; }
+button.tt-entry:hover { background: rgba(127, 127, 127, 0.10); }
+button.tt-entry:focus-visible { outline: 2px solid var(--red-ink); outline-offset: 1px; }
+button.tt-entry + button.tt-entry { margin-top: 6px; border-top-left-radius: 0; border-top-right-radius: 0; }
+.tt-att { margin-top: 3px; font-size: 11.5px; font-weight: 700; color: var(--good-ink); background: var(--good-tint); border-radius: 999px; padding: 1px 8px; }
+.tt-att-none { color: var(--att-warn); }
+.tt-att.tt-att-none { background: rgba(180, 83, 9, 0.10); }
+.tt-hint { font-size: 13px; color: var(--ink-muted); margin: 10px 0 0; }
+
+/* The class panel: a native dialog, so Esc and focus come for free. Padding
+   sits on the body, so a click on the dialog itself is the backdrop. */
+.tt-panel { width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 0; border: 1px solid var(--hairline); border-radius: 14px; background: var(--surface-raised); color: var(--ink); box-shadow: var(--shadow-md); }
+.tt-panel::backdrop { background: rgba(15, 23, 42, 0.45); }
+.tt-panel-body { padding: 20px 20px 4px; }
+.tt-panel form { padding: 8px 20px 18px; display: flex; justify-content: flex-end; }
+.tt-panel-title { margin: 0 0 4px; font-size: 19px; line-height: 1.3; }
+.tt-panel-class { margin: 0 0 2px; font-weight: 600; color: var(--tt-class); }
+.tt-panel-meta { display: block; margin: 0 0 2px; font-size: 13px; color: var(--ink-muted); }
+.tt-panel-part { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--hairline); }
+.tt-panel-part h3 { margin: 0 0 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-muted); }
+.tt-panel-att { list-style: none; margin: 0; padding: 0; }
+.tt-panel-att li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; font-size: 14px; }
+.tt-panel-att li + li { border-top: 1px dashed var(--hairline); }
+.tt-panel-att strong { color: var(--good-ink); }
+.tt-panel-src { display: flex; flex-direction: column; gap: 3px; }
+.tt-panel-src + .tt-panel-src { margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--hairline); }
+.tt-panel-doc { font-size: 14px; overflow-wrap: anywhere; }
+.tt-panel-where { font-size: 13px; font-weight: 600; font-family: 'IBM Plex Mono', monospace; }
+.tt-panel-fix { font-size: 12.5px; color: var(--att-warn); }
+.tt-panel-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.tt-panel-acts a { display: inline-flex; align-items: center; width: auto; margin: 0; text-decoration: none; font-size: 13.5px; padding: 8px 14px; min-height: 0; }
+
+/* source.php: one of the schools' documents, opened at a class. */
+.src-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin-bottom: 12px; }
+.card h2.src-name { margin: 0; font-size: 18px; overflow-wrap: anywhere; }
+.src-how { font-size: 13px; color: var(--ink-muted); }
+.src-head .btn-quiet { display: inline-flex; align-items: center; margin-left: auto; width: auto; text-decoration: none; font-size: 13.5px; padding: 8px 14px; }
+.src-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; padding: 0; list-style: none; }
+.src-tabs a { display: block; font-size: 12.5px; font-weight: 600; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--hairline); color: var(--ink); text-decoration: none; background: var(--surface); }
+.src-tabs a[aria-current] { background: var(--red-ink); border-color: var(--red-ink); color: #fff; }
+.src-wrap { position: relative; overflow: auto; max-height: 75vh; border: 1px solid var(--hairline); border-radius: 10px; background: var(--surface-raised); }
+.src-sheet { border-collapse: collapse; font-size: 12px; }
+.src-sheet th, .src-sheet td { border: 1px solid var(--hairline); padding: 4px 6px; vertical-align: top; white-space: pre-line; min-width: 48px; max-width: 260px; }
+.src-sheet thead th, .src-sheet tbody th { position: sticky; background: var(--surface); color: var(--ink-muted); font-weight: 600; font-size: 11px; text-align: center; }
+.src-sheet thead th { top: 0; z-index: 2; }
+.src-sheet tbody th { left: 0; z-index: 1; min-width: 36px; }
+.src-sheet td.src-hit { background: #fef3c7; color: #0f172a; box-shadow: inset 0 0 0 2px #d97706; }
+.src-pdf { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.src-pdf canvas { max-width: 100%; height: auto; border: 1px solid var(--hairline); border-radius: 6px; background: #fff; }
+.src-pager { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; }
+.src-pager button { width: auto; margin: 0; padding: 7px 14px; }
+
 
 @media (max-width: 640px) {
   .tt-card { padding: 14px 12px; }

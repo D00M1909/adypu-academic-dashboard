@@ -39,6 +39,24 @@ function timetable_parse(string $json): array|string {
     }
     if (!$days || !$slots) return 'That timetable has no days or no time slots in it.';
 
+    // The documents the timetable was built from, for the source panel: an id,
+    // the school's file name, where its copy sits under timetable/, whether it
+    // is a workbook or a PDF, and how it was read (straight from the sheet, by
+    // a converter script, or typed in by hand). The path is checked here
+    // because source.php serves it.
+    $docs = [];
+    foreach ((array) ($raw['docs'] ?? []) as $id => $d) {
+        $id = $str($id);
+        $file = $str($d['file'] ?? '');
+        if (!preg_match('/^[a-z0-9-]+$/', $id) || !preg_match('#^docs/' . $id . '\.(pdf|xlsx)$#', $file)) continue;
+        $docs[$id] = [
+            'name' => $str($d['name'] ?? '') ?: basename($file),
+            'file' => $file,
+            'kind' => ($d['kind'] ?? '') === 'pdf' ? 'pdf' : 'sheet',
+            'how' => in_array($d['how'] ?? '', ['direct', 'script', 'hand'], true) ? $d['how'] : 'direct',
+        ];
+    }
+
     $rooms = [];
     foreach ((array) ($raw['rooms'] ?? []) as $room => $entries) {
         $room = $str($room);
@@ -57,9 +75,13 @@ function timetable_parse(string $json): array|string {
                 'span' => max(1, min(4, (int) ($e['span'] ?? 1))),
                 'code' => $str($e['code'] ?? ''),
                 'class' => $str($e['class'] ?? ''),
+                // Each class on its own ("B.Tech CSE Sem III Div A"), where
+                // 'class' joins them for display. Attendance is looked up by these.
+                'classes' => array_values(array_filter(array_map($str, (array) ($e['classes'] ?? [])), 'strlen')),
                 'faculty' => $str($e['faculty'] ?? ''),
                 'lab' => !empty($e['lab']),
                 'blocked' => $str($e['blocked'] ?? ''),
+                'src' => timetable_parse_src($e['src'] ?? [], $docs),
             ];
         }
     }
@@ -92,7 +114,29 @@ function timetable_parse(string $json): array|string {
         'slots' => array_values($slots),
         'buildings' => $buildings,
         'rooms' => $rooms,
+        'docs' => $docs,
     ];
+}
+
+// One booking's citations, each a document it is written in and where: the
+// tab and its cells [first row, first col, last row, last col] (0-based) for a
+// workbook, the page for a PDF, and any repair the build made. A citation of a
+// document the file does not list is dropped.
+function timetable_parse_src(mixed $list, array $docs): array {
+    $out = [];
+    foreach ((array) $list as $s) {
+        if (!is_array($s) || !isset($docs[$s['doc'] ?? ''])) continue;
+        $cell = $s['cell'] ?? null;
+        $cell = is_array($cell) && count($cell) === 4 ? array_map(fn($n) => max(0, (int) $n), array_values($cell)) : null;
+        $out[] = [
+            'doc' => (string) $s['doc'],
+            'tab' => is_scalar($s['tab'] ?? null) ? trim((string) $s['tab']) : '',
+            'page' => max(0, (int) ($s['page'] ?? 0)),
+            'cell' => $cell,
+            'fix' => is_scalar($s['fix'] ?? null) ? trim((string) $s['fix']) : '',
+        ];
+    }
+    return $out;
 }
 
 // "1.30 to 3.30" -> [810, 930], minutes from midnight. The sheets write a
@@ -267,7 +311,7 @@ function timetable_for_school(array $t, string $school): array {
                 $mine = $mine || $e['blocked'] === '';
                 continue;
             }
-            $entries[$i] = ['code' => '', 'class' => '', 'faculty' => '', 'lab' => false, 'blocked' => 'Other school'] + $e;
+            $entries[$i] = ['code' => '', 'class' => '', 'classes' => [], 'faculty' => '', 'lab' => false, 'blocked' => 'Other school', 'src' => []] + $e;
         }
         if ($mine) $rooms[$room] = $entries;
     }
@@ -277,4 +321,72 @@ function timetable_for_school(array $t, string $school): array {
         if ($in) $buildings[$b] = $in;
     }
     return ['rooms' => $rooms, 'buildings' => $buildings] + $t;
+}
+
+// The attendance classes (class_rows() entries) one timetable class is, for
+// the schools whose timetable names classes the way the structure does:
+// Engineering and Management. Law and Liberal Arts timetable by programme
+// ("BA LLB Sem III", "BA Psychology Sem I") while their attendance is kept by
+// division, so they match nothing rather than a guess.
+//
+// A semester is half a year ("Sem V" is 3rd Year). A label with no division
+// is every division of its year ("BBA Sem I" is BBA A and B). A specialisation
+// ("BBA Sem V Marketing") is part of every division at once, so its reading
+// would be the whole year's: it matches nothing. CSE's 3rd and 4th years are
+// "SE" in the structure (their tabs are "TY SE A", "BTECH SE A"); 1st Year's
+// divisions are spread over its Core and CS halves.
+function timetable_attendance_classes(string $label, array $rows): array {
+    $roman = ['I' => 1, 'II' => 2, 'III' => 3, 'IV' => 4, 'V' => 5, 'VI' => 6, 'VII' => 7, 'VIII' => 8, 'IX' => 9, 'X' => 10];
+    $yearOf = fn(string $sem) => isset($roman[$sem]) ? [1 => '1st', 2 => '2nd', 3 => '3rd', 4 => '4th', 5 => '5th'][intdiv($roman[$sem] + 1, 2)] . ' Year' : '';
+    $want = null;   // [school, year, [branches], division or null]
+    if (preg_match('/^B\.Tech First Year Div (\w+)$/', $label, $m)) {
+        $want = ['eng', '1st Year', ['Core', 'CS'], $m[1]];
+    } elseif (preg_match('/^B\.Tech (AIDS|CSE) Sem ([IVX]+) Div (\w+)$/', $label, $m)) {
+        $year = $yearOf($m[2]);
+        $want = ['eng', $year, [$m[1] === 'CSE' && $year !== '2nd Year' ? 'SE' : $m[1]], $m[3]];
+    } elseif (preg_match('/^B\.Tech BT(?:-(MBT|FT|BI))? Sem ([IVX]+)$/', $label, $m)) {
+        $spec = ['MBT' => 'Medical Biotechnology', 'FT' => 'Food Technology', 'BI' => 'Bioinformatics'][$m[1]] ?? null;
+        $want = ['eng', $yearOf($m[2]), ['Biotechnology'], $spec];
+    } elseif (preg_match('/^M\.Tech BT Sem ([IVX]+)$/', $label, $m)) {
+        $want = ['eng', $yearOf($m[1]), ['M. Tech'], 'Biotechnology'];
+    } elseif (preg_match('/^B\.Tech (Biomedical|ME-AE|Robotics) Sem ([IVX]+)$/', $label, $m)) {
+        $want = ['eng', $yearOf($m[2]), [['ME-AE' => 'Mechanical'][$m[1]] ?? $m[1]], null];
+    } elseif (preg_match('/^B\.Tech Civil Sem ([IVX]+) \(\w+-(\w)\)$/', $label, $m)) {
+        $want = ['eng', $yearOf($m[1]), ['Civil Engineering'], $m[2]];
+    } elseif (preg_match('/^(BBA|MBA) Sem ([IVX]+)$/', $label, $m)) {
+        $want = ['mgmt', $yearOf($m[2]), [$m[1]], null];
+    }
+    if (!$want || $want[1] === '') return [];
+    [$school, $year, $branches, $division] = $want;
+    return array_values(array_filter($rows, fn($r) => $r['school'] === $school && $r['year'] === $year
+        && in_array($r['branch'], $branches, true) && ($division === null || $r['division'] === $division)));
+}
+
+// The reading a class filed for one lecture: the latest on that date whose
+// time falls between the lecture's start and end. Null when none did. $days
+// is get_attendance_days(): date => class key => time => present.
+function timetable_reading(array $days, string $date, string $key, array $entry): ?int {
+    $m = timetable_minutes($entry['time']);
+    $end = timetable_end($entry);
+    if (!$m || $end === null) return null;
+    $found = null;
+    foreach ((array) ($days[$date][$key] ?? []) as $time => $present) {
+        if (!preg_match('/^(\d{2}):(\d{2})$/', (string) $time, $t)) continue;
+        $at = (int) $t[1] * 60 + (int) $t[2];
+        if ($at >= $m[0] && $at < $end) $found = (int) $present;
+    }
+    return $found;
+}
+
+// "B11:B12", the cells a citation points at as Excel names them.
+function timetable_cell_name(array $cell): string {
+    $col = function (int $i): string {
+        $s = '';
+        for ($i++; $i > 0; $i = intdiv($i - 1, 26)) $s = chr(65 + ($i - 1) % 26) . $s;
+        return $s;
+    };
+    [$r1, $c1, $r2, $c2] = $cell;
+    $a = $col($c1) . ($r1 + 1);
+    $b = $col($c2) . ($r2 + 1);
+    return $a === $b ? $a : "$a:$b";
 }

@@ -155,4 +155,73 @@ assert($law['rooms']['301'][1]['class'] === '' && $law['rooms']['301'][1]['facul
 // A hold alone does not put a room in the school's list.
 assert(timetable_for_school($both, 'eng')['rooms'] === []);
 
+// Sources: a document is kept only with a safe path under docs/, a citation
+// only of a listed document, and a cell only as four numbers.
+$cited = $export;
+$cited['docs'] = [
+    'eng-cse' => ['name' => 'CSE.xlsx', 'file' => 'docs/eng-cse.xlsx', 'kind' => 'sheet', 'how' => 'script'],
+    'fy' => ['name' => 'FY.pdf', 'file' => 'docs/fy.pdf', 'kind' => 'pdf', 'how' => 'hand'],
+    'bad' => ['name' => 'x', 'file' => '../includes/config.local.php'],
+];
+$cited['rooms'] = ['102' => [$e('Monday', '09.30 to 10.30', ['classes' => ['B.Tech CSE Sem III Div A', ''], 'src' => [
+    ['doc' => 'eng-cse', 'tab' => 'CSE A', 'cell' => [5, 1, 5, 1], 'fix' => 'swapped'],
+    ['doc' => 'fy', 'page' => '6', 'cell' => 'x'],
+    ['doc' => 'bad', 'tab' => 'A'],
+]])]];
+$c = timetable_parse(json_encode($cited));
+assert(array_keys($c['docs']) === ['eng-cse', 'fy'] && $c['docs']['fy']['kind'] === 'pdf' && $c['docs']['eng-cse']['how'] === 'script');
+$src = $c['rooms'][102][0]['src'];
+assert(count($src) === 2 && $src[0]['cell'] === [5, 1, 5, 1] && $src[0]['fix'] === 'swapped');
+assert($src[1]['page'] === 6 && $src[1]['cell'] === null);
+assert($c['rooms'][102][0]['classes'] === ['B.Tech CSE Sem III Div A']);
+// A file from before sources existed still reads, with none.
+assert($t['docs'] === [] && $t['rooms'][102][0]['src'] === [] && $t['rooms'][102][0]['classes'] === []);
+assert(timetable_cell_name([5, 1, 5, 1]) === 'B6' && timetable_cell_name([10, 3, 13, 27]) === 'D11:AB14');
+
+// Attendance: which structure classes a timetable class is.
+$rows = [];
+foreach ([['eng', '1st Year', 'Core', 'F'], ['eng', '1st Year', 'CS', 'AA'], ['eng', '1st Year', 'Biomedical', 'B'],
+    ['eng', '2nd Year', 'CSE', 'A'], ['eng', '3rd Year', 'SE', 'A'], ['eng', '3rd Year', 'CS', 'A'],
+    ['eng', '3rd Year', 'Biotechnology', 'Food Technology'], ['eng', '2nd Year', 'Biotechnology', 'A'],
+    ['eng', '2nd Year', 'Mechanical', 'A'], ['eng', '2nd Year', 'Civil Engineering', 'A'], ['eng', '1st Year', 'M. Tech', 'Biotechnology'],
+    ['mgmt', '1st Year', 'BBA', 'A'], ['mgmt', '1st Year', 'BBA', 'B'], ['mgmt', '3rd Year', 'BBA', 'A'],
+    ['law', '1st Year', '', 'A']] as [$s, $y, $b, $d]) $rows[] = ['school' => $s, 'year' => $y, 'branch' => $b, 'division' => $d, 'strength' => 60];
+$which = fn($label) => array_map(fn($r) => "{$r['year']}/{$r['branch']}/{$r['division']}", timetable_attendance_classes($label, $rows));
+assert($which('B.Tech First Year Div F') === ['1st Year/Core/F'] && $which('B.Tech First Year Div AA') === ['1st Year/CS/AA']);
+assert($which('B.Tech CSE Sem III Div A') === ['2nd Year/CSE/A'] && $which('B.Tech CSE Sem V Div A') === ['3rd Year/SE/A']);
+assert($which('B.Tech BT-FT Sem V') === ['3rd Year/Biotechnology/Food Technology'] && $which('B.Tech BT Sem III') === ['2nd Year/Biotechnology/A']);
+assert($which('B.Tech ME-AE Sem III') === ['2nd Year/Mechanical/A'] && $which('B.Tech Civil Sem III (SE-A)') === ['2nd Year/Civil Engineering/A']);
+assert($which('M.Tech BT Sem I') === ['1st Year/M. Tech/Biotechnology']);
+assert($which('BBA Sem I') === ['1st Year/BBA/A', '1st Year/BBA/B']);
+// A specialisation, Law, Liberal Arts and ECE match nothing rather than a guess.
+assert($which('BBA Sem V Marketing') === [] && $which('BA LLB Sem I') === [] && $which('BA Psychology Sem I') === [] && $which('B.Tech ECE') === []);
+
+// The reading for a lecture is the latest filed between its start and end.
+$days = ['2026-10-12' => ['k' => ['09:30' => 50, '10:15' => 52, '10:30' => 40], 'old' => 30]];
+$lec = ['time' => '9.30 to 10.30', 'span' => 1];
+assert(timetable_reading($days, '2026-10-12', 'k', $lec) === 52);
+assert(timetable_reading($days, '2026-10-12', 'k', ['time' => '10.30 to 11.30', 'span' => 1]) === 40);
+assert(timetable_reading($days, '2026-10-12', 'k', ['time' => '8.30 to 9.30', 'span' => 1]) === null);
+assert(timetable_reading($days, '2026-10-13', 'k', $lec) === null && timetable_reading($days, '2026-10-12', 'old', $lec) === null);
+
+// Finding a class in a school's sheet, in each of the three layouts.
+require_once __DIR__ . '/../tools/timetable/sources.php';
+// Days across, times down, three rows a period: the period's rows under the day.
+$g = [1 => [1 => 'Monday', 2 => 'Tuesday'], 2 => [0 => '09.30 to 10.30', 1 => 'OS', 2 => 'CN'], 3 => [1 => 'Dr. A'], 4 => [1 => '202'],
+    5 => [0 => '10.30 to 11.30', 1 => 'DBMS']];
+assert(source_cell($g, [], 'Tuesday', 570) === [2, 2, 4, 2] && source_cell($g, [], 'Monday', 630) === [5, 1, 8, 1]);
+// a two-hour lab merged over both periods is taken whole
+assert(source_cell($g, [[2, 1, 5, 1]], 'Monday', 570) === [2, 1, 5, 1]);
+assert(source_cell($g, [], 'Friday', 570) === null && source_cell($g, [], 'Monday', 900) === null);
+// Days down, times across, two classes a day: the row naming the subject.
+$g = [0 => [2 => '10.30-11.30', 3 => '11.30-12.30'], 1 => [0 => 'MON', 2 => 'MOS(DAJ)'], 2 => [2 => 'T1-SD (AV)'], 3 => [0 => 'TUE']];
+assert(source_cell($g, [], 'Monday', 630, '', ['SD']) === [2, 2, 2, 2]);
+assert(source_cell($g, [], 'Monday', 630, '', ['MOS']) === [1, 2, 1, 2]);
+// Days across with periods under each, rooms down; the later days unlabelled.
+$g = [0 => [3 => 'MONDAY'], 1 => [0 => 'Room No.', 3 => '1 09:30–10:30', 4 => '2 10:30–11:30', 5 => '1 09:30–10:30', 6 => '2 10:30–11:30',
+    7 => '3 11:30-12:30', 8 => '4 12:30-1:30', 9 => '5 1:30-2:30', 10 => '6 2:30-3:30', 11 => '7 3:30-4:30', 12 => '8 4:30-5:30'],
+    2 => [0 => 'ULC 1 603', 6 => 'ECA-KK'], 3 => [0 => 'ULC-1 Computer Lab', 5 => 'DBMS']];
+assert(source_cell($g, [], 'Tuesday', 630, '603') === [2, 6, 2, 6]);
+assert(source_cell($g, [], 'Tuesday', 570, 'Computer Lab') === [3, 5, 3, 5]);
+
 echo "OK\n";

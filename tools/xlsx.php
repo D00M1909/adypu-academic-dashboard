@@ -170,6 +170,32 @@ function read_xlsx(string $path): array {
     return $book;
 }
 
+// Every tab's merged ranges as [first row, first col, last row, last col], all
+// 0-based like read_xlsx(), for drawing a sheet the way it looks in Excel.
+function read_xlsx_merges(string $path): array {
+    $zip = new ZipArchive();
+    if ($zip->open($path) !== true) {
+        throw new RuntimeException("cannot read $path");
+    }
+    $part = fn(string $name) => simplexml_load_string((string)$zip->getFromName($name));
+    $targets = [];
+    foreach ($part('xl/_rels/workbook.xml.rels')->Relationship as $rel) {
+        $targets[(string)$rel['Id']] = preg_replace('#^/?(xl/)?#', '', (string)$rel['Target']);
+    }
+    $book = [];
+    foreach ($part('xl/workbook.xml')->sheets->sheet as $sheet) {
+        $rid = (string)$sheet->attributes('http://schemas.openxmlformats.org/officeDocument/2006/relationships')['id'];
+        $ranges = [];
+        foreach ($part('xl/' . $targets[$rid])->mergeCells->mergeCell ?? [] as $m) {
+            if (!preg_match('/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/', (string)$m['ref'], $x)) continue;
+            $ranges[] = [(int)$x[2] - 1, xlsx_col_index($x[1]), (int)$x[4] - 1, xlsx_col_index($x[3])];
+        }
+        $book[(string)$sheet['name']] = $ranges;
+    }
+    $zip->close();
+    return $book;
+}
+
 // Excel: 31 chars max, and []:*?/\ are illegal in a tab name.
 function xlsx_tab_name(string $name): string {
     return substr(str_replace(['[', ']', ':', '*', '?', '/', '\\'], '-', $name), 0, 31);
