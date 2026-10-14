@@ -23,12 +23,20 @@ $schools = [];
 foreach ($t['rooms'] ?? [] as $entries) {
     foreach ($entries as $x) foreach (timetable_schools($x) as $k) $schools[$k] = true;
 }
+foreach ($t['calendars'] ?? [] as $c) foreach (timetable_schools(['blocked' => '', 'class' => $c['class']]) as $k) $schools[$k] = true;
 $schools = array_filter(SCHOOLS, fn($k) => isset($schools[$k]), ARRAY_FILTER_USE_KEY);
 $school = (string) ($_GET['school'] ?? '');
 if (!isset($schools[$school])) $school = '';
+
+// No date means today in India, which is what a phone opened at a classroom
+// door wants. Most of the timetable repeats weekly, so only the weekday
+// matters to it; a dated booking (Design's) shows only in the weeks it runs.
+$tz = new DateTimeZone('Asia/Kolkata');
+$date = DateTimeImmutable::createFromFormat('!Y-m-d', (string) ($_GET['date'] ?? ''), $tz) ?: new DateTimeImmutable('today', $tz);
+$monday = $date->modify('monday this week');
 // Every class's lectures across every room, taken before a school is picked
 // (which hides other schools' classes), for matching attendance to lectures.
-$lectures = $t ? timetable_lectures($t) : [];
+$lectures = $t ? timetable_lectures(timetable_for_week($t, $monday)) : [];
 // A dean is a person, not a place: their week spans rooms and schools, so the
 // school, ULC and room pickers stand aside while one is picked. A dean with
 // no classes in the timetable is still a choice and shows an empty week.
@@ -36,9 +44,12 @@ $deans = $t['deans'] ?? [];
 $deanId = (string) ($_GET['dean'] ?? '');
 $dean = $deans[$deanId] ?? null;
 if (!$dean) $deanId = '';
-$teaching = $dean ? timetable_teaching($t, $dean) : [];
 if ($dean) $school = '';
+// A school's rooms are the ones it teaches in at all, so they are picked
+// before the week drops the bookings that do not run in it.
 if ($t && $school !== '') $t = timetable_for_school($t, $school);
+if ($t) $t = timetable_for_week($t, $monday);
+$teaching = $dean ? timetable_teaching($t, $dean) : [];
 $buildings = $t['buildings'] ?? [];
 // Pick order is the one the request asked for: date, then ULC, then room. Each
 // falls back to the first valid choice, so changing the ULC with a room from
@@ -49,10 +60,6 @@ $rooms = $buildings[$ulc] ?? [];
 $room = (string) ($_GET['room'] ?? '');
 if (!in_array($room, $rooms, true)) $room = $rooms[0] ?? '';
 
-// No date means today in India, which is what a phone opened at a classroom
-// door wants. The timetable repeats weekly, so only the weekday is used.
-$tz = new DateTimeZone('Asia/Kolkata');
-$date = DateTimeImmutable::createFromFormat('!Y-m-d', (string) ($_GET['date'] ?? ''), $tz) ?: new DateTimeImmutable('today', $tz);
 // The whole week unless week=0 asks for one day: a room's week is what most
 // people open it for.
 $week = ($_GET['week'] ?? '1') !== '0';
@@ -98,7 +105,6 @@ page_head('Room timetable', 'page-wide', 'timetable');
     // the lecture happened and nobody filed it.
     $attDays = get_attendance_days();
     $attRows = class_rows();
-    $monday = $date->modify('monday this week');
     $now = new DateTimeImmutable('now', $tz);
     $attendance = function (array $x, string $d) use ($attDays, $attRows, $week, $monday, $date, $now, $t, $lectures): ?array {
         $on = $week ? $monday->modify('+' . (int) array_search($d, $t['days'], true) . ' days') : $date;

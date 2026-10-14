@@ -247,6 +247,66 @@ assert(timetable_reading(['d' => ['k' => ['13:15' => 37, '13:40' => 40]]], 'd', 
 $lt = timetable_lectures(['rooms' => ['1' => [['day' => 'Monday', 'time' => '1.30 to 2.30', 'span' => 2, 'classes' => ['A', 'B']]]]]);
 assert($lt['A']['Monday'] === [[810, 930]] && $lt['B']['Monday'] === [[810, 930]]);
 
+// Design: its classes are the design school's, and a Design room's number is
+// shown plain like a ULC's.
+assert(timetable_schools($x('B.Des Fashion Design Sem III')) === ['design'] && timetable_schools($x('M.Des UI/UX Design Sem I')) === ['design']);
+assert(timetable_room_label('201 (School of Design)') === '201' && timetable_room_label('107 (Cintiq Lab)') === '107 (Cintiq Lab)');
+$rows = [];
+foreach ([['1st Year', 'B Des Fashion Design', 'A'], ['1st Year', 'B Des UI/UX', 'B'], ['1st Year', 'M Des UI/UX', 'B'],
+    ['2nd Year', 'B Des UI/UX', 'A'], ['3rd Year', 'B Des Visual Communication Design', 'A'], ['2nd Year', 'M Des Transportation', 'A'],
+    ['2nd Year', 'M Des UI/UX', 'B']] as [$y, $b, $d]) $rows[] = ['school' => 'design', 'year' => $y, 'branch' => $b, 'division' => $d, 'strength' => 5];
+// $which keeps the rows it was made with, so Design's get their own.
+$which = fn($label) => array_map(fn($r) => "{$r['year']}/{$r['branch']}/{$r['division']}", timetable_attendance_classes($label, $rows));
+assert($which('B.Des UI/UX Design Sem III') === ['2nd Year/B Des UI/UX/A'] && $which('B.Des Visual Communication Design Sem V') === ['3rd Year/B Des Visual Communication Design/A']);
+assert($which('M.Des Transportation Design Sem III') === ['2nd Year/M Des Transportation/A'] && $which('M.Des UI/UX Design Sem I') === ['1st Year/M Des UI/UX/B']);
+// The foundation is every B.Des programme's first year, never the M.Des's.
+assert($which('B.Des Foundation Sem I') === ['1st Year/B Des Fashion Design/A', '1st Year/B Des UI/UX/B']);
+
+// A semester calendar: kept as dates, drawn a week at a time. A date's
+// session -1 is a day out of the room, and a date not listed (a holiday) has
+// nothing in it.
+$cal = $export;
+$cal['days'] = ['Monday', 'Tuesday'];
+$cal['rooms'] += ['205 (School of Design)' => [], '305' => []];
+$cal['calendars'] = [
+    ['class' => 'B.Des Fashion Design Sem III', 'rooms' => ['205 (School of Design)', 'nowhere'],
+        'sessions' => [['09.30 to 10.30', 3], ['1.15 to 2.15', 2]],
+        'subjects' => [['Fabric Study', 'Prof. A'], ['Garment studio 1', 'Prof. B']],
+        'dates' => ['2026-10-12' => [0, 1], '2026-10-13' => [1, -1], '2026-10-19' => [0, 0], 'Mon' => [0, 0]],
+        'src' => ['doc' => 'nope', 'tab' => 'x', 'cells' => []]],
+    ['class' => 'Empty', 'rooms' => ['305'], 'sessions' => [['09.30 to 10.30', 3]], 'subjects' => [], 'dates' => []],
+];
+$c = timetable_parse(json_encode($cal));
+assert(count($c['calendars']) === 1, 'a calendar with no dates is dropped');
+assert($c['calendars'][0]['rooms'] === ['205 (School of Design)'] && array_keys($c['calendars'][0]['dates']) === ['2026-10-12', '2026-10-13', '2026-10-19']);
+assert($c['calendars'][0]['src'] === [], 'a citation of an unlisted document is dropped');
+$wk = timetable_for_week($c, new DateTimeImmutable('2026-10-12'));
+$in = $wk['rooms']['205 (School of Design)'];
+assert($wk['calendars'] === [] && count($in) === 3);
+assert($in[0]['day'] === 'Monday' && $in[0]['time'] === '09.30 to 10.30' && $in[0]['span'] === 3 && $in[0]['code'] === 'Fabric Study' && $in[0]['faculty'] === 'Prof. A');
+assert($in[1]['time'] === '1.15 to 2.15' && $in[1]['code'] === 'Garment studio 1' && $in[1]['classes'] === ['B.Des Fashion Design Sem III']);
+assert($in[2]['day'] === 'Tuesday' && $in[2]['code'] === 'Garment studio 1');
+assert(count(timetable_for_week($c, new DateTimeImmutable('2026-10-19'))['rooms']['205 (School of Design)']) === 2);
+assert(timetable_for_week($c, new DateTimeImmutable('2026-11-09'))['rooms']['205 (School of Design)'] === [], 'a week off leaves the room, empty');
+assert(count(timetable_for_week($c, new DateTimeImmutable('2026-10-12'))['rooms']['102']) === 4, 'weekly bookings are untouched');
+// A school keeps its calendar's rooms in a week with nothing in them, and
+// another school sees that calendar as a hold.
+$des = timetable_for_school($c, 'design');
+assert(isset($des['rooms']['205 (School of Design)']) && !isset($des['rooms']['102']));
+assert(timetable_for_week($des, new DateTimeImmutable('2026-11-09'))['rooms']['205 (School of Design)'] === []);
+$other = timetable_for_week(['rooms' => ['205 (School of Design)' => []]] + timetable_for_school($c + ['buildings' => []], 'eng'), new DateTimeImmutable('2026-10-12'));
+assert($other['rooms']['205 (School of Design)'][0]['blocked'] === 'Other school' && $other['rooms']['205 (School of Design)'][0]['code'] === '');
+// The split write sends a calendar's cells to the side file, like any source.
+$c['docs'] = ['des' => ['name' => 'D.xlsx', 'file' => 'docs/des.xlsx', 'kind' => 'sheet', 'how' => 'script']];
+$c['calendars'][0]['src'] = ['doc' => 'des', 'tab' => 'FD', 'cells' => ['2026-10-12' => [[8, 4, 9, 4], null]]];
+$side = dirname(TIMETABLE_FILE) . '/sources-cal.php';
+assert(timetable_write_split($c, TIMETABLE_FILE, $side));
+$back = timetable_read();
+assert(!isset($back['calendars'][0]['src']['cells']) || $back['calendars'][0]['src'] === [], 'no cells on the server');
+$wk = timetable_for_week(['calendars' => [$c['calendars'][0]]] + $c, new DateTimeImmutable('2026-10-12'));
+assert($wk['rooms']['205 (School of Design)'][0]['src'][0]['cell'] === [8, 4, 9, 4] && $wk['rooms']['205 (School of Design)'][1]['src'] === []);
+@unlink($side);
+
 // Deans: a name matches with titles ignored, through every spelling in 'as',
 // and a booking taught by two belongs to each.
 assert(timetable_person('Adv. Dr.  Abhilasha Mane') === 'abhilasha mane' && timetable_person('Prof Bindiya Naik') === 'bindiya naik');

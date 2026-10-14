@@ -25,6 +25,12 @@ const SOURCE_DOCS = [
     'firstyear' => ['eng-firstyear', 'School of Engineering - First Year Timetable 2026-27.pdf'],
     'mechanical' => ['eng-mech', 'School of Engineering - Mechanical, AE and Robotics Timetable 2026-27.xlsx'],
     'management' => ['mgmt', 'School of Management - Timetable 2026-27.xlsx'],
+    'design-foundation' => ['des-foundation', 'School of Design - Foundation Timetable 2026-27.xlsx'],
+    'design-td' => ['des-td', 'School of Design - Transportation Design Timetable 2026-27.xlsx'],
+    'design-uiux' => ['des-uiux', 'School of Design - UI-UX Design Timetable 2026-27.xlsx'],
+    'design-fashion' => ['des-fashion', 'School of Design - Fashion Design Timetable 2026-27.xlsx'],
+    'design-product' => ['des-product', 'School of Design - Product Design Timetable 2026-27.xlsx'],
+    'design-vcd' => ['des-vcd', 'School of Design - Visual Communication Design Timetable 2026-27.xlsx'],
 ];
 
 // The document behind one source path, copied into $out, as the entry the

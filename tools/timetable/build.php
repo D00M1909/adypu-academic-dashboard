@@ -46,6 +46,12 @@ $sources = array_slice($argv, 1) ?: [
     "$data/btech-cse-2026-09-28.json",
     "$data/aids-2026-08-03.json",
     "$data/mechanical-2026-09-30.json",
+    "$data/design-foundation-2026-10-14.json",
+    "$data/design-td-2026-10-14.json",
+    "$data/design-uiux-2026-10-14.json",
+    "$data/design-fashion-2026-10-14.json",
+    "$data/design-product-2026-10-14.json",
+    "$data/design-vcd-2026-10-14.json",
 ];
 
 require_once "$dash/tools/xlsx.php";
@@ -128,6 +134,7 @@ $split = [];
 $home = [];
 $inFile = [];     // file => person keys seen in it
 $blocks = [];     // outside bookings, added to the rooms as they are
+$calendars = [];  // semester calendars, exported as they are (see below)
 $classes = 0;
 $docs = [];       // id => the document a source came from (sources.php)
 foreach ($sources as $src) {
@@ -161,6 +168,12 @@ foreach ($sources as $src) {
                     'fix' => [],
                 ];
             }
+        }
+        // A semester calendar (Design): one subject a session, changing by
+        // the week, kept whole and drawn a week at a time by the page.
+        foreach ($tx['calendars'] ?? [] as $cal) {
+            $classes++;
+            $calendars[] = $cal + ['building' => $tx['building'] ?? 'ULC 1', 'doc' => $doc['id'] ?? ''];
         }
         // Another department's hold on a room (ECE's sheet names who else is in
         // each room): drawn as "Booked", never as one of our classes.
@@ -339,7 +352,7 @@ function lecture_key(string $subj): string {
 
 // The ULCs the page offers. A booking in any other is written into the data
 // files anyway (AIDS and CSE use ULC 5), so adding one is a change here only.
-const SHOW = ['ULC 1', 'ULC 5', 'ULC 6', 'ULC 7'];
+const SHOW = ['ULC 1', 'ULC 5', 'ULC 6', 'ULC 7', 'School of Design'];
 $hidden = [];
 $bookings = array_values(array_filter($bookings, function ($b) use (&$hidden) {
     $bld = $b['building'] ?? 'ULC 1';
@@ -348,6 +361,7 @@ $bookings = array_values(array_filter($bookings, function ($b) use (&$hidden) {
     return false;
 }));
 $blocks = array_values(array_filter($blocks, fn($k) => in_array($k['building'], SHOW, true)));
+$calendars = array_values(array_filter($calendars, fn($c) => in_array($c['building'], SHOW, true)));
 
 // ULC 5's rooms are known by a letter and a number ("ULC 5C 16" is C-16), but
 // some cells drop the letter ("ULC_5 16"). A bare number that appears with
@@ -399,15 +413,23 @@ $blocks = array_merge(...array_map($place, $blocks));
 
 // The same room number in two ULCs (105 is an AIDS room in ULC 1 and a lab in
 // ULC 6) is two rooms: each is named with its ULC, so neither hides the other.
+// The School of Design's rooms (201 to 305) share numbers with ULC 1's, so
+// they always carry their building, and ULC 1's keep their plain names (and
+// the links people already have to them).
+// A calendar's rooms go through the same naming as a booking's.
+$calRooms = fn(array $c): array => array_map(fn($r) => ['room' => (string) $r, 'building' => $c['building']], $c['rooms']);
+foreach ($calendars as $i => $c) $calendars[$i]['rooms'] = array_column(array_merge(...array_map($place, $calRooms($c))), 'room');
 $ulcsOf = [];
-foreach ([...$bookings, ...$blocks] as $b) $ulcsOf[$b['room']][$b['building'] ?? 'ULC 1'] = true;
+foreach ([...$bookings, ...$blocks, ...array_merge([], ...array_map($calRooms, $calendars))] as $b) $ulcsOf[$b['room']][$b['building'] ?? 'ULC 1'] = true;
 $qualify = function (array $b) use ($ulcsOf): array {
     $bld = $b['building'] ?? 'ULC 1';
-    if (count($ulcsOf[$b['room']]) > 1) $b['room'] = "{$b['room']} ($bld)";
+    $ulcs = array_filter(array_keys($ulcsOf[$b['room']]), fn($x) => str_starts_with($x, 'ULC '));
+    if (str_starts_with($bld, 'ULC ') ? count($ulcs) > 1 : count($ulcsOf[$b['room']]) > 1) $b['room'] = "{$b['room']} ($bld)";
     return $b;
 };
 $bookings = array_map($qualify, $bookings);
 $blocks = array_map($qualify, $blocks);
+foreach ($calendars as $i => $c) $calendars[$i]['rooms'] = array_column(array_map($qualify, $calRooms($c)), 'room');
 
 // One lecture typed on several classes' tabs is one booking with every class.
 $merged = [];
@@ -555,8 +577,65 @@ foreach ($blocks as $k) {
         'faculty' => '', 'lab' => false, 'blocked' => $k['by'], 'src' => $cite([$k['src']])];
 }
 
+// The calendars, exported whole rather than as a booking per week: a booking
+// each would carry the term's 20 weeks of Design on 2,000 lines and push
+// rooms.php past the size the host deletes (see includes/timetable.php). Each
+// session is its first hour and a span, like any long booking, and its rooms
+// are rooms like any other, booked or not this week.
+$calOut = [];
+foreach ($calendars as $c) {
+    $sessions = [];
+    foreach ($c['sessions'] as [$start, $span]) {
+        [$h, $m] = array_map('intval', explode('.', $start));
+        $at = ($h < 8 ? $h + 12 : $h) * 60 + $m;
+        for ($i = 0; $i < $span; $i++) {
+            [$l, $x, $y] = slot_from($at + 60 * $i, $at + 60 * ($i + 1));
+            $slots[$l] = [$x, $y];
+        }
+        $sessions[] = [slot_from($at, $at + 60)[0], (int) $span];
+    }
+    foreach ($c['rooms'] as $room) {
+        if (isset($inBuilding[$room]) && $inBuilding[$room] !== $c['building']) {
+            fwrite(STDERR, "room $room is in both {$inBuilding[$room]} and {$c['building']}\n");
+            exit(1);
+        }
+        $inBuilding[$room] = $c['building'];
+        $rooms[$room] ??= [];
+    }
+    $doc = $docs[$c['doc']] ?? null;
+    $calOut[] = [
+        'class' => $c['class'], 'rooms' => $c['rooms'], 'sessions' => $sessions,
+        'subjects' => $c['subjects'], 'dates' => $c['dates'],
+        'src' => $doc ? ['doc' => $doc['id'], 'tab' => source_tab($doc, $c['page']) ?? '', 'cells' => $c['cells']] : [],
+    ];
+}
+
 // Overlaps that are not the same lecture: same room, same day, times crossing.
 $clashes = [];
+// Two calendars in one room on one date and session (three Fashion years share
+// 205): one line per pair of classes, with how many days it happens.
+$held = [];
+foreach ($calOut as $c) {
+    foreach ($c['dates'] as $date => $per) {
+        foreach ($per as $k => $s) {
+            if ($s < 0) continue;
+            foreach ($c['rooms'] as $room) $held[$room][$date][$k][] = $c['class'];
+        }
+    }
+}
+$pairs = [];
+foreach ($held as $room => $byDate) {
+    foreach ($byDate as $date => $bySession) {
+        foreach ($bySession as $who) {
+            foreach ($who as $i => $a) foreach (array_slice($who, $i + 1) as $b) {
+                $p = &$pairs["room $room: $a and $b"];
+                $p = [($p[0] ?? 0) + 1, $p[1] ?? $date];
+                unset($p);
+            }
+        }
+    }
+}
+foreach ($pairs as $what => [$n, $first]) $clashes[] = "$what, $n session(s) from $first";
 foreach ($rooms as $room => $list) {
     foreach ($list as $i => $e) {
         foreach (array_slice($list, $i + 1) as $f) {
@@ -584,10 +663,12 @@ $export = [
     'buildings' => (function () use ($inBuilding) {
         $by = [];
         foreach ($inBuilding as $room => $bld) $by[$bld][] = (string) $room;
-        ksort($by, SORT_NATURAL);
+        // The ULCs in order, then any other building: the first is the page's default.
+        uksort($by, fn($a, $b) => [!str_starts_with($a, 'ULC '), $a] <=> [!str_starts_with($b, 'ULC '), $b]);
         return $by;
     })(),
     'rooms' => $rooms,
+    'calendars' => $calOut,
     'docs' => array_map(fn($d) => array_intersect_key($d, array_flip(['name', 'file', 'kind', 'how'])), $docs),
     // The Dean picker's people, kept with the data rather than in the repo.
     'deans' => json_decode((string) @file_get_contents("$data/deans.json"), true)['deans'] ?? [],
@@ -608,9 +689,12 @@ echo "\nClashes (" . count($clashes) . "):\n";
 foreach ($clashes as $c) echo "  $c\n";
 printf("\n%d classes, %d rooms, %d bookings (%d before merging shared lectures), %d time slots -> %s\n",
     $classes, count($t['rooms']), array_sum(array_map('count', $t['rooms'])), count($bookings), count($t['slots']), $out);
+printf("%d calendars (%s), %d class days\n", count($t['calendars']), implode(', ', array_column($t['calendars'], 'class')),
+    array_sum(array_map(fn($c) => count($c['dates']), $t['calendars'])));
 echo 'rooms: ', implode(', ', array_map('strval', array_keys($t['rooms']))), "\n";
 echo 'slots: ', implode(' | ', array_column($t['slots'], 'time')), "\n";
 $who = [];
 foreach ($t['rooms'] as $list) foreach ($list as $e) foreach (explode(' / ', $e['faculty']) as $f) if ($f !== '') $who[$f] = true;
+foreach ($t['calendars'] as $c) foreach ($c['subjects'] as [, $fac]) foreach (explode(' / ', $fac) as $f) if ($f !== '') $who[$f] = true;
 ksort($who);
 echo 'faculty: ', implode(', ', array_keys($who)), "\n";

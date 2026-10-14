@@ -29,15 +29,19 @@ function timetable_read(): array {
     // Every entry has a 'src' and the timetable a 'docs', filled from the
     // sources file only where the source panel is on (TIMETABLE_SOURCES).
     $src = [];
+    $calSrc = [];
     if (defined('TIMETABLE_SOURCES') && TIMETABLE_SOURCES) {
         $s = store_decode((string) @file_get_contents(TIMETABLE_SOURCES_FILE)) ?? [];
         $t['docs'] = $s['docs'] ?? [];
         $src = $s['src'] ?? [];
+        $calSrc = $s['calendars'] ?? [];
     }
     $t['docs'] ??= [];
     foreach ($t['rooms'] as $room => $entries) {
         foreach ($entries as $i => $e) $t['rooms'][$room][$i]['src'] = $src[$room][$i] ?? $e['src'] ?? [];
     }
+    $t['calendars'] ??= [];
+    foreach ($t['calendars'] as $i => $c) $t['calendars'][$i]['src'] = $calSrc[$i] ?? $c['src'] ?? [];
     return $t;
 }
 
@@ -53,7 +57,12 @@ function timetable_write_split(array $t, string $path = TIMETABLE_FILE, string $
             unset($t['rooms'][$room][$i]['src']);
         }
     }
-    $side = ['docs' => $t['docs'] ?? [], 'src' => $src];
+    $calSrc = [];
+    foreach ($t['calendars'] ?? [] as $i => $c) {
+        if (!empty($c['src'])) $calSrc[$i] = $c['src'];
+        unset($t['calendars'][$i]['src']);
+    }
+    $side = ['docs' => $t['docs'] ?? [], 'src' => $src, 'calendars' => $calSrc];
     unset($t['docs']);
     $json = json_encode($side, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     return timetable_write($t, $path) && $json !== false
@@ -126,6 +135,34 @@ function timetable_parse(string $json): array|string {
     if (!$rooms) return 'That timetable has no rooms in it.';
     uksort($rooms, fn($a, $b) => strnatcasecmp((string) $a, (string) $b));
 
+    // Semester calendars (Design): a class whose subject changes by the week,
+    // so it is kept as dates rather than as bookings, and timetable_for_week()
+    // draws the week asked for. Each date maps to one subject per session, by
+    // its place in 'subjects', or -1 for a session the class is not in its room.
+    $calendars = [];
+    foreach ((array) ($raw['calendars'] ?? []) as $c) {
+        if (!is_array($c) || ($class = $str($c['class'] ?? '')) === '') continue;
+        $in = array_values(array_filter(array_map($str, (array) ($c['rooms'] ?? [])), fn($r) => isset($rooms[$r])));
+        $sessions = [];
+        foreach ((array) ($c['sessions'] ?? []) as $s) {
+            $time = is_array($s) ? $str($s[0] ?? '') : '';
+            $sessions[] = isset($slots[$time]) ? [$time, max(1, min(4, (int) ($s[1] ?? 1)))] : null;
+        }
+        $subjects = [];
+        foreach ((array) ($c['subjects'] ?? []) as $s) $subjects[] = is_array($s) ? [$str($s[0] ?? ''), $str($s[1] ?? '')] : ['', ''];
+        $dates = [];
+        foreach ((array) ($c['dates'] ?? []) as $date => $per) {
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $date) || !is_array($per)) continue;
+            $dates[(string) $date] = array_map(fn($i) => is_int($i) && isset($subjects[$i]) ? $i : -1, array_values($per));
+        }
+        if (!$in || !$dates) continue;
+        $src = (array) ($c['src'] ?? []);
+        $calendars[] = [
+            'class' => $class, 'rooms' => $in, 'sessions' => $sessions, 'subjects' => $subjects, 'dates' => $dates,
+            'src' => isset($docs[$src['doc'] ?? '']) ? ['doc' => (string) $src['doc'], 'tab' => $str($src['tab'] ?? ''), 'cells' => (array) ($src['cells'] ?? [])] : [],
+        ];
+    }
+
     // building => [room, ...], which is the ULC picker. The workbook only names
     // a building in a handful of cells, so the build script supplies this. A
     // room it misses still has to be reachable, so it lands under "Other rooms"
@@ -152,6 +189,7 @@ function timetable_parse(string $json): array|string {
         'slots' => array_values($slots),
         'buildings' => $buildings,
         'rooms' => $rooms,
+        'calendars' => $calendars,
         'docs' => $docs,
         'deans' => timetable_parse_deans($raw['deans'] ?? []),
     ];
@@ -313,11 +351,41 @@ function timetable_room_slots(array $t, string $room): array {
     return $out;
 }
 
-// What a room is called on the page. A room number used in two ULCs (105 in
-// ULC 1 and ULC 6) is stored as "105 (ULC 1)" so the two stay apart, but the
-// page has already picked the ULC, so the bracket would only repeat it.
+// What a room is called on the page. A room number used in two buildings (105
+// in ULC 1 and ULC 6, 201 in ULC 1 and the School of Design) is stored as
+// "105 (ULC 1)" so the two stay apart, but the page has already picked the
+// building, so the bracket would only repeat it.
 function timetable_room_label(string $room): string {
-    return preg_replace('/\s*\(ULC \d+\)$/', '', $room);
+    return preg_replace('/\s*\((ULC \d+|School of [A-Za-z ]+)\)$/', '', $room);
+}
+
+// The timetable as it stands in the week starting $monday: each calendar's
+// sessions on that week's dates become ordinary bookings in its rooms, and the
+// calendars are gone, so everything after this reads one plain week. A
+// calendar timetable_for_school() turned into another school's hold is drawn
+// as one. Every room stays, booked that week or not, so the pickers do not
+// change from week to week (Diwali week leaves Design's rooms empty).
+function timetable_for_week(array $t, DateTimeImmutable $monday): array {
+    foreach ($t['calendars'] ?? [] as $c) {
+        foreach ($t['days'] as $i => $day) {
+            $date = $monday->modify("+$i days")->format('Y-m-d');
+            foreach ($c['dates'][$date] ?? [] as $k => $s) {
+                if ($s < 0 || empty($c['sessions'][$k])) continue;
+                [$time, $span] = $c['sessions'][$k];
+                [$code, $faculty] = $c['subjects'][$s];
+                $cell = $c['src']['cells'][$date][$k] ?? null;
+                $src = $c['src'] && is_array($cell) && count($cell) === 4
+                    ? [['doc' => $c['src']['doc'], 'tab' => $c['src']['tab'], 'page' => 0, 'cell' => array_map('intval', $cell), 'fix' => '']]
+                    : [];
+                $e = ['day' => $day, 'time' => $time, 'span' => $span, 'code' => $code, 'class' => $c['class'],
+                    'classes' => [$c['class']], 'faculty' => $faculty, 'lab' => false, 'blocked' => '', 'src' => $src];
+                if (($c['blocked'] ?? '') !== '') $e = ['code' => '', 'class' => '', 'classes' => [], 'faculty' => '', 'blocked' => $c['blocked'], 'src' => []] + $e;
+                foreach ($c['rooms'] as $room) if (isset($t['rooms'][$room])) $t['rooms'][$room][] = $e;
+            }
+        }
+    }
+    $t['calendars'] = [];
+    return $t;
 }
 
 // The weekday a date falls on, if the timetable teaches that day, else ''. The
@@ -431,6 +499,7 @@ function timetable_schools(array $e): array {
         $c = trim($c);
         $s = match (true) {
             (bool) preg_match('/^[BM]\.\s?Tech\b/i', $c) => 'eng',
+            (bool) preg_match('/^[BM]\.\s?Des\b/i', $c) => 'design',
             (bool) preg_match('/^(BA LLB|BBA LLB|LLB|LLM)\b/i', $c) => 'law',
             (bool) preg_match('/^(BBA|MBA)\b/i', $c) => 'mgmt',
             (bool) preg_match('/^(BA|MA)\b/i', $c) => 'lib',
@@ -446,9 +515,19 @@ function timetable_schools(array $e): array {
 // the slot reads as taken without listing someone else's class as if it were
 // the school's own. Drawing it as free would send a teacher to an occupied room.
 function timetable_for_school(array $t, string $school): array {
+    // A calendar's rooms are the school's whether or not this week has a
+    // session in them; another school's calendar becomes its hold.
+    $calRooms = [];
+    foreach ($t['calendars'] ?? [] as $i => $c) {
+        if (in_array($school, timetable_schools(['blocked' => '', 'class' => $c['class']]), true)) {
+            foreach ($c['rooms'] as $r) $calRooms[$r] = true;
+        } else {
+            $t['calendars'][$i]['blocked'] = 'Other school';
+        }
+    }
     $rooms = [];
     foreach ($t['rooms'] as $room => $entries) {
-        $mine = false;
+        $mine = isset($calRooms[$room]);
         foreach ($entries as $i => $e) {
             if (in_array($school, timetable_schools($e), true)) {
                 $mine = $mine || $e['blocked'] === '';
@@ -468,7 +547,7 @@ function timetable_for_school(array $t, string $school): array {
 
 // The attendance classes (class_rows() entries) one timetable class is, for
 // the schools whose timetable names classes the way the structure does:
-// Engineering and Management. Law and Liberal Arts timetable by programme
+// Engineering, Management and Design. Law and Liberal Arts timetable by programme
 // ("BA LLB Sem III", "BA Psychology Sem I") while their attendance is kept by
 // division, so they match nothing rather than a guess.
 //
@@ -498,6 +577,16 @@ function timetable_attendance_classes(string $label, array $rows): array {
         $want = ['eng', $yearOf($m[1]), ['Civil Engineering'], $m[2]];
     } elseif (preg_match('/^(BBA|MBA) Sem ([IVX]+)$/', $label, $m)) {
         $want = ['mgmt', $yearOf($m[2]), [$m[1]], null];
+    } elseif ($label === 'B.Des Foundation Sem I') {
+        // Every B.Des programme's first year sits the common foundation.
+        $want = ['design', '1st Year', ['B Des Fashion Design', 'B Des Interior Design', 'B Des Product Design',
+            'B Des Transportation Design', 'B Des Visual Communication Design', 'B Des UI/UX'], null];
+    } elseif (preg_match('/^([BM])\.Des (.+?)(?: Design)? Sem ([IVX]+)$/', $label, $m)) {
+        // "B.Des UI/UX Design Sem V" is "B Des UI/UX" and "M.Des
+        // Transportation Design" is "M Des Transportation"; every other
+        // programme keeps its "Design".
+        $branch = "{$m[1]} Des " . ($m[2] === 'UI/UX' || $m[1] === 'M' ? $m[2] : "{$m[2]} Design");
+        $want = ['design', $yearOf($m[3]), [$branch], null];
     }
     if (!$want || $want[1] === '') return [];
     [$school, $year, $branches, $division] = $want;
