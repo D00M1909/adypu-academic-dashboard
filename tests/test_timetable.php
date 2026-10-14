@@ -262,6 +262,14 @@ assert($which('M.Des Transportation Design Sem III') === ['2nd Year/M Des Transp
 // The foundation is every B.Des programme's first year, never the M.Des's.
 assert($which('B.Des Foundation Sem I') === ['1st Year/B Des Fashion Design/A', '1st Year/B Des UI/UX/B']);
 
+// Science: B.Sc is the science school, a Dental Building room shows its plain
+// number, and a year's lab divisions are all its one structure division.
+assert(timetable_schools($x('B.Sc Sem I')) === ['science'] && timetable_room_label('203 (Dental Building)') === '203');
+$rows = [['school' => 'science', 'year' => '1st Year', 'branch' => 'B.Sc.', 'division' => 'A', 'strength' => 100],
+    ['school' => 'science', 'year' => '2nd Year', 'branch' => 'B.Sc.', 'division' => 'A', 'strength' => 30]];
+$which = fn($label) => array_map(fn($r) => "{$r['year']}/{$r['branch']}/{$r['division']}", timetable_attendance_classes($label, $rows));
+assert($which('B.Sc Sem I') === ['1st Year/B.Sc./A'] && $which('B.Sc Sem III') === ['2nd Year/B.Sc./A']);
+
 // A semester calendar: kept as dates, drawn a week at a time. A date's
 // session -1 is a day out of the room, and a date not listed (a holiday) has
 // nothing in it.

@@ -361,7 +361,7 @@ function timetable_room_slots(array $t, string $room): array {
 // "105 (ULC 1)" so the two stay apart, but the page has already picked the
 // building, so the bracket would only repeat it.
 function timetable_room_label(string $room): string {
-    return preg_replace('/\s*\((ULC \d+|School of [A-Za-z ]+)\)$/', '', $room);
+    return preg_replace('/\s*\((ULC \d+|School of [A-Za-z ]+|Dental Building)\)$/', '', $room);
 }
 
 // The timetable as it stands in the week starting $monday: each calendar's
@@ -505,6 +505,7 @@ function timetable_schools(array $e): array {
         $s = match (true) {
             (bool) preg_match('/^[BM]\.\s?Tech\b/i', $c) => 'eng',
             (bool) preg_match('/^[BM]\.\s?Des\b/i', $c) => 'design',
+            (bool) preg_match('/^[BM]\.\s?Sc\b/i', $c) => 'science',
             (bool) preg_match('/^(BA LLB|BBA LLB|LLB|LLM)\b/i', $c) => 'law',
             (bool) preg_match('/^(BBA|MBA)\b/i', $c) => 'mgmt',
             (bool) preg_match('/^(BA|MA)\b/i', $c) => 'lib',
@@ -552,7 +553,7 @@ function timetable_for_school(array $t, string $school): array {
 
 // The attendance classes (class_rows() entries) one timetable class is, for
 // the schools whose timetable names classes the way the structure does:
-// Engineering, Management and Design. Law and Liberal Arts timetable by programme
+// Engineering, Management, Design and Science. Law and Liberal Arts timetable by programme
 // ("BA LLB Sem III", "BA Psychology Sem I") while their attendance is kept by
 // division, so they match nothing rather than a guess.
 //
@@ -582,6 +583,10 @@ function timetable_attendance_classes(string $label, array $rows): array {
         $want = ['eng', $yearOf($m[1]), ['Civil Engineering'], $m[2]];
     } elseif (preg_match('/^(BBA|MBA) Sem ([IVX]+)$/', $label, $m)) {
         $want = ['mgmt', $yearOf($m[2]), [$m[1]], null];
+    } elseif (preg_match('/^B\.Sc Sem ([IVX]+)$/', $label, $m)) {
+        // Science's lab divisions (Div A to C) are batches of one B.Sc. year,
+        // which the structure keeps as a single division.
+        $want = ['science', $yearOf($m[1]), ['B.Sc.'], null];
     } elseif ($label === 'B.Des Foundation Sem I') {
         // Every B.Des programme's first year sits the common foundation.
         $want = ['design', '1st Year', ['B Des Fashion Design', 'B Des Interior Design', 'B Des Product Design',

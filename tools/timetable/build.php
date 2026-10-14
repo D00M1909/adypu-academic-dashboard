@@ -47,6 +47,8 @@ $sources = array_slice($argv, 1) ?: [
     "$data/aids-2026-08-03.json",
     "$data/mechanical-2026-09-30.json",
     "$data/mdmc-cyber-2026-10-14.json",
+    "$data/science-sem1-2026-09-28.json",
+    "$data/science-sem3-2026-09-28.json",
     "$data/design-foundation-2026-10-14.json",
     "$data/design-td-2026-10-14.json",
     "$data/design-uiux-2026-10-14.json",
@@ -106,7 +108,7 @@ function subject_name(string $s): string {
 
 function room_name(string $s): string {
     $s = trim($s);
-    if (preg_match('/^(\d{3})\.0$/', $s, $m)) return $m[1];
+    if (preg_match('/^(\d{1,3})\.0$/', $s, $m)) return $m[1];
     if (preg_match('/^(psy\s*)?lab$/i', $s)) return 'Psy Lab';
     if (preg_match('/^dig(ital)?\.?\s*lib(rary)?$/i', $s)) return 'Digital Library';
     if (preg_match('/^moot\s*court$/i', $s)) return 'Moot Court';
@@ -134,6 +136,7 @@ $people = [];     // person key => [spelling => count], across every workbook:
 $split = [];
 $home = [];
 $inFile = [];     // file => person keys seen in it
+$listed = [];     // file => person key => full name, from the course lists
 $blocks = [];     // outside bookings, added to the rooms as they are
 $calendars = [];  // semester calendars, exported as they are (see below)
 $classes = 0;
@@ -205,7 +208,20 @@ foreach ($sources as $src) {
         $lastEnd = null;
         foreach ($rows as $r => $row) {
             $row = array_map($tidy, $row);
-            if (in_array('Sr. No.', $row, true)) break;   // the course list below the grid
+            if (in_array('Sr. No.', $row, true)) {
+                // The course list below the grid: no bookings, but it is where
+                // the sheet spells its teachers in full ("Prof First Surname"
+                // where the grid says "Prof First"). Each titled full name is
+                // kept for $who to resolve a first name against.
+                foreach (array_slice($rows, array_search($r, array_keys($rows), true), null, true) as $below) {
+                    foreach ($below as $v) {
+                        foreach (preg_split('#\s*(?:,|/|\band\b)\s*#', $tidy($v)) as $n) {
+                            if (preg_match('/^(Dr|Prof|Mr|Mrs|Ms)\.?\s+[A-Z][a-z]+\s+[A-Z][a-z]+$/', $n)) $listed[$file][person_key($n)] = $n;
+                        }
+                    }
+                }
+                break;
+            }
             if ($k === null) {
                 foreach ($row as $c => $v) if (preg_match('#^Time\s*/\s*(Day|Date)#i', $v)) $k = $c;
                 if ($k !== null) foreach ($row as $c => $v) if (in_array($v, DAYS, true)) $cols[$c] = $v;
@@ -305,15 +321,23 @@ foreach ($split as &$x) {
     unset($x);
 
     // A first name alone ("Prof First") is the one full name in the same file
-    // that starts with it ("Prof. First Surname"), if there is exactly one.
-    $who = function (string $file, string $name) use (&$inFile): string {
+    // that starts with it ("Prof. First Surname"), if there is exactly one,
+    // whether in the grid or only in a course list below it.
+    $who = function (string $file, string $name) use (&$inFile, &$listed): string {
         $key = person_key($name);
         if (str_contains($key, ' ')) return $key;
-        $full = array_filter(array_keys($inFile[$file] ?? []), fn($k) => str_starts_with($k, "$key "));
+        $known = array_keys(($inFile[$file] ?? []) + ($listed[$file] ?? []));
+        $full = array_filter($known, fn($k) => str_starts_with($k, "$key "));
         return count($full) === 1 ? reset($full) : $key;
     };
     foreach ($split as $x) {
-        foreach (explode('/', $x['fac']) as $f) if (($f = trim($f)) !== '') $people[$who($x['file'], $f)][$f] = ($people[$who($x['file'], $f)][$f] ?? 0) + 1;
+        foreach (explode('/', $x['fac']) as $f) {
+            if (($f = trim($f)) === '') continue;
+            $key = $who($x['file'], $f);
+            $people[$key][$f] = ($people[$key][$f] ?? 0) + 1;
+            // The list's own spelling competes for the fullest, used or not.
+            if (isset($listed[$x['file']][$key])) $people[$key][$listed[$x['file']][$key]] ??= 0;
+        }
     }
 
     // The fullest spelling of each person: most words of name (titles do not
@@ -328,6 +352,14 @@ foreach ($split as &$x) {
     }
 
     foreach ($split as $x) {
+        // "Online" is no room at all, and in the workbooks read here directly
+        // (Law, Liberal Arts: ULC 1, three-digit rooms) a one- or two-digit
+        // number ("18") is none either: left out and printed, never guessed.
+        // A converted file's "12" is ULC 7's 012, so it is not touched.
+        if (preg_match('/^online$/i', $x['room']) || (!isset($x['building']) && preg_match('/^\d{1,2}$/', $x['room']))) {
+            $note("{$x['tab']} row {$x['r']} {$x['day']}: room \"{$x['room']}\" is not a classroom, left out ({$x['subj']})");
+            continue;
+        }
         if ($x['room'] === '') {
             $mine = $home[$x['tab']] ?? [];
             arsort($mine);
@@ -353,7 +385,7 @@ function lecture_key(string $subj): string {
 
 // The ULCs the page offers. A booking in any other is written into the data
 // files anyway (AIDS and CSE use ULC 5), so adding one is a change here only.
-const SHOW = ['ULC 1', 'ULC 5', 'ULC 6', 'ULC 7', 'School of Design'];
+const SHOW = ['ULC 1', 'ULC 5', 'ULC 6', 'ULC 7', 'School of Design', 'Dental Building'];
 $hidden = [];
 $bookings = array_values(array_filter($bookings, function ($b) use (&$hidden) {
     $bld = $b['building'] ?? 'ULC 1';
