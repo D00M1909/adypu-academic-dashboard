@@ -46,6 +46,7 @@ $sources = array_slice($argv, 1) ?: [
     "$data/btech-cse-2026-09-28.json",
     "$data/aids-2026-08-03.json",
     "$data/mechanical-2026-09-30.json",
+    "$data/mdmc-cyber-2026-10-14.json",
     "$data/design-foundation-2026-10-14.json",
     "$data/design-td-2026-10-14.json",
     "$data/design-uiux-2026-10-14.json",

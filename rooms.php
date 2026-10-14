@@ -93,7 +93,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
     $classesShown = count(array_filter($teaching, fn($x) => in_array($x['day'], $days, true)));
     // A dean's workload is always the whole week's teaching hours, even on
     // the one-day view: it is a weekly figure, and a day's would read as one.
-    $load = timetable_hours($teaching);
+    $load = timetable_hours($teaching, $dean['count_each_group'] ?? false);
     $hours = $load == round($load) ? (string) (int) $load : number_format($load, 1);
     $hasClash = false;
     $hasBlocked = false;

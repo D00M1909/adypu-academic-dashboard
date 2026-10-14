@@ -209,6 +209,7 @@ function timetable_parse_deans(mixed $list): array {
             'name' => $name,
             'role' => is_scalar($d['role'] ?? null) ? trim((string) $d['role']) : '',
             'as' => array_values(array_unique([timetable_person($name), ...$as])),
+            'count_each_group' => !empty($d['count_each_group']),
         ];
     }
     return $out;
@@ -240,13 +241,17 @@ function timetable_clock(int $t): string {
 
 // Teaching hours in a list of bookings: each one's length by the clock, so a
 // two-hour lab is two and a 45-minute slot three quarters. A booking with no
-// readable time counts its span in hours.
-function timetable_hours(array $entries): float {
+// readable time counts its span in hours. $eachGroup counts a lecture shared
+// by several classes once per class: a dean whose deans.json entry says
+// count_each_group (the user's call for one dean, 14 Oct 2026, whose two
+// groups are written into the same lecture hour).
+function timetable_hours(array $entries, bool $eachGroup = false): float {
     $min = 0;
     foreach ($entries as $e) {
         $m = timetable_minutes($e['time']);
         $end = timetable_end($e);
-        $min += $m && $end !== null ? max(0, $end - $m[0]) : 60 * ($e['span'] ?? 1);
+        $times = $eachGroup ? max(1, count($e['classes'] ?? [])) : 1;
+        $min += $times * ($m && $end !== null ? max(0, $end - $m[0]) : 60 * ($e['span'] ?? 1));
     }
     return $min / 60;
 }

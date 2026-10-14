@@ -354,4 +354,11 @@ $g = [0 => [3 => 'MONDAY'], 1 => [0 => 'Room No.', 3 => '1 09:30–10:30', 4 => 
 assert(source_cell($g, [], 'Tuesday', 630, '603') === [2, 6, 2, 6]);
 assert(source_cell($g, [], 'Tuesday', 570, 'Computer Lab') === [3, 5, 3, 5]);
 
+// A lecture written for two groups counts once, unless the dean's entry says
+// count_each_group: then once per group.
+$two = [['time' => '4.30 to 5.30', 'span' => 1, 'classes' => ['A', 'B']], ['time' => '9.30 to 10.30', 'span' => 2, 'classes' => ['A']]];
+assert(timetable_hours($two) === 3.0 && timetable_hours($two, true) === 4.0);
+assert(timetable_parse_deans([['name' => 'Dr. X', 'count_each_group' => true]])['x']['count_each_group'] === true);
+assert(timetable_parse_deans([['name' => 'Dr. Y']])['y']['count_each_group'] === false);
+
 echo "OK\n";
