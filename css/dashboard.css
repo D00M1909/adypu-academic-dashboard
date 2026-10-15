@@ -48,10 +48,11 @@
   --break-tint: #fdf6e3;
   --lunch-tint: #fbecc0;
   --break-ink: #854d0e;
-  /* Free rooms: a free cell is the one green on the grid, so it is what the
+  /* Free slots: a free cell is the one green on the grid, so it is what the
      eye lands on; the ink is AA on its own tint. */
   --open-tint: #bfeccd;
   --open-ink: #14532d;
+  --taken-line: rgba(100, 116, 139, 0.28);
   --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.10), 0 1px 1px rgba(15, 23, 42, 0.06);
   --shadow-md: 0 8px 20px -6px rgba(15, 23, 42, 0.18), 0 2px 6px rgba(15, 23, 42, 0.08);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -109,6 +110,7 @@
     --break-ink: #d6b26a;
     --open-tint: #1d5a35;
     --open-ink: #c8f7d8;
+    --taken-line: rgba(148, 163, 184, 0.16);
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 1px rgba(0, 0, 0, 0.4);
     --shadow-md: 0 8px 20px -6px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.45);
     /* Native widgets follow this: without it the two date inputs stay white
@@ -1448,10 +1450,10 @@ input:focus-visible, select:focus-visible {
 .tt-source { font-size: 13px; color: var(--ink-muted); margin: 12px 0 0; }
 /* Export PDF sits with the other view action, beside Show one day. */
 .tt-head .tt-print { width: auto; min-height: 0; padding: 7px 14px; font-size: 13.5px; }
-.tt-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 16px; margin: 16px -16px 14px; padding: 16px 16px 0; border-top: 1px solid var(--hairline); }
+.tt-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 16px; margin: 16px -16px 14px; padding: 16px 16px 0; border-top: 1px solid var(--hairline); }
 /* The room number (or the dean) in the dashboard's serif, its name and
    building beside it in plain text. */
-.card h2.tt-room { font-family: 'Playfair Display', Georgia, serif; font-size: 27px; line-height: 1.1; margin: 0; color: var(--red-ink); }
+.card h2.tt-room { font-family: 'Playfair Display', Georgia, serif; font-size: 27px; line-height: 1.1; margin: 0; font-variant-numeric: lining-nums; color: var(--red-ink); }
 .card h2.tt-room span { font-family: 'IBM Plex Sans', sans-serif; font-size: 15px; font-weight: 500; color: var(--ink-muted); margin-left: 4px; }
 .tt-usage { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-muted); }
 .tt-usage b { font-family: 'IBM Plex Mono', monospace; color: var(--ink); }
@@ -1539,9 +1541,11 @@ button.tt-entry + button.tt-entry { margin-top: 6px; border-top-left-radius: 0; 
 .tt-att-none { color: var(--ink-muted); }
 .tt-hint { font-size: 13px; color: var(--ink-muted); margin: 10px 0 0; }
 
-/* Free rooms: the room grid with each free stretch filled green. A cell free
+/* Free slots: the room grid with each free stretch filled green. A cell free
    for only part of its period is striped, and says which part. */
-.tt-note { margin: -4px 0 12px; font-size: 13px; color: var(--att-warn); }
+/* A booked slot on Free slots: fine grey hatching, no text, quieter than
+   the green so the free time is what reads first. */
+.tt-taken { background: repeating-linear-gradient(45deg, var(--taken-line) 0 1px, transparent 1px 7px), var(--surface); }
 .tt-open { background: var(--open-tint); }
 .tt-open-part { background: repeating-linear-gradient(135deg, var(--open-tint), var(--open-tint) 6px, var(--surface-raised) 6px, var(--surface-raised) 12px); }
 .tt-open-label { font-size: 12.5px; font-weight: 700; color: var(--open-ink); }
@@ -1769,5 +1773,5 @@ button.tt-entry + button.tt-entry { margin-top: 6px; border-top-left-radius: 0; 
   .tt-wrap { overflow: visible; }
   .tt-grid { min-width: 0; font-size: 11px; }
   .tt-grid .tt-time { position: static; }
-  .tt-open { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .tt-open, .tt-taken { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }

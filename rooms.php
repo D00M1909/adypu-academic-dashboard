@@ -2,7 +2,7 @@
 // One room on one day (or its whole week): which class, subject and teacher is
 // in it each period. Picked by school, then date, then ULC, then classroom.
 // Or one dean's week instead: every class they teach, in whichever room.
-// Or Free rooms: the same room grid with every free stretch highlighted.
+// Or Free slots: the same room grid with every free stretch highlighted.
 // The same view as By Room on the timetable generator, drawn from
 // timetable/rooms.php (see includes/timetable.php for why it is a file).
 // Open to everyone and read-only, like the dashboard.
@@ -46,7 +46,7 @@ $deanId = (string) ($_GET['dean'] ?? '');
 $dean = $deans[$deanId] ?? null;
 if (!$dean) $deanId = '';
 if ($dean) $school = '';
-// Free rooms is the room view with its free time marked, for a teacher
+// Free slots is the room view with its free time marked, for a teacher
 // looking for somewhere to hold an extra class.
 $free = !$dean && ($_GET['view'] ?? '') === 'free';
 // A school's rooms are the ones it teaches in at all, so they are picked
@@ -109,7 +109,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
     $key = $dean ? '@dean' : $room;
     $from = $dean ? ['rooms' => [$key => $teaching]] + $t : $t;
     $slots = timetable_room_slots($from, $key);
-    // Free rooms draws the whole teaching day, 8.00 to 5.45, so the hours
+    // Free slots draws the whole teaching day, 8.00 to 5.45, so the hours
     // before the room's first class and between its clocks show too.
     if ($free) $slots = timetable_slots_with_gaps($slots);
     $shown = ['days' => $days, 'slots' => $slots] + $from;
@@ -159,7 +159,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
             $chips[$r] = $n ? $u / $n : 0;
         }
     }
-    // On Free rooms every room in the picker says how much free time it has,
+    // On Free slots every room in the picker says how much free time it has,
     // so the emptiest can be found without opening each one.
     $roomFree = [];
     foreach ($free ? $rooms : [] as $r) {
@@ -247,7 +247,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
         <?php // Rooms or one dean's week: a mode, so each shows only its own picker. ?>
         <nav class="tt-seg" aria-label="View">
           <a href="<?= $e($link(['dean' => null, 'view' => null] + ($dean ? ['school' => $school, 'ulc' => $ulc, 'room' => $room] : []))) ?>"<?= $dean || $free ? '' : ' aria-current="page"' ?>>Rooms</a>
-          <a href="<?= $e($link(['dean' => null, 'view' => 'free'] + ($dean ? ['school' => $school, 'ulc' => $ulc, 'room' => $room] : []))) ?>"<?= $free ? ' aria-current="page"' : '' ?>>Free rooms</a>
+          <a href="<?= $e($link(['dean' => null, 'view' => 'free'] + ($dean ? ['school' => $school, 'ulc' => $ulc, 'room' => $room] : []))) ?>"<?= $free ? ' aria-current="page"' : '' ?>>Free slots</a>
           <?php if ($deans): ?><a href="<?= $e($dean ? $link([]) : 'rooms.php?' . http_build_query(['dean' => array_key_first($deans), 'date' => $date->format('Y-m-d')] + ($week ? [] : ['week' => '0']))) ?>"<?= $dean ? ' aria-current="page"' : '' ?>>Dean workload</a><?php endif; ?>
         </nav>
         <div class="tt-week">
@@ -342,12 +342,6 @@ page_head('Room timetable', 'page-wide', 'timetable');
         <button class="btn-quiet tt-print" type="button" onclick="window.print()">Export PDF</button>
       </span>
     </div>
-    <?php
-    // Schools with no timetable in yet: a room one of them uses reads as free.
-    $missing = $free ? array_column(array_diff_key(SCHOOLS, $schools), 'name') : [];
-    if ($missing): ?>
-    <p class="tt-note">No timetable yet for <?= $e(count($missing) > 1 ? implode(', ', array_slice($missing, 0, -1)) . ' and ' . end($missing) : $missing[0]) ?>, so a room they use can show as free here.</p>
-    <?php endif; ?>
     <?php if ($dean): ?>
     <?php // The dean's week in figures, the way the Usage page shows its own: label over number. ?>
     <dl class="tt-stats">
@@ -385,14 +379,20 @@ page_head('Room timetable', 'page-wide', 'timetable');
                 // it: left blank in the class's colour, so it reads as taken,
                 // with the end time only on hover (the user's call).
                 if ($tail = $grid['tails'][$time][$d] ?? null): ?>
-              <td class="tt-cont <?= $tail['lab'] ? 'tt-lab' : 'tt-lecture' ?>" title="Continues until <?= $e($tail['until']) ?>"><span class="sr-only">Continues until <?= $e($tail['until']) ?></span></td>
+              <td class="tt-cont <?= $free ? 'tt-taken' : ($tail['lab'] ? 'tt-lab' : 'tt-lecture') ?>" title="Continues until <?= $e($tail['until']) ?>"><span class="sr-only">Continues until <?= $e($tail['until']) ?></span></td>
             <?php continue; endif;
                 $cell = $grid['cells'][$time][$d] ?? null;
                 if (!$cell && $free && ($open = $openIn($time, $d))):
                     if (!$open['whole']) $hasPart = true; ?>
               <td class="tt-open<?= $open['whole'] ? '' : ' tt-open-part' ?>"><span class="tt-open-label"><?= $e($open['label']) ?></span></td>
             <?php elseif (!$cell): ?>
-              <td class="tt-free<?= $dateOf($d) == $today ? ' tt-today' : '' ?>"><span class="sr-only"><?= $free ? 'Taken' : 'Free' ?></span></td>
+              <td class="<?= $free ? 'tt-taken' : 'tt-free' . ($dateOf($d) == $today ? ' tt-today' : '') ?>"><span class="sr-only"><?= $free ? 'Booked' : 'Free' ?></span></td>
+            <?php elseif ($free):
+                // Free slots says only that a slot is taken, not by what: the
+                // free cells are the point, so a booked one is a quiet texture,
+                // with the class on hover for anyone who wants it.
+                $what = implode('; ', array_map(fn($x) => $x['blocked'] !== '' ? $x['blocked'] : trim("{$x['code']}, {$x['class']}", ', '), $cell['entries'])); ?>
+              <td class="tt-taken" title="Booked: <?= $e($what) ?>"<?= $cell['rows'] > 1 ? ' rowspan="' . $cell['rows'] . '"' : '' ?>><span class="sr-only">Booked</span></td>
             <?php else:
                 $first = $cell['entries'][0];
                 $cls = $first['blocked'] !== '' ? 'tt-blocked' : ($first['lab'] ? 'tt-lab' : 'tt-lecture');
@@ -433,8 +433,12 @@ page_head('Room timetable', 'page-wide', 'timetable');
     </div>
 
     <ul class="tt-legend">
+      <?php if ($free): ?>
+      <li><i class="tt-key tt-taken"></i>Booked</li>
+      <?php else: ?>
       <li><i class="tt-key tt-lecture"></i>Lecture</li>
       <li><i class="tt-key tt-lab"></i>Lab</li>
+      <?php endif; ?>
       <?php if ($hasBlocked): ?><li><i class="tt-key tt-blocked"></i>Booked by <?= $school === '' ? 'another department' : 'another school or department' ?></li><?php endif; ?>
       <?php if ($free): ?>
       <li><i class="tt-key tt-open"></i>Free</li>
@@ -446,7 +450,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
       <?php if ($attShown): ?><li><span class="tt-att tt-att-none tt-att-key">Not marked yet</span></li><?php endif; ?>
     </ul>
 <?php endif; endif; ?>
-    <p class="tt-hint no-print"><?= $free ? 'Free time runs 8.00 to 5.45; a gap under half an hour is left out. ' : '' ?><?= TIMETABLE_SOURCES ? 'Tap a class to see its attendance and the document it comes from.' : 'Tap a class with attendance to see it division by division.' ?></p>
+    <p class="tt-hint no-print"><?= $free ? 'Free time runs 8.00 to 5.45; a gap under half an hour is left out. Hover a booked slot to see the class.' : (TIMETABLE_SOURCES ? 'Tap a class to see its attendance and the document it comes from.' : 'Tap a class with attendance to see it division by division.') ?></p>
     <p class="tt-source">Official timetable<?= $t['exported_at'] !== '' ? ' &middot; updated ' . $e($when($t['exported_at'])) : '' ?></p>
   </section>
 <?php endif; ?>
@@ -462,7 +466,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
 <?php if ($room !== '' || $dean): ?>
 <script>
   // The saved PDF is named after document.title, so name it after the room (or the dean) and day.
-  document.title = <?= json_encode(($dean ? 'Timetable ' . $dean['name'] : ($free ? 'Free time room ' : 'Room ') . timetable_room_label($room) . ' ' . $ulc) . ' ' . ($week ? 'week of ' . $date->modify('monday this week')->format('j M Y') : $date->format('l j M Y')), JSON_HEX_TAG) ?>;
+  document.title = <?= json_encode(($dean ? 'Timetable ' . $dean['name'] : ($free ? 'Free slots room ' : 'Room ') . timetable_room_label($room) . ' ' . $ulc) . ' ' . ($week ? 'week of ' . $date->modify('monday this week')->format('j M Y') : $date->format('l j M Y')), JSON_HEX_TAG) ?>;
 </script>
 <?php endif; ?>
 <?php // The Room and Dean pickers become searchable; without it they stay plain selects. ?>
