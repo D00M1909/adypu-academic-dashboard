@@ -1527,12 +1527,10 @@ button.tt-entry:hover { background: rgba(127, 127, 127, 0.10); }
 button.tt-entry:focus-visible { outline: 2px solid var(--red-ink); outline-offset: 1px; }
 button.tt-entry + button.tt-entry { margin-top: 6px; border-top-left-radius: 0; border-top-right-radius: 0; }
 /* Attendance is quiet: a coloured dot and a few words, green when marked,
-   grey when not; a past day's "Not marked" is the dot alone (its words on
-   hover), since last Monday's is not news. */
+   grey "Not marked" when not, on every day. */
 .tt-att { display: inline-flex; align-items: center; gap: 5px; margin-top: 3px; font-size: 11.5px; font-weight: 600; color: var(--good-ink); }
 .tt-att::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
 .tt-att-none { color: var(--ink-muted); }
-.tt-att-quiet { margin-top: 5px; }
 .tt-hint { font-size: 13px; color: var(--ink-muted); margin: 10px 0 0; }
 
 /* The class panel: a native dialog, so Esc and focus come for free. Padding

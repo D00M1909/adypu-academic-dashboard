@@ -364,8 +364,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
                       <span class="tt-class"><?= $e($x['class']) ?></span>
                       <?php if ($dean): ?><span class="tt-faculty">Room <?= $e(timetable_room_label($x['room'])) ?>, <?= $e($x['ulc']) ?></span><?php elseif ($x['faculty'] !== ''): ?><span class="tt-faculty"><?= $e($x['faculty']) ?></span><?php endif; ?>
                       <?php if ($att): ?>
-                        <?php $past = $dateOf($d) < $today; ?>
-                        <span class="tt-att<?= $att['marked'] ? '' : ' tt-att-none' ?><?= $past && !$att['marked'] ? ' tt-att-quiet' : '' ?>"<?= $past && !$att['marked'] ? ' title="Not marked"' : '' ?>><?php if ($past && !$att['marked']): ?><span class="sr-only">Not marked</span><?php else: ?><?= $att['marked'] ? $att['present'] . '/' . $att['strength'] . ' present' . ($att['marked'] < count($att['classes']) ? " &middot; {$att['marked']} of " . count($att['classes']) . ' marked' : '') : 'Not marked' ?><?php endif; ?></span>
+                        <span class="tt-att<?= $att['marked'] ? '' : ' tt-att-none' ?>"><?= $att['marked'] ? $att['present'] . '/' . $att['strength'] . ' present' . ($att['marked'] < count($att['classes']) ? " &middot; {$att['marked']} of " . count($att['classes']) . ' marked' : '') : 'Not marked' ?></span>
                       <?php endif; ?>
                     <?php endif; ?>
                   </<?= $tag ?>>
