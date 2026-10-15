@@ -6,8 +6,6 @@ Daily attendance and room timetables for Ajeenkya D Y Patil University.
 
 ![The dashboard](docs/screenshots/dashboard.png)
 
-<sub>Figures in the screenshots are sample data.</sub>
-
 ## Attendance
 
 - **Honest numbers.** Present against the strength of the classes that reported, always shown with how many reported.
