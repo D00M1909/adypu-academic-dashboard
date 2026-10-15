@@ -497,12 +497,14 @@ function timetable_usage(array $t, array $grid): array {
 const TIMETABLE_OPEN = 480;
 const TIMETABLE_CLOSE = 1065;
 
-// One room's day as minutes: when it is booked (overlaps merged) and the gaps
-// between, from $open to $close. Worked out by the clock rather than by grid
-// row, since the schools keep nine different clocks and a row free on one is
-// half taken on another. A booking with no readable time cannot be placed and
-// is left out. A long booking stops at a break, as it does on the grid.
-function timetable_free(array $t, string $room, string $day, int $open = TIMETABLE_OPEN, int $close = TIMETABLE_CLOSE): array {
+// One room's day, $open to $close, as the pieces it falls into, in order:
+// ['from', 'to', 'entries'], where a piece with entries is a class (several
+// when they overlap: a clash, or one lecture written for two groups) and one
+// without is a gap. Worked out by the clock rather than by grid row, since
+// the schools keep nine different clocks. A booking with no readable time
+// cannot be placed and is left out; a long one stops at a break, as on the
+// grid. Back-to-back classes stay separate pieces.
+function timetable_day_runs(array $t, string $room, string $day, int $open = TIMETABLE_OPEN, int $close = TIMETABLE_CLOSE): array {
     $breaks = [];
     foreach ($t['slots'] as $s) if ($s['break'] !== '' && ($m = timetable_minutes($s['time']))) $breaks[] = $m[0];
     $busy = [];
@@ -512,23 +514,38 @@ function timetable_free(array $t, string $room, string $day, int $open = TIMETAB
         foreach ($breaks as $b) if ($b > $m[0] && $b < $end) $end = $b;
         $s = max($m[0], $open);
         $end = min($end, $close);
-        if ($end > $s) $busy[] = [$s, $end];
+        if ($end > $s) $busy[] = [$s, $end, $e];
     }
-    sort($busy);
-    $merged = [];
-    foreach ($busy as [$s, $end]) {
-        $last = count($merged) - 1;
-        if ($last >= 0 && $s <= $merged[$last][1]) $merged[$last][1] = max($merged[$last][1], $end);
-        else $merged[] = [$s, $end];
-    }
-    $free = [];
+    usort($busy, fn($a, $b) => [$a[0], $a[1]] <=> [$b[0], $b[1]]);
+    $runs = [];
     $at = $open;
-    foreach ($merged as [$s, $end]) {
-        if ($s > $at) $free[] = [$at, $s];
-        $at = $end;
+    foreach ($busy as [$s, $end, $e]) {
+        $last = count($runs) - 1;
+        if ($last >= 0 && $runs[$last]['entries'] && $s < $runs[$last]['to']) {
+            $runs[$last]['to'] = max($runs[$last]['to'], $end);
+            $runs[$last]['entries'][] = $e;
+        } else {
+            if ($s > $at) $runs[] = ['from' => $at, 'to' => $s, 'entries' => []];
+            $runs[] = ['from' => $s, 'to' => $end, 'entries' => [$e]];
+        }
+        $at = max($at, $runs[count($runs) - 1]['to']);
     }
-    if ($at < $close) $free[] = [$at, $close];
-    return ['busy' => $merged, 'free' => $free];
+    if ($at < $close) $runs[] = ['from' => $at, 'to' => $close, 'entries' => []];
+    return $runs;
+}
+
+// One room's day as minutes: when it is booked (back-to-back and overlapping
+// classes merged into one stretch) and the gaps between.
+function timetable_free(array $t, string $room, string $day, int $open = TIMETABLE_OPEN, int $close = TIMETABLE_CLOSE): array {
+    $busy = [];
+    $free = [];
+    foreach (timetable_day_runs($t, $room, $day, $open, $close) as $r) {
+        if (!$r['entries']) { $free[] = [$r['from'], $r['to']]; continue; }
+        $last = count($busy) - 1;
+        if ($last >= 0 && $busy[$last][1] === $r['from']) $busy[$last][1] = $r['to'];
+        else $busy[] = [$r['from'], $r['to']];
+    }
+    return ['busy' => $busy, 'free' => $free];
 }
 
 // A room's grid rows with the rest of the teaching day filled in, for the Free

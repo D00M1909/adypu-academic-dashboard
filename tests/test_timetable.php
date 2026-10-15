@@ -391,6 +391,15 @@ $ft['slots'][] = ['time' => '12.30 to 1.15', 'break' => 'LUNCH'];
 $ft['rooms']['L'] = [$e('Monday', '11.30 to 12.30', ['span' => 2])];
 assert(timetable_free($ft, 'L', 'Monday')['busy'] === [[690, 750]]);
 
+// The same day as pieces for the all-rooms grid: the two clocks' overlapping
+// lectures are one piece holding both, a back-to-back class is its own piece,
+// and the gaps between are pieces with no entries.
+$runs = array_map(fn($r) => [$r['from'], $r['to'], count($r['entries'])], timetable_day_runs($ft, 'R', 'Monday'));
+assert($runs === [[480, 570, 0], [570, 675, 2], [675, 810, 0], [810, 930, 1], [930, 1005, 0], [1005, 1065, 1]], json_encode($runs));
+$ft['rooms']['B'] = [$e('Monday', '9.30 to 10.30'), $e('Monday', '10.30 to 11.30', ['code' => 'CN'])];
+assert(count(timetable_day_runs($ft, 'B', 'Monday')) === 4, 'back to back stays two pieces');
+assert(timetable_free($ft, 'B', 'Monday')['busy'] === [[570, 690]], 'but one busy stretch');
+
 // The free grid's rows: the room's own, plus a row for each stretch of 30
 // minutes or more none of them covers. 5.30 to 5.45 is too short for one.
 $rows = array_column(timetable_slots_with_gaps([

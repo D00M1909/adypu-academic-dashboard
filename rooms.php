@@ -3,6 +3,7 @@
 // in it each period. Picked by school, then date, then ULC, then classroom.
 // Or one dean's week instead: every class they teach, in whichever room.
 // Or Free slots: the same room grid with every free stretch highlighted.
+// Either can show every room at once (all=1): one day, a row per room.
 // The same view as By Room on the timetable generator, drawn from
 // timetable/rooms.php (see includes/timetable.php for why it is a file).
 // Open to everyone and read-only, like the dashboard.
@@ -49,6 +50,10 @@ if ($dean) $school = '';
 // Free slots is the room view with its free time marked, for a teacher
 // looking for somewhere to hold an extra class.
 $free = !$dean && ($_GET['view'] ?? '') === 'free';
+// All rooms: every room's day side by side, a row each, for seeing the whole
+// campus (or one building) at a glance. One day at a time: a week of ninety
+// rooms is too long a page to read.
+$all = !$dean && ($_GET['all'] ?? '') === '1';
 // A school's rooms are the ones it teaches in at all, so they are picked
 // before the week drops the bookings that do not run in it.
 if ($t && $school !== '') $t = timetable_for_school($t, $school);
@@ -59,14 +64,15 @@ $buildings = $t['buildings'] ?? [];
 // falls back to the first valid choice, so changing the ULC with a room from
 // the old one still selected lands on the new ULC's first room.
 $ulc = (string) ($_GET['ulc'] ?? '');
-if (!isset($buildings[$ulc])) $ulc = (string) (array_key_first($buildings) ?? '');
+// All rooms can span every building: no ULC means all of them.
+if (!isset($buildings[$ulc])) $ulc = $all ? '' : (string) (array_key_first($buildings) ?? '');
 $rooms = $buildings[$ulc] ?? [];
 $room = (string) ($_GET['room'] ?? '');
 if (!in_array($room, $rooms, true)) $room = $rooms[0] ?? '';
 
 // The whole week unless week=0 asks for one day: a room's week is what most
 // people open it for.
-$week = ($_GET['week'] ?? '1') !== '0';
+$week = !$all && ($_GET['week'] ?? '1') !== '0';
 $day = $t ? timetable_day($t, $date) : '';
 
 $e = fn(string $v): string => htmlspecialchars($v);
@@ -77,8 +83,8 @@ $when = function (string $stamp): string {
 // Every link keeps the view it came from: the room (or the dean), the date,
 // and the one-day view when that is what is showing. An $over value of null
 // drops that key.
-$link = fn(array $over): string => 'rooms.php?' . http_build_query(array_filter($over + ($dean ? ['dean' => $deanId] : ['view' => $free ? 'free' : null, 'school' => $school, 'ulc' => $ulc, 'room' => $room])
-    + ['date' => $date->format('Y-m-d')] + ($week ? [] : ['week' => '0']), fn($v) => $v !== null));
+$link = fn(array $over): string => 'rooms.php?' . http_build_query(array_filter($over + ($dean ? ['dean' => $deanId] : ['view' => $free ? 'free' : null, 'all' => $all ? '1' : null, 'school' => $school, 'ulc' => $ulc, 'room' => $all ? null : $room])
+    + ['date' => $date->format('Y-m-d')] + ($week || $all ? [] : ['week' => '0']), fn($v) => $v !== null && $v !== ''));
 // The step arrows move a week at a time, or a day on the one-day view.
 $step = $week ? '7 days' : '1 day';
 $prev = $date->modify("-$step")->format('Y-m-d');
@@ -152,7 +158,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
     // A small building's rooms are chips, one tap each, with how full each
     // is this week; a big one (ULC 1 has 50) keeps the dropdown.
     $chips = [];
-    if (!$dean && count($rooms) <= 16) {
+    if (!$dean && !$all && count($rooms) <= 16) {
         foreach ($rooms as $r) {
             $v = ['days' => $days, 'slots' => timetable_room_slots($t, $r)] + $t;
             [$u, $n] = timetable_usage($v, timetable_grid($v, $r));
@@ -258,10 +264,19 @@ page_head('Room timetable', 'page-wide', 'timetable');
           </label>
           <a class="tt-step" href="<?= $e($link(['date' => $next])) ?>" title="<?= $week ? 'Next week' : 'Next day' ?>" aria-label="<?= $week ? 'Next week' : 'Next day' ?>">&#8250;</a>
           <a class="tt-today" href="<?= $e($link(['date' => $today->format('Y-m-d')])) ?>">Today</a>
+          <?php if ($all): ?>
+          <?php // All rooms shows one day: the week's days are a tap each instead of Week / Day. ?>
+          <nav class="tt-seg" aria-label="Day">
+            <?php foreach ($t['days'] as $i => $d): ?>
+              <a href="<?= $e($link(['date' => $monday->modify("+$i days")->format('Y-m-d')])) ?>"<?= $d === $day ? ' aria-current="page"' : '' ?> title="<?= $e($d . ' ' . $monday->modify("+$i days")->format('j M')) ?>"><?= $e(substr($d, 0, 3)) ?></a>
+            <?php endforeach; ?>
+          </nav>
+          <?php else: ?>
           <nav class="tt-seg" aria-label="Span">
             <a href="<?= $e($link(['week' => null])) ?>"<?= $week ? ' aria-current="page"' : '' ?>>Week</a>
             <a href="<?= $e($link(['week' => '0'])) ?>"<?= $week ? '' : ' aria-current="page"' ?>>Day</a>
           </nav>
+          <?php endif; ?>
         </div>
       </div>
       <div class="tt-bar-row">
@@ -287,13 +302,15 @@ page_head('Room timetable', 'page-wide', 'timetable');
         <div class="tt-pick">
           <label for="tt-ulc">Building</label>
           <select id="tt-ulc" name="ulc" onchange="this.form.submit()">
+            <?php if ($all): ?><option value="">All buildings</option><?php endif; ?>
             <?php foreach (array_keys($buildings) as $b): $b = (string) $b; ?>
               <option value="<?= $e($b) ?>"<?= $b === $ulc ? ' selected' : '' ?>><?= $e($b) ?></option>
             <?php endforeach; ?>
           </select>
         </div>
         <?php if ($free): ?><input type="hidden" name="view" value="free"><?php endif; ?>
-        <?php if (!$chips): ?>
+        <?php if ($all): ?>
+        <?php elseif (!$chips): ?>
         <div class="tt-pick">
           <label for="tt-room">Room</label>
           <select id="tt-room" name="room" onchange="this.form.submit()" data-combo<?= $rooms ? '' : ' disabled' ?>>
@@ -306,6 +323,11 @@ page_head('Room timetable', 'page-wide', 'timetable');
         <?php else: ?>
         <input type="hidden" name="room" value="<?= $e($room) ?>">
         <?php endif; ?>
+        <?php // Turning it on opens every building; the Building picker narrows it again. ?>
+        <label class="tt-switch">
+          <input type="checkbox" name="all" value="1" onchange="if (this.checked) this.form.ulc.selectedIndex = -1; this.form.submit()"<?= $all ? ' checked' : '' ?>>
+          <span class="tt-switch-track" aria-hidden="true"></span>All rooms
+        </label>
       <?php endif; ?>
       </div>
       <?php if ($chips): ?>
@@ -316,11 +338,115 @@ page_head('Room timetable', 'page-wide', 'timetable');
         <?php endforeach; ?>
       </ul>
       <?php endif; ?>
-      <?php if (!$week): ?><input type="hidden" name="week" value="0"><?php endif; ?>
+      <?php if (!$week && !$all): ?><input type="hidden" name="week" value="0"><?php endif; ?>
       <noscript><button class="btn-quiet" type="submit">Show</button></noscript>
     </form>
 
-<?php if (!$rooms && !$dean): ?>
+<?php if ($all):
+    // Every room's day as one row. The columns are quarter hours from 8.00 to
+    // 5.45, so a class sits where it really starts and ends whatever clock
+    // its school keeps, and spans as many columns as it lasts.
+    $slice = 15;
+    $cols = intdiv(TIMETABLE_CLOSE - TIMETABLE_OPEN, $slice);
+    $col = fn(int $m): int => (int) round(($m - TIMETABLE_OPEN) / $slice);
+    $board = [];
+    $bookedMins = 0;
+    $openMins = 0;
+    $roomCount = 0;
+    foreach ($day === '' ? [] : ($ulc === '' ? $buildings : [$ulc => $rooms]) as $b => $list) {
+        foreach ($list as $r) {
+            $runs = timetable_day_runs($t, $r, $day);
+            $board[(string) $b][$r] = $runs;
+            $roomCount++;
+            foreach ($runs as $x) {
+                if ($x['entries']) $bookedMins += $x['to'] - $x['from'];
+                elseif ($x['to'] - $x['from'] >= 30) $openMins += $x['to'] - $x['from'];
+            }
+        }
+    }
+    $dayAll = $roomCount * (TIMETABLE_CLOSE - TIMETABLE_OPEN);
+    $who = fn(array $x): string => $x['blocked'] !== '' ? $x['blocked'] . ' (booked)' : trim("{$x['code']}, {$x['class']}" . ($x['faculty'] !== '' ? ", {$x['faculty']}" : ''), ', ');
+?>
+    <div class="tt-head">
+      <h2 class="tt-room">All rooms <span><?= $e($ulc === '' ? 'Every building' : $ulc) ?><?= $day !== '' ? ' &middot; ' . $e($date->format('l')) : '' ?></span></h2>
+      <?php if ($roomCount): ?>
+      <?php if ($free): ?>
+      <span class="tt-usage"><span class="tt-usage-bar tt-usage-free" aria-hidden="true"><i style="width:<?= $dayAll ? round(100 * $openMins / $dayAll) : 0 ?>%"></i></span><b><?= $freeHours($openMins) ?></b> room hours free across <?= $roomCount ?> rooms</span>
+      <?php else: ?>
+      <span class="tt-usage"><span class="tt-usage-bar" aria-hidden="true"><i style="width:<?= $dayAll ? round(100 * $bookedMins / $dayAll) : 0 ?>%"></i></span><b><?= $freeHours($bookedMins) ?></b> room hours booked across <?= $roomCount ?> rooms</span>
+      <?php endif; ?>
+      <?php endif; ?>
+      <span class="tt-when-print"><?= $e($date->format('l j M Y')) ?></span>
+      <span class="tt-actions no-print">
+        <button class="btn-quiet tt-print" type="button" onclick="window.print()">Export PDF</button>
+      </span>
+    </div>
+  <?php if ($day === ''): ?>
+    <p class="tt-none">No classes on <?= $e($date->format('l')) ?>s. The timetable runs <?= $e($t['days'][0]) ?> to <?= $e(end($t['days'])) ?>.</p>
+  <?php elseif (!$board): ?>
+    <p class="tt-none">No classrooms listed here yet. They come with the next timetable update.</p>
+  <?php else: ?>
+    <div class="tt-wrap">
+      <table class="tt-grid tt-all">
+        <colgroup><col class="tt-all-room"><?php for ($i = 0; $i < $cols; $i++): ?><col><?php endfor; ?></colgroup>
+        <thead>
+          <tr>
+            <th class="tt-time" scope="col">Room</th>
+            <?php for ($h = intdiv(TIMETABLE_OPEN, 60); $h * 60 < TIMETABLE_CLOSE; $h++): $a = max(0, $col($h * 60)); $z = min($cols, $col(($h + 1) * 60)); ?>
+            <th scope="col" colspan="<?= $z - $a ?>"><?= timetable_clock($h * 60) ?></th>
+            <?php endfor; ?>
+          </tr>
+        </thead>
+        <tbody>
+        <?php foreach ($board as $b => $list): ?>
+          <?php if ($ulc === ''): ?><tr class="tt-all-group"><th colspan="<?= $cols + 1 ?>" scope="rowgroup"><?= $e($b) ?></th></tr><?php endif; ?>
+          <?php foreach ($list as $r => $runs): [$num, $name] = $roomParts($r); ?>
+          <tr>
+            <th class="tt-time" scope="row"><a href="<?= $e($link(['all' => null, 'ulc' => $b, 'room' => $r])) ?>" title="Open this room's week"><?= $e($num) ?><?php if ($name !== ''): ?><small><?= $e($name) ?></small><?php endif; ?></a></th>
+            <?php foreach ($runs as $x):
+                $a = $col($x['from']);
+                $z = $col($x['to']);
+                if ($z <= $a) continue;
+                $cs = ' colspan="' . ($z - $a) . '"';
+                $stretch = timetable_clock($x['from']) . ' to ' . timetable_clock($x['to']);
+                if ($x['entries'] && $free): ?>
+            <td class="tt-taken"<?= $cs ?> title="<?= $e("Booked $stretch: " . implode('; ', array_map($who, $x['entries']))) ?>"><span class="sr-only">Booked</span></td>
+            <?php elseif ($x['entries']):
+                $first = $x['entries'][0];
+                $cls = $first['blocked'] !== '' ? 'tt-blocked' : ($first['lab'] ? 'tt-lab' : 'tt-lecture');
+                if (count($x['entries']) > 1) { $cls .= ' tt-clash'; $hasClash = true; }
+                foreach ($x['entries'] as $y) if ($y['blocked'] !== '') $hasBlocked = true; ?>
+            <td class="<?= $cls ?>"<?= $cs ?> title="<?= $e("$stretch: " . implode('; ', array_map($who, $x['entries']))) ?>">
+              <div class="tt-all-cell">
+                <strong><?= $e($first['blocked'] !== '' ? $first['blocked'] : $first['code']) ?><?= count($x['entries']) > 1 ? ' +' . (count($x['entries']) - 1) : '' ?></strong>
+                <?php if ($first['blocked'] === ''): ?><span><?= $e($first['class']) ?></span><?php endif; ?>
+              </div>
+            </td>
+            <?php elseif ($free && $x['to'] - $x['from'] >= 30): ?>
+            <td class="tt-open"<?= $cs ?> title="<?= $e("Free $stretch") ?>"><span class="tt-open-label">Free</span></td>
+            <?php else: ?>
+            <td class="tt-free"<?= $cs ?>><span class="sr-only"><?= $free ? 'Under half an hour' : 'Free' ?></span></td>
+            <?php endif; endforeach; ?>
+          </tr>
+          <?php endforeach; ?>
+        <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+    <ul class="tt-legend">
+      <?php if ($free): ?>
+      <li><i class="tt-key tt-open"></i>Free</li>
+      <li><i class="tt-key tt-taken"></i>Booked</li>
+      <?php else: ?>
+      <li><i class="tt-key tt-lecture"></i>Lecture</li>
+      <li><i class="tt-key tt-lab"></i>Lab</li>
+      <?php if ($hasBlocked): ?><li><i class="tt-key tt-blocked"></i>Booked by another department</li><?php endif; ?>
+      <li><i class="tt-key tt-free"></i>Free</li>
+      <?php if ($hasClash): ?><li><i class="tt-key tt-clash"></i>Clash: two classes booked at once</li><?php endif; ?>
+      <?php endif; ?>
+    </ul>
+  <?php endif; ?>
+<?php elseif (!$rooms && !$dean): ?>
     <p class="tt-none">No classrooms listed for <?= $e($ulc) ?> yet. They come with the next timetable update.</p>
 <?php else: ?>
     <div class="tt-head">
@@ -450,7 +576,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
       <?php if ($attShown): ?><li><span class="tt-att tt-att-none tt-att-key">Not marked yet</span></li><?php endif; ?>
     </ul>
 <?php endif; endif; ?>
-    <p class="tt-hint no-print"><?= $free ? 'Free time runs 8.00 to 5.45; a gap under half an hour is left out. Hover a booked slot to see the class.' : (TIMETABLE_SOURCES ? 'Tap a class to see its attendance and the document it comes from.' : 'Tap a class with attendance to see it division by division.') ?></p>
+    <p class="tt-hint no-print"><?= $all ? 'Tap a room to open its week; hover a class for its details. ' . ($free ? 'A gap under half an hour is left out.' : '') : '' ?><?= $all ? '' : ($free ? 'Free time runs 8.00 to 5.45; a gap under half an hour is left out. Hover a booked slot to see the class.' : (TIMETABLE_SOURCES ? 'Tap a class to see its attendance and the document it comes from.' : 'Tap a class with attendance to see it division by division.')) ?></p>
     <p class="tt-source">Official timetable<?= $t['exported_at'] !== '' ? ' &middot; updated ' . $e($when($t['exported_at'])) : '' ?></p>
   </section>
 <?php endif; ?>
@@ -463,10 +589,10 @@ page_head('Room timetable', 'page-wide', 'timetable');
 <script type="application/json" id="tt-panel-data"><?= json_encode($panel, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?></script>
 <script src="js/rooms.js?v=<?= filemtime(__DIR__ . '/js/rooms.js') ?>"></script>
 <?php endif; ?>
-<?php if ($room !== '' || $dean): ?>
+<?php if ($room !== '' || $dean || $all): ?>
 <script>
   // The saved PDF is named after document.title, so name it after the room (or the dean) and day.
-  document.title = <?= json_encode(($dean ? 'Timetable ' . $dean['name'] : ($free ? 'Free slots room ' : 'Room ') . timetable_room_label($room) . ' ' . $ulc) . ' ' . ($week ? 'week of ' . $date->modify('monday this week')->format('j M Y') : $date->format('l j M Y')), JSON_HEX_TAG) ?>;
+  document.title = <?= json_encode($all ? ($free ? 'Free slots ' : 'Timetable ') . ($ulc === '' ? 'all rooms' : $ulc) . ' ' . $date->format('l j M Y') : ($dean ? 'Timetable ' . $dean['name'] : ($free ? 'Free slots room ' : 'Room ') . timetable_room_label($room) . ' ' . $ulc) . ' ' . ($week ? 'week of ' . $date->modify('monday this week')->format('j M Y') : $date->format('l j M Y')), JSON_HEX_TAG) ?>;
 </script>
 <?php endif; ?>
 <?php // The Room and Dean pickers become searchable; without it they stay plain selects. ?>
