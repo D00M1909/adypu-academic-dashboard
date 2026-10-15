@@ -1442,7 +1442,9 @@ input:focus-visible, select:focus-visible {
   background: var(--surface-raised); border: 1px solid var(--hairline); border-radius: 10px; box-shadow: var(--shadow-md); }
 .combo-list li { padding: 8px 10px; border-radius: 7px; font-size: 14.5px; color: var(--ink); cursor: pointer; }
 .combo-list li[aria-selected="true"] { font-weight: 600; }
-.combo-list li.is-active { background: var(--red-tint); }
+/* The option the arrow keys are on: the plain red tint vanished on a white
+   list, so the stronger one, with a red bar down its left edge. */
+.combo-list li.is-active { background: var(--red-tint-strong); box-shadow: inset 3px 0 0 var(--red-ink); }
 .combo-list mark { background: none; color: var(--red-ink); font-weight: 700; }
 .combo-list .combo-none { color: var(--ink-muted); cursor: default; }
 /* The list may be wider than a narrow picker: it grows to fit, never past the card. */
