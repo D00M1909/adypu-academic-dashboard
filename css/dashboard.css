@@ -48,10 +48,10 @@
   --break-tint: #fdf6e3;
   --lunch-tint: #fbecc0;
   --break-ink: #854d0e;
-  /* Free rooms: a booked stretch is a solid slate, a usable gap the green
-     the attendance lines use, so free is the colour that stands out. */
-  --fr-busy: #aab6c5;
-  --fr-free: #22a052;
+  /* Free rooms: a free cell is the one green on the grid, so it is what the
+     eye lands on; the ink is AA on its own tint. */
+  --open-tint: #bfeccd;
+  --open-ink: #14532d;
   --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.10), 0 1px 1px rgba(15, 23, 42, 0.06);
   --shadow-md: 0 8px 20px -6px rgba(15, 23, 42, 0.18), 0 2px 6px rgba(15, 23, 42, 0.08);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -107,8 +107,8 @@
     --break-tint: #151b22;
     --lunch-tint: #1b1f22;
     --break-ink: #d6b26a;
-    --fr-busy: #3a4655;
-    --fr-free: #2fb562;
+    --open-tint: #1d5a35;
+    --open-ink: #c8f7d8;
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 1px rgba(0, 0, 0, 0.4);
     --shadow-md: 0 8px 20px -6px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.45);
     /* Native widgets follow this: without it the two date inputs stay white
@@ -1539,35 +1539,16 @@ button.tt-entry + button.tt-entry { margin-top: 6px; border-top-left-radius: 0; 
 .tt-att-none { color: var(--ink-muted); }
 .tt-hint { font-size: 13px; color: var(--ink-muted); margin: 10px 0 0; }
 
-/* Free rooms: a row per room, each day a bar from 8.00 to 5.45 with an hour
-   line every 10.2564% (60 of its 585 minutes). */
-.fr-note { margin: -4px 0 12px; font-size: 13px; color: var(--att-warn); }
-.fr-table td.fr-day, .fr-table th.fr-day { padding: 8px 12px; text-align: left; }
-.fr-table thead th.fr-day { padding-bottom: 6px; }
-.fr-axis { position: relative; display: block; height: 14px; margin-top: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600; letter-spacing: 0; color: var(--ink-muted); }
-.fr-axis span { position: absolute; top: 0; transform: translateX(-50%); }
-.fr-axis span:first-child { transform: none; }
-.fr-week .fr-axis .fr-odd { display: none; }
-.fr-bar { position: relative; height: 22px; border-radius: 5px; border: 1px solid var(--hairline); overflow: hidden;
-  background: repeating-linear-gradient(to right, transparent 0, transparent calc(10.2564% - 1px), var(--hairline) calc(10.2564% - 1px), var(--hairline) 10.2564%), var(--surface); }
-.fr-week .fr-bar { height: 16px; }
-.fr-bar i { position: absolute; top: 0; bottom: 0; }
-.fr-busy { background: var(--fr-busy); }
-.fr-gap { background: var(--fr-free); opacity: 0.85; }
-.fr-at { border-left: 2px solid var(--ink); background: rgba(127, 127, 127, 0.28); }
-.tt-key.fr-gap { opacity: 0.85; border-color: transparent; }
-.tt-key.fr-busy { border-color: transparent; }
-.fr-at-key { border: 0; border-left: 2px solid var(--ink); border-radius: 0; background: rgba(127, 127, 127, 0.28); }
-.fr-gaps { margin: 5px 0 0; font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; font-weight: 600; color: var(--good-ink); }
-.fr-gaps-none { font-family: inherit; font-weight: 500; color: var(--ink-muted); }
-.fr-table .fr-room a { color: inherit; text-decoration: none; }
-.fr-table .fr-room a:hover { color: var(--red-ink); }
-.fr-table .fr-room small { font-family: 'IBM Plex Sans', sans-serif; font-weight: 500; white-space: normal; }
-.fr-table .fr-hours { width: 64px; font-family: 'IBM Plex Mono', monospace; font-size: 14px; font-weight: 700; color: var(--ink); white-space: nowrap; }
-.fr-table thead .fr-hours { font-family: inherit; font-size: 12px; color: var(--ink-muted); }
-.fr-hours small { font-family: 'IBM Plex Sans', sans-serif; font-size: 12px; font-weight: 600; color: var(--ink-muted); }
-.fr-table tr.fr-group th { padding: 7px 14px; text-align: left; background: var(--surface); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-muted); }
-.tt-pick.tt-pick-short { min-width: 130px; }
+/* Free rooms: the room grid with each free stretch filled green. A cell free
+   for only part of its period is striped, and says which part. */
+.tt-note { margin: -4px 0 12px; font-size: 13px; color: var(--att-warn); }
+.tt-open { background: var(--open-tint); }
+.tt-open-part { background: repeating-linear-gradient(135deg, var(--open-tint), var(--open-tint) 6px, var(--surface-raised) 6px, var(--surface-raised) 12px); }
+.tt-open-label { font-size: 12.5px; font-weight: 700; color: var(--open-ink); }
+.tt-open-part .tt-open-label { font-weight: 600; }
+.tt-key.tt-open { border-color: transparent; }
+.tt-chip-free i { background: var(--open-ink); opacity: 0.8; }
+.tt-usage-free i { background: var(--open-ink); }
 
 /* The class panel: a native dialog, so Esc and focus come for free. Padding
    sits on the body, so a click on the dialog itself is the backdrop. */
@@ -1623,11 +1604,6 @@ button.tt-entry + button.tt-entry { margin-top: 6px; border-top-left-radius: 0; 
   .tt-stats div { padding: 0 12px; flex: 0 1 auto; min-width: 0; }
   .tt-stats dt { font-size: 11px; }
   .tt-stats dd { font-size: 18px; }
-  .tt-pick.tt-pick-short { flex: 1 1 40%; }
-  .fr-table .fr-hours { width: 48px; padding-left: 4px; padding-right: 4px; }
-  .fr-table td.fr-day, .fr-table th.fr-day { padding-left: 8px; padding-right: 8px; }
-  .fr-table .tt-time { width: 68px; padding-left: 10px; }
-  .fr-axis .fr-odd { display: none; }
 }
 
 /* ---------- Footer ----------
@@ -1793,5 +1769,5 @@ button.tt-entry + button.tt-entry { margin-top: 6px; border-top-left-radius: 0; 
   .tt-wrap { overflow: visible; }
   .tt-grid { min-width: 0; font-size: 11px; }
   .tt-grid .tt-time { position: static; }
-  .fr-bar i, .fr-bar { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .tt-open { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }

@@ -531,6 +531,26 @@ function timetable_free(array $t, string $room, string $day, int $open = TIMETAB
     return ['busy' => $merged, 'free' => $free];
 }
 
+// A room's grid rows with the rest of the teaching day filled in, for the Free
+// rooms view: timetable_room_slots() draws only the hours the room is booked
+// in, so 8.00 to 9.30 in a room whose first class is at 9.30 had no row to
+// show it free. Each stretch no row covers, $least minutes or longer, becomes
+// a row of its own, and the rows come back in time order.
+function timetable_slots_with_gaps(array $slots, int $least = 30, int $open = TIMETABLE_OPEN, int $close = TIMETABLE_CLOSE): array {
+    $spans = [];
+    foreach ($slots as $s) if ($m = timetable_minutes($s['time'])) $spans[] = $m;
+    sort($spans);
+    $at = $open;
+    $gaps = [];
+    foreach ([...$spans, [$close, $close]] as [$s, $end]) {
+        if ($s - $at >= $least) $gaps[] = ['time' => timetable_clock($at) . ' to ' . timetable_clock($s), 'break' => ''];
+        $at = max($at, $end);
+    }
+    $rows = [...$slots, ...$gaps];
+    usort($rows, fn($a, $b) => (timetable_minutes($a['time']) ?? [0, 0]) <=> (timetable_minutes($b['time']) ?? [0, 0]));
+    return $rows;
+}
+
 // Which schools a booking belongs to, as SCHOOLS keys. Read off the class
 // label the build writes, since the export carries no school: a lecture shared
 // by several classes ("MA Counselling Psychology; MA Politics & IR") belongs to

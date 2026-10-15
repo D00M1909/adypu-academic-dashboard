@@ -391,4 +391,13 @@ $ft['slots'][] = ['time' => '12.30 to 1.15', 'break' => 'LUNCH'];
 $ft['rooms']['L'] = [$e('Monday', '11.30 to 12.30', ['span' => 2])];
 assert(timetable_free($ft, 'L', 'Monday')['busy'] === [[690, 750]]);
 
+// The free grid's rows: the room's own, plus a row for each stretch of 30
+// minutes or more none of them covers. 5.30 to 5.45 is too short for one.
+$rows = array_column(timetable_slots_with_gaps([
+    ['time' => '9.30 to 10.30', 'break' => ''], ['time' => '10.15 to 11.15', 'break' => ''],
+    ['time' => '12.30 to 1.30', 'break' => 'LUNCH'], ['time' => '3.30 to 5.30', 'break' => ''],
+]), 'time');
+assert($rows === ['8.00 to 9.30', '9.30 to 10.30', '10.15 to 11.15', '11.15 to 12.30', '12.30 to 1.30', '1.30 to 3.30', '3.30 to 5.30'], json_encode($rows));
+assert(array_column(timetable_slots_with_gaps([]), 'time') === ['8.00 to 5.45'], 'a room never booked is one free row');
+
 echo "OK\n";
