@@ -492,6 +492,45 @@ function timetable_usage(array $t, array $grid): array {
     return [$used, $total];
 }
 
+// The teaching day the Free rooms view measures, minutes from midnight: the
+// earliest class starts at 8.00 and the latest ends at 5.45 (Oct 2026 data).
+const TIMETABLE_OPEN = 480;
+const TIMETABLE_CLOSE = 1065;
+
+// One room's day as minutes: when it is booked (overlaps merged) and the gaps
+// between, from $open to $close. Worked out by the clock rather than by grid
+// row, since the schools keep nine different clocks and a row free on one is
+// half taken on another. A booking with no readable time cannot be placed and
+// is left out. A long booking stops at a break, as it does on the grid.
+function timetable_free(array $t, string $room, string $day, int $open = TIMETABLE_OPEN, int $close = TIMETABLE_CLOSE): array {
+    $breaks = [];
+    foreach ($t['slots'] as $s) if ($s['break'] !== '' && ($m = timetable_minutes($s['time']))) $breaks[] = $m[0];
+    $busy = [];
+    foreach ($t['rooms'][$room] ?? [] as $e) {
+        if ($e['day'] !== $day || !($m = timetable_minutes($e['time']))) continue;
+        $end = timetable_end($e);
+        foreach ($breaks as $b) if ($b > $m[0] && $b < $end) $end = $b;
+        $s = max($m[0], $open);
+        $end = min($end, $close);
+        if ($end > $s) $busy[] = [$s, $end];
+    }
+    sort($busy);
+    $merged = [];
+    foreach ($busy as [$s, $end]) {
+        $last = count($merged) - 1;
+        if ($last >= 0 && $s <= $merged[$last][1]) $merged[$last][1] = max($merged[$last][1], $end);
+        else $merged[] = [$s, $end];
+    }
+    $free = [];
+    $at = $open;
+    foreach ($merged as [$s, $end]) {
+        if ($s > $at) $free[] = [$at, $s];
+        $at = $end;
+    }
+    if ($at < $close) $free[] = [$at, $close];
+    return ['busy' => $merged, 'free' => $free];
+}
+
 // Which schools a booking belongs to, as SCHOOLS keys. Read off the class
 // label the build writes, since the export carries no school: a lecture shared
 // by several classes ("MA Counselling Psychology; MA Politics & IR") belongs to

@@ -369,4 +369,26 @@ assert(timetable_hours($two) === 3.0 && timetable_hours($two, true) === 4.0);
 assert(timetable_parse_deans([['name' => 'Dr. X', 'count_each_group' => true]])['x']['count_each_group'] === true);
 assert(timetable_parse_deans([['name' => 'Dr. Y']])['y']['count_each_group'] === false);
 
+// Free rooms: a room's gaps by the clock, 8.00 to 5.45. Two clocks overlapping
+// merge into one busy stretch; a two-hour lab is busy for both hours; a
+// booking on another day or outside the day's edges does not count beyond them.
+$ft = ['slots' => [], 'rooms' => ['R' => [
+    $e('Monday', '9.30 to 10.30'),
+    $e('Monday', '10.15 to 11.15'),                       // another school's clock
+    $e('Monday', '1.30 to 2.30', ['span' => 2, 'lab' => true]),
+    $e('Monday', '4.45 to 5.45'),
+    $e('Tuesday', '8.00 to 9.00'),
+    $e('Monday', '7.30 to 8.30'),                         // reads as 7.30 pm: the sheets' clock
+]]];
+$f = timetable_free($ft, 'R', 'Monday');
+assert($f['busy'] === [[570, 675], [810, 930], [1005, 1065]], json_encode($f['busy']));
+assert($f['free'] === [[480, 570], [675, 810], [930, 1005]], json_encode($f['free']));
+assert(timetable_free($ft, 'R', 'Tuesday')['free'] === [[540, 1065]], 'a booking at the opening edge');
+assert(timetable_free($ft, 'R', 'Friday') === ['busy' => [], 'free' => [[480, 1065]]], 'an empty day is free all day');
+assert(timetable_free($ft, 'nowhere', 'Monday')['free'] === [[480, 1065]]);
+// A lab written across a break stops at it, as on the grid.
+$ft['slots'][] = ['time' => '12.30 to 1.15', 'break' => 'LUNCH'];
+$ft['rooms']['L'] = [$e('Monday', '11.30 to 12.30', ['span' => 2])];
+assert(timetable_free($ft, 'L', 'Monday')['busy'] === [[690, 750]]);
+
 echo "OK\n";
