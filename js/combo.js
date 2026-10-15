@@ -43,6 +43,21 @@
     wrap.appendChild(list);
     wrap.appendChild(select);
 
+    // As wide as the longest option, the way a select sizes itself, so the
+    // chosen name shows in full (CSS still caps it at the card's width).
+    // Measured again once the web font has loaded, since the fallback font
+    // it may be measured in first is narrower.
+    function fit() {
+      var cs = getComputedStyle(input);
+      var ctx = document.createElement('canvas').getContext('2d');
+      ctx.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+      var widest = options.reduce(function (w, o) { return Math.max(w, ctx.measureText(o.text).width); }, 0);
+      input.style.width = Math.ceil(widest + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight)
+          + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth) + 2) + 'px';
+    }
+    fit();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+
     var shown = [];   // the options in the list now, in order
     var active = -1;
 

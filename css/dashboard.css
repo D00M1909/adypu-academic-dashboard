@@ -1388,10 +1388,12 @@ input:focus-visible, select:focus-visible {
    pickers that mode needs, School > Building > Room, or the dean. */
 .tt-bar { display: flex; flex-direction: column; gap: 12px; }
 .tt-bar-row { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 10px 12px; }
-.tt-pick { display: flex; flex-direction: column; gap: 4px; flex: 0 1 230px; min-width: 0; }
+/* Each picker is as wide as its longest option, so no name is cut short; a
+   select sizes itself that way, and js/combo.js measures the same for the
+   searchable ones. Never wider than the card. */
+.tt-pick { display: flex; flex-direction: column; gap: 4px; flex: 0 0 auto; min-width: 160px; max-width: 100%; }
 .tt-pick label { margin: 0 0 0 2px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-muted); }
-.page-main .tt-pick select { width: 100%; min-width: 0; }
-.tt-bar-row .tt-pick:only-child { flex-basis: 420px; }
+.page-main .tt-pick select { width: auto; min-width: 100%; max-width: 100%; }
 /* A two-way switch drawn from links, since every choice reloads the page. */
 .tt-seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: 10px; background: var(--surface); border: 1px solid var(--hairline); }
 .tt-seg a { padding: 6px 14px; border-radius: 7px; font-size: 14px; font-weight: 500; color: var(--ink-muted); text-decoration: none; white-space: nowrap; }
@@ -1422,7 +1424,7 @@ input:focus-visible, select:focus-visible {
 /* A searchable picker (js/combo.js): a text box dressed as the select it
    replaces, chevron and all, over a list that narrows as you type. */
 .combo { position: relative; }
-.page-main .combo-input { padding-right: 34px; text-overflow: ellipsis; cursor: pointer;
+.page-main .combo-input { max-width: 100%; padding-right: 34px; text-overflow: ellipsis; cursor: pointer;
   background-image: linear-gradient(45deg, transparent 50%, var(--ink-muted) 50%),
                     linear-gradient(135deg, var(--ink-muted) 50%, transparent 50%);
   background-position: right 16px center, right 11px center;
@@ -1581,7 +1583,7 @@ button.tt-entry + button.tt-entry { margin-top: 6px; border-top-left-radius: 0; 
   .tt-card { padding: 14px 12px; }
   .tt-grid .tt-time { width: 96px; white-space: normal; }
   /* Full width each: at half width "Dental Building" is cut off mid-word. */
-  .tt-pick, .tt-bar-row .tt-pick:only-child { flex: 1 1 100%; }
+  .tt-pick { flex: 1 1 100%; }
   /* Three figures on one row at phone width. */
   .tt-stats { flex-wrap: nowrap; }
   .tt-stats div { padding: 0 12px; flex: 0 1 auto; min-width: 0; }
