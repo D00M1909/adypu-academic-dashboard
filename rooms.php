@@ -226,7 +226,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
       <?php if ($dean): ?>
         <div class="tt-pick">
           <label for="tt-dean">Dean</label>
-          <select id="tt-dean" name="dean" onchange="this.form.submit()">
+          <select id="tt-dean" name="dean" onchange="this.form.submit()" data-combo>
             <?php foreach ($deans as $id => $p): ?>
               <option value="<?= $e($id) ?>"<?= $id === $deanId ? ' selected' : '' ?>><?= $e($p['name']) ?><?= $p['role'] !== '' ? ', ' . $e($p['role']) : '' ?></option>
             <?php endforeach; ?>
@@ -253,7 +253,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
         <?php if (!$chips): ?>
         <div class="tt-pick">
           <label for="tt-room">Room</label>
-          <select id="tt-room" name="room" onchange="this.form.submit()"<?= $rooms ? '' : ' disabled' ?>>
+          <select id="tt-room" name="room" onchange="this.form.submit()" data-combo<?= $rooms ? '' : ' disabled' ?>>
             <?php if (!$rooms): ?><option>None yet</option><?php endif; ?>
             <?php foreach ($rooms as $r): ?>
               <option value="<?= $e($r) ?>"<?= $r === $room ? ' selected' : '' ?>><?= $e(timetable_room_label($r)) ?></option>
@@ -406,4 +406,6 @@ page_head('Room timetable', 'page-wide', 'timetable');
   document.title = <?= json_encode(($dean ? 'Timetable ' . $dean['name'] : 'Room ' . timetable_room_label($room) . ' ' . $ulc) . ' ' . ($week ? 'week of ' . $date->modify('monday this week')->format('j M Y') : $date->format('l j M Y')), JSON_HEX_TAG) ?>;
 </script>
 <?php endif; ?>
+<?php // The Room and Dean pickers become searchable; without it they stay plain selects. ?>
+<script src="js/combo.js?v=<?= filemtime(__DIR__ . '/js/combo.js') ?>"></script>
 <?php page_foot(); ?>

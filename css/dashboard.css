@@ -1419,6 +1419,24 @@ input:focus-visible, select:focus-visible {
 :root[data-theme="dark"] .tt-chips a[aria-current], :root[data-theme="dark"] .tt-chips a[aria-current] small { color: #1b0b0d; }
 .tt-chip-bar { display: inline-block; width: 22px; height: 4px; margin-left: 4px; border-radius: 2px; background: var(--hairline); overflow: hidden; }
 .tt-chip-bar i { display: block; height: 100%; background: currentColor; opacity: 0.55; }
+/* A searchable picker (js/combo.js): a text box dressed as the select it
+   replaces, chevron and all, over a list that narrows as you type. */
+.combo { position: relative; }
+.page-main .combo-input { padding-right: 34px; text-overflow: ellipsis; cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--ink-muted) 50%),
+                    linear-gradient(135deg, var(--ink-muted) 50%, transparent 50%);
+  background-position: right 16px center, right 11px center;
+  background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; }
+.page-main .combo-input:focus { cursor: text; }
+.combo-list { position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 4px); max-height: 320px; overflow-y: auto; margin: 0; padding: 4px; list-style: none;
+  background: var(--surface-raised); border: 1px solid var(--hairline); border-radius: 10px; box-shadow: var(--shadow-md); }
+.combo-list li { padding: 8px 10px; border-radius: 7px; font-size: 14.5px; color: var(--ink); cursor: pointer; }
+.combo-list li[aria-selected="true"] { font-weight: 600; }
+.combo-list li.is-active { background: var(--red-tint); }
+.combo-list mark { background: none; color: var(--red-ink); font-weight: 700; }
+.combo-list .combo-none { color: var(--ink-muted); cursor: default; }
+/* The list may be wider than a narrow picker: it grows to fit, never past the card. */
+.tt-pick .combo-list { min-width: 100%; width: max-content; max-width: min(460px, calc(100vw - 48px)); right: auto; }
 .tt-source { font-size: 13px; color: var(--ink-muted); margin: 12px 0 0; }
 /* Export PDF sits with the other view action, beside Show one day. */
 .tt-head .tt-print { width: auto; min-height: 0; padding: 7px 14px; font-size: 13.5px; }
