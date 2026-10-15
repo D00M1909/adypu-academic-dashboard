@@ -17,6 +17,7 @@ const SOURCE_DOCS = [
     'aids' => ['eng-aids', 'School of Engineering - AIDS Timetable 2026-27.xlsx'],
     'biomedical' => ['eng-biomedical', 'School of Engineering - Biomedical Timetable 2026-27.xlsx'],
     'biotech' => ['eng-biotech', 'School of Engineering - Biotechnology Timetable 2026-27.pdf'],
+    'biotech-ft' => ['eng-biotech-ft', 'School of Engineering - Biotechnology Food Tech Timetable 2026-27.xlsx'],
     'btech-cse' => ['eng-cse-final', 'School of Engineering - CSE Final Year Timetable 2026-27.xlsx'],
     'sy-cse' => ['eng-cse-sy', 'School of Engineering - CSE SY Timetable 2026-27.xlsx'],
     'ty-cse' => ['eng-cse-ty', 'School of Engineering - CSE TY Timetable 2026-27.xlsx'],
