@@ -67,7 +67,12 @@ $payload = ['days' => $days, 'faculty' => faculty_map($rows), 'push' => [
     'rows'    => count($rows),
     'skipped' => array_count_values($skipped),
 ]];
-if (@file_put_contents(ATTENDANCE_CACHE_FILE, json_encode($payload)) === false) {
+// Written beside the real file and renamed over it, so a page load that lands
+// mid-write reads the old data or the new, never a half-written file that
+// json_decodes to nothing and empties the dashboard until the next push.
+$tmp = ATTENDANCE_CACHE_FILE . '.' . getmypid() . '.tmp';
+if (@file_put_contents($tmp, json_encode($payload)) === false || !@rename($tmp, ATTENDANCE_CACHE_FILE)) {
+    @unlink($tmp);
     fail(500, 'could not write the cache file — check that cache/ is writable');
 }
 traffic_hit('push');
