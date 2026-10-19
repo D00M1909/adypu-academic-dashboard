@@ -491,6 +491,25 @@ foreach ($kpSections as $labels) foreach ($labels as $label) {
 }
 assert(count($kpSeen) === count($partnerKeys), 'partner sections miss a class');
 
+// --- A line break inside a quoted cell ----------------------------------------
+// The Apps Script quotes every cell, so a name pasted with an Enter arrives as
+// one cell across two lines. Splitting on newlines first cut that response in
+// two and threw from array_combine, failing the whole push.
+$label = class_label('eng', '2nd Year', 'CSE', 'A');
+$multi = parse_attendance_csv(
+    "\"timestamp\",\"faculty name\",\"class\",\"present\"\r\n" .
+    "\"2026-08-26 09:10:00\",\"Dr. A\nB\",\"$label\",\"40\"\r\n" .
+    "\"2026-08-26 11:05:00\",\"Dr. C\",\"$label\",\"41\"\r\n",
+    $multiSkipped
+);
+assert(count($multi) === 2, 'a multi-line cell dropped a row: ' . count($multi));
+assert($multi[0]['faculty'] === "Dr. A\nB" && $multi[0]['present'] === 40, 'the multi-line row parsed wrong');
+assert($multiSkipped === [], 'nothing should be skipped');
+
+// A record with too few or too many cells costs only itself, never the push.
+$ragged = parse_attendance_csv("class,present\n\"$label\"\n\"$label\",30,extra\n");
+assert(count($ragged) === 2 && $ragged[1]['present'] === 30, 'a ragged record broke the parse');
+
 // --- Range labels -----------------------------------------------------------
 assert(range_label('2026-08-26', '2026-08-26') === '26 Aug 2026', range_label('2026-08-26', '2026-08-26'));
 assert(range_label('2026-08-24', '2026-08-26') === '24 Aug to 26 Aug 2026', range_label('2026-08-24', '2026-08-26'));

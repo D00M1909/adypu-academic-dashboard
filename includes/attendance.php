@@ -201,17 +201,34 @@ function class_from_row(array $r): ?array {
     return compact('school', 'year', 'branch', 'division', 'strength');
 }
 
+// The sheet's records, each a list of cells. Read as CSV rather than split on
+// newlines first: every cell arrives quoted (tools/apps-script.gs quote()), so
+// a cell may legitimately hold a line break, a faculty name pasted with a
+// trailing Enter or a paragraph answer, and splitting on it cut that response
+// in two. Blank lines are dropped. The empty escape is RFC 4180: quotes are
+// doubled, and a backslash is just a backslash.
+function csv_records(string $csv): array {
+    $stream = fopen('php://temp', 'r+');
+    fwrite($stream, $csv);
+    rewind($stream);
+    $records = [];
+    while (($fields = fgetcsv($stream, null, ',', '"', '')) !== false) {
+        if (trim(implode('', array_map('strval', $fields))) === '') continue;
+        $records[] = $fields;
+    }
+    fclose($stream);
+    return $records;
+}
+
 // $skipped collects one label per row that named no real class. A dropped row
 // is the failure mode nobody notices: the push reports the rows it stored, so a
 // Form option that no longer matches the structure just quietly stops counting.
 function parse_attendance_csv(string $csv, ?array &$skipped = null): array {
     $skipped = [];
-    $lines = array_filter(explode("\n", str_replace("\r\n", "\n", $csv)), fn($l) => trim($l) !== '');
     $rows = [];
     $header = null;
     $today = date('Y-m-d');
-    foreach ($lines as $line) {
-        $fields = str_getcsv($line);
+    foreach (csv_records($csv) as $fields) {
         if ($header === null) {
             $header = array_map(fn($h) => strtolower(trim($h)), $fields);
             // Without a Present column every row would parse as present = 0 —
@@ -223,8 +240,12 @@ function parse_attendance_csv(string $csv, ?array &$skipped = null): array {
             }
             return [];
         }
-        $r = @array_combine($header, $fields);
-        if (!$r) continue;
+        // The sheet is a rectangle, so a short or long record is a malformed
+        // line, not a different layout. Fit it to the header rather than hand
+        // array_combine a mismatch: on PHP 8 that throws, and one bad row took
+        // the whole push down with it instead of costing only itself.
+        $fields = array_slice(array_pad($fields, count($header), ''), 0, count($header));
+        $r = array_combine($header, $fields);
         // See first_value(): repeated Class / Present columns must be coalesced
         // off the raw arrays, or array_combine hands back the blank last one.
         $r['class'] = first_value($header, $fields, 'class');
