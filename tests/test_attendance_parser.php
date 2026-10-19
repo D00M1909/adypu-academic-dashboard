@@ -507,8 +507,24 @@ assert($multi[0]['faculty'] === "Dr. A\nB" && $multi[0]['present'] === 40, 'the 
 assert($multiSkipped === [], 'nothing should be skipped');
 
 // A record with too few or too many cells costs only itself, never the push.
-$ragged = parse_attendance_csv("class,present\n\"$label\"\n\"$label\",30,extra\n");
+$ragged = parse_attendance_csv("class,present\n\"$label\",31\n\"$label\",30,extra\n\"$label\"\n", $raggedSkipped);
 assert(count($ragged) === 2 && $ragged[1]['present'] === 30, 'a ragged record broke the parse');
+assert(count($raggedSkipped) === 1, 'a short record with no count should be reported, not dropped');
+
+// --- A Present answer that isn't a number ---------------------------------------
+// Read as 0 it put the class at 0% for the day, indistinguishable from an
+// empty room. It is reported and left out, so the class stays unreported.
+$bad = parse_attendance_csv(
+    "class,present,date\n" .
+    "\"$label\",,2026-08-26\n" .
+    "\"$label\",forty,2026-08-27\n" .
+    "\"$label\",-5,2026-08-28\n" .
+    "\"$label\",45 students,2026-08-29\n",
+    $badSkipped
+);
+assert(count($bad) === 1 && $bad[0]['present'] === 45, 'only "45 students" is a count');
+assert(count($badSkipped) === 3, 'each bad count must be reported: ' . json_encode($badSkipped));
+assert(str_contains($badSkipped[1], 'forty'), 'the report should show what was typed');
 
 // --- Range labels -----------------------------------------------------------
 assert(range_label('2026-08-26', '2026-08-26') === '26 Aug 2026', range_label('2026-08-26', '2026-08-26'));

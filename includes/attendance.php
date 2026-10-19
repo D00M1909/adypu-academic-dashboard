@@ -260,6 +260,16 @@ function parse_attendance_csv(string $csv, ?array &$skipped = null): array {
             if ($named !== '') $skipped[] = $named;
             continue;
         }
+        // A count that isn't a number is not "nobody came". Read as 0, a blank,
+        // "forty" or "-5" put a class at 0% for the day, which on a tile looks
+        // exactly like a real empty room. Leading digits are enough ("45
+        // students"); anything else is reported like an unknown class, so the
+        // row stays unreported instead of passing for an absence.
+        if (!preg_match('/^\d+/', $r['present'])) {
+            $skipped[] = class_label($class['school'], $class['year'], $class['branch'], $class['division'])
+                . ' (present: "' . $r['present'] . '")';
+            continue;
+        }
         // The day the class met, which is not the day the form was filled in:
         // the Form's Date question wins, the submission timestamp is the
         // fallback (so rows submitted before that question existed keep their
@@ -273,7 +283,7 @@ function parse_attendance_csv(string $csv, ?array &$skipped = null): array {
             if ($parsed !== null && $parsed <= $today) { $date = $parsed; break; }
         }
         $rows[] = $class + [
-            'present' => (int) ($r['present'] ?? 0),
+            'present' => (int) $r['present'],
             'date'    => $date,
             // Who filed it. Presentational only: it never touches a count, so
             // a missing or misspelt name costs nothing but the attribution.
