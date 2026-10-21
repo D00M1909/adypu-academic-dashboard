@@ -38,7 +38,8 @@ $date = DateTimeImmutable::createFromFormat('!Y-m-d', (string) ($_GET['date'] ??
 $monday = $date->modify('monday this week');
 // Every class's lectures across every room, taken before a school is picked
 // (which hides other schools' classes), for matching attendance to lectures.
-$lectures = $t ? timetable_lectures(timetable_for_week($t, $monday)) : [];
+$fullWeek = $t ? timetable_for_week($t, $monday) : [];
+$lectures = $t ? timetable_lectures($fullWeek) : [];
 // A dean is a person, not a place: their week spans rooms and schools, so the
 // school, ULC and room pickers stand aside while one is picked. A dean with
 // no classes in the timetable is still a choice and shows an empty week.
@@ -67,7 +68,8 @@ $facultyView = $facultyView && $person;
 // looking for somewhere to hold an extra class.
 $free = !$person && $view === 'free';
 // Overlapping slots is the room view with every double booking marked: two
-// classes in one room at once, which someone has to move.
+// classes in one room at once, or one teacher in two rooms at once, either of
+// which someone has to move.
 $overlap = !$person && $view === 'overlap';
 // All rooms: every room's day side by side, a row each, for seeing the whole
 // campus (or one building) at a glance. One day at a time: a week of ninety
@@ -88,21 +90,36 @@ $ulc = (string) ($_GET['ulc'] ?? '');
 // people open it for.
 $week = !$all && ($_GET['week'] ?? '1') !== '0';
 $day = $t ? timetable_day($t, $date) : '';
-// On Overlapping slots, each room's double bookings over the days shown: the
-// room picker counts them, and opening the view with no building or room
-// picked lands on the first that has one rather than on a clean room.
+// On Overlapping slots, each room's double bookings over the days shown, and
+// every teacher down for two rooms at once: the room picker counts both, and
+// opening the view with no building or room picked lands on the first that
+// has one rather than on a clean room. Teachers are found across the whole
+// timetable, since picking a school hides other schools' classes and a
+// teacher's other room may be one of theirs; a school keeps the clashes
+// that involve one of its own classes.
 $roomOverlaps = [];
+$teacherOverlaps = [];
+$teacherAt = [];
+$roomHits = [];
 if ($overlap) {
+    $shownDays = $week ? $t['days'] : ($day !== '' ? [$day] : []);
+    foreach (timetable_teacher_overlaps($fullWeek) as $o) {
+        if (!in_array($o['day'], $shownDays, true)) continue;
+        if ($school !== '' && !array_filter($o['entries'], fn($x) => in_array($school, timetable_schools($x['entry']), true))) continue;
+        $teacherOverlaps[] = $o;
+        foreach (array_unique(array_column($o['entries'], 'room')) as $r) $teacherAt[$r][] = $o;
+    }
     foreach ($buildings as $list) {
         foreach ($list as $r) {
             $roomOverlaps[$r] = [];
             foreach ($week ? $t['days'] : ($day !== '' ? [$day] : []) as $d) {
                 foreach (timetable_overlaps($t, $r, $d) as $o) $roomOverlaps[$r][] = ['day' => $d] + $o;
             }
+            $roomHits[$r] = count($roomOverlaps[$r]) + count($teacherAt[$r] ?? []);
         }
     }
     if (!isset($buildings[$ulc]) && !$all) {
-        foreach ($buildings as $b => $list) if (array_filter($list, fn($r) => $roomOverlaps[$r])) { $ulc = (string) $b; break; }
+        foreach ($buildings as $b => $list) if (array_filter($list, fn($r) => $roomHits[$r])) { $ulc = (string) $b; break; }
     }
 }
 // All rooms can span every building: no ULC means all of them.
@@ -110,7 +127,7 @@ if (!isset($buildings[$ulc])) $ulc = $all ? '' : (string) (array_key_first($buil
 $rooms = $buildings[$ulc] ?? [];
 $room = (string) ($_GET['room'] ?? '');
 if ($overlap && !in_array($room, $rooms, true)) {
-    foreach ($rooms as $r) if ($roomOverlaps[$r]) { $room = $r; break; }
+    foreach ($rooms as $r) if ($roomHits[$r]) { $room = $r; break; }
 }
 if (!in_array($room, $rooms, true)) $room = $rooms[0] ?? '';
 
@@ -227,7 +244,16 @@ page_head('Room timetable', 'page-wide', 'timetable');
     foreach ($roomOverlaps[$room] ?? [] as $o) $mine[$o['day']][] = $o;
     $overlapsOf = fn(array $entries, string $d): array => array_values(array_filter($mine[$d] ?? [],
         fn($o) => (bool) array_filter($entries, fn($x) => in_array($x, $o['entries']))));
-    $mostOverlaps = max([1, ...array_map('count', $roomOverlaps)]);
+    // And the teacher clashes a room's bookings are part of, with where else
+    // the teacher is meant to be: "Also in 208, ULC 1".
+    $teacherClash = fn(string $r, array $entries, string $d): array => array_values(array_filter($teacherAt[$r] ?? [],
+        fn($o) => $o['day'] === $d && array_filter($o['entries'], fn($y) => $y['room'] === $r && in_array($y['entry'], $entries))));
+    $fullUlc = [];
+    foreach ($fullWeek['buildings'] ?? [] as $b => $list) foreach ($list as $r) $fullUlc[(string) $r] = (string) $b;
+    $whereElse = fn(array $o, string $r): string => implode(' and ', array_unique(array_map(fn($y) => timetable_room_label($y['room']) . ', ' . ($fullUlc[$y['room']] ?? ''),
+        array_filter($o['entries'], fn($y) => $y['room'] !== $r))));
+    $clashNote = fn(array $o, string $r): string => $o['person'] . ' also in ' . $whereElse($o, $r) . ', ' . timetable_clock($o['from']) . ' to ' . timetable_clock($o['to']);
+    $mostOverlaps = max([1, ...array_values($roomHits)]);
     $plural = fn(int $n, string $one, string $many): string => $n . ' ' . ($n === 1 ? $one : $many);
     // Which column is which date, for the day headings: the week's dates, or
     // the one day picked.
@@ -393,7 +419,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
           <select id="tt-room" name="room" onchange="this.form.submit()" data-combo<?= $rooms ? '' : ' disabled' ?>>
             <?php if (!$rooms): ?><option>None yet</option><?php endif; ?>
             <?php foreach ($rooms as $r): ?>
-              <option value="<?= $e($r) ?>"<?= $r === $room ? ' selected' : '' ?>><?= $e(timetable_room_label($r)) ?><?= $free ? ' &middot; ' . $freeHours($roomFree[$r]) . ' h free' : '' ?><?= $overlap && $roomOverlaps[$r] ? ' &middot; ' . $plural(count($roomOverlaps[$r]), 'overlap', 'overlaps') : '' ?></option>
+              <option value="<?= $e($r) ?>"<?= $r === $room ? ' selected' : '' ?>><?= $e(timetable_room_label($r)) ?><?= $free ? ' &middot; ' . $freeHours($roomFree[$r]) . ' h free' : '' ?><?= $overlap && $roomHits[$r] ? ' &middot; ' . $plural($roomHits[$r], 'overlap', 'overlaps') : '' ?></option>
             <?php endforeach; ?>
           </select>
         </div>
@@ -411,8 +437,8 @@ page_head('Room timetable', 'page-wide', 'timetable');
       <ul class="tt-chips" aria-label="Rooms in <?= $e($ulc) ?>">
         <?php foreach ($chips as $r => $full): [$num, $name] = $roomParts($r);
             if ($free) $full = $dayMins ? $roomFree[$r] / $dayMins : 0;
-            if ($overlap) $full = count($roomOverlaps[$r]) / $mostOverlaps; ?>
-          <li><a href="<?= $e($link(['room' => $r])) ?>"<?= $r === $room ? ' aria-current="page"' : '' ?> title="<?= $overlap ? $plural(count($roomOverlaps[$r]), 'overlap', 'overlaps') : ($free ? $freeHours($roomFree[$r]) . ' hours free' : round($full * 100) . '% booked') ?> <?= $week ? 'this week' : 'this day' ?>"><?= $e($num) ?><?php if ($name !== ''): ?><small><?= $e($name) ?></small><?php endif; ?><span class="tt-chip-bar<?= $free ? ' tt-chip-free' : ($overlap ? ' tt-chip-overlap' : '') ?>"><i style="width:<?= round($full * 100) ?>%"></i></span></a></li>
+            if ($overlap) $full = $roomHits[$r] / $mostOverlaps; ?>
+          <li><a href="<?= $e($link(['room' => $r])) ?>"<?= $r === $room ? ' aria-current="page"' : '' ?> title="<?= $overlap ? $plural($roomHits[$r], 'overlap', 'overlaps') : ($free ? $freeHours($roomFree[$r]) . ' hours free' : round($full * 100) . '% booked') ?> <?= $week ? 'this week' : 'this day' ?>"><?= $e($num) ?><?php if ($name !== ''): ?><small><?= $e($name) ?></small><?php endif; ?><span class="tt-chip-bar<?= $free ? ' tt-chip-free' : ($overlap ? ' tt-chip-overlap' : '') ?>"><i style="width:<?= round($full * 100) ?>%"></i></span></a></li>
         <?php endforeach; ?>
       </ul>
       <?php endif; ?>
@@ -432,11 +458,13 @@ page_head('Room timetable', 'page-wide', 'timetable');
     $openMins = 0;
     $roomCount = 0;
     $overlapsShown = 0;
+    $teachersShown = [];
     foreach ($day === '' ? [] : ($ulc === '' ? $buildings : [$ulc => $rooms]) as $b => $list) {
         foreach ($list as $r) {
             // Overlapping slots lists only the rooms with an overlap that day.
-            if ($overlap && !$roomOverlaps[$r]) continue;
+            if ($overlap && !$roomHits[$r]) continue;
             $overlapsShown += count($roomOverlaps[$r] ?? []);
+            foreach ($teacherAt[$r] ?? [] as $o) $teachersShown[$o['person'] . $o['day'] . $o['from']] = true;
             $runs = timetable_day_runs($t, $r, $day);
             $board[(string) $b][$r] = $runs;
             $roomCount++;
@@ -453,7 +481,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
       <h2 class="tt-room">All rooms <span><?= $e($ulc === '' ? 'Every building' : $ulc) ?><?= $day !== '' ? ' &middot; ' . $e($date->format('l')) : '' ?></span></h2>
       <?php if ($roomCount): ?>
       <?php if ($overlap): ?>
-      <span class="tt-usage"><b><?= $overlapsShown ?></b> overlap<?= $overlapsShown === 1 ? '' : 's' ?> across <?= $plural($roomCount, 'room', 'rooms') ?></span>
+      <span class="tt-usage"><b><?= $overlapsShown ?></b> room overlap<?= $overlapsShown === 1 ? '' : 's' ?> and <b><?= count($teachersShown) ?></b> teacher clash<?= count($teachersShown) === 1 ? '' : 'es' ?> across <?= $plural($roomCount, 'room', 'rooms') ?></span>
       <?php elseif ($free): ?>
       <span class="tt-usage"><span class="tt-usage-bar tt-usage-free" aria-hidden="true"><i style="width:<?= $dayAll ? round(100 * $openMins / $dayAll) : 0 ?>%"></i></span><b><?= $freeHours($openMins) ?></b> room hours free across <?= $roomCount ?> rooms</span>
       <?php else: ?>
@@ -495,7 +523,15 @@ page_head('Room timetable', 'page-wide', 'timetable');
                 if ($z <= $a) continue;
                 $cs = ' colspan="' . ($z - $a) . '"';
                 $stretch = timetable_clock($x['from']) . ' to ' . timetable_clock($x['to']);
-                if (count($x['entries']) > 1 && $overlap):
+                $tc = $overlap && $x['entries'] ? $teacherClash($r, $x['entries'], $day) : [];
+                if ($tc && count($x['entries']) === 1): ?>
+            <td class="tt-overlap"<?= $cs ?> title="<?= $e(implode('; ', array_map(fn($o) => $clashNote($o, $r), $tc)) . ': ' . $who($x['entries'][0])) ?>">
+              <div class="tt-all-cell">
+                <strong>Teacher clash</strong>
+                <span><?= $e(implode('; ', array_map(fn($o) => 'also in ' . $whereElse($o, $r), $tc))) ?></span>
+              </div>
+            </td>
+            <?php elseif (count($x['entries']) > 1 && $overlap):
                     $overlapAt = implode(', ', array_map(fn($o) => timetable_clock($o['from']) . ' to ' . timetable_clock($o['to']), array_filter($roomOverlaps[$r], fn($o) => $o['from'] < $x['to'] && $o['to'] > $x['from']))); ?>
             <td class="tt-overlap"<?= $cs ?> title="<?= $e("Overlap $overlapAt: " . implode('; ', array_map($who, $x['entries']))) ?>">
               <div class="tt-all-cell">
@@ -532,7 +568,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
       <li><i class="tt-key tt-open"></i>Free</li>
       <li><i class="tt-key tt-taken"></i>Booked</li>
       <?php elseif ($overlap): ?>
-      <li><i class="tt-key tt-overlap"></i>Overlap: two or more bookings at once</li>
+      <li><i class="tt-key tt-overlap"></i>Overlap: a room or a teacher booked twice at once</li>
       <li><i class="tt-key tt-taken"></i>Booked</li>
       <li><i class="tt-key tt-free"></i>Free</li>
       <?php else: ?>
@@ -555,7 +591,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
       <?php if ($days && !$week): ?><span class="tt-usage"><?= $classesShown ?> class<?= $classesShown === 1 ? '' : 'es' ?> on <?= $e($date->format('l')) ?></span><?php endif; ?>
       <?php else: [$num, $name] = $roomParts($room); ?>
       <h2 class="tt-room"><?= $e($num) ?> <span><?= $name !== '' ? $e($name) . ' &middot; ' : '' ?><?= $e($ulc) ?></span></h2>
-      <?php if ($days && $overlap): $n = count($roomOverlaps[$room] ?? []); ?>
+      <?php if ($days && $overlap): $n = $roomHits[$room] ?? 0; ?>
       <span class="tt-usage"><?php if ($n): ?><b><?= $n ?></b> overlap<?= $n === 1 ? '' : 's' ?> <?= $week ? 'this week' : 'this day' ?><?php else: ?>No overlaps in this room <?= $week ? 'this week' : 'this day' ?><?php endif; ?></span>
       <?php elseif ($days && $free): ?>
       <span class="tt-usage"><span class="tt-usage-bar tt-usage-free" aria-hidden="true"><i style="width:<?= $dayMins ? round(100 * $freeMins / $dayMins) : 0 ?>%"></i></span><b><?= $freeHours($freeMins) ?></b> hour<?= $freeMins === 60 ? '' : 's' ?> free <?= $week ? 'this week' : 'this day' ?></span>
@@ -615,7 +651,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
               <td class="tt-open<?= $open['whole'] ? '' : ' tt-open-part' ?>"><span class="tt-open-label"><?= $e($open['label']) ?></span></td>
             <?php elseif (!$cell): ?>
               <td class="<?= $free ? 'tt-taken' : 'tt-free' . ($dateOf($d) == $today ? ' tt-today' : '') ?>"><span class="sr-only"><?= $free ? 'Booked' : 'Free' ?></span></td>
-            <?php elseif ($free || ($overlap && !$overlapsOf($cell['entries'], $d))):
+            <?php elseif ($free || ($overlap && !$overlapsOf($cell['entries'], $d) && !$teacherClash($room, $cell['entries'], $d))):
                 // Free slots says only that a slot is taken, not by what: the
                 // free cells are the point, so a booked one is a quiet texture,
                 // with the class on hover for anyone who wants it. Overlapping
@@ -636,6 +672,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
             ?>
               <td class="<?= $cls ?>"<?= $clash && !$overlap ? ' title="Clash: two bookings in this slot"' : '' ?><?= $cell['rows'] > 1 ? ' rowspan="' . $cell['rows'] . '"' : '' ?>>
                 <?php if ($overlapAt !== ''): ?><span class="tt-overlap-when">Overlap <?= $e($overlapAt) ?></span><?php endif; ?>
+                <?php foreach ($overlap ? $teacherClash($room, $cell['entries'], $d) : [] as $o): ?><span class="tt-overlap-when">Teacher clash: <?= $e($clashNote($o, $room)) ?></span><?php endforeach; ?>
                 <?php foreach ($cell['entries'] as $x):
                     // A class opens its panel when there is something to show
                     // in it: its attendance, or (where enabled) its sources.
@@ -669,7 +706,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
 
     <ul class="tt-legend">
       <?php if ($overlap): ?>
-      <li><i class="tt-key tt-overlap"></i>Overlap: two or more bookings at once</li>
+      <li><i class="tt-key tt-overlap"></i>Overlap: a room or a teacher booked twice at once</li>
       <?php endif; ?>
       <?php if ($free || $overlap): ?>
       <li><i class="tt-key tt-taken"></i>Booked</li>
@@ -699,8 +736,31 @@ page_head('Room timetable', 'page-wide', 'timetable');
     usort($every, fn($a, $b) => [array_search($a['day'], $t['days'], true), $a['from'], $ulcOf[$a['room']], $a['room']] <=> [array_search($b['day'], $t['days'], true), $b['from'], $ulcOf[$b['room']], $b['room']]);
     $what = fn(array $x): string => $x['blocked'] !== '' ? $x['blocked'] . ' (booked)' : trim("{$x['code']}, {$x['class']}", ', ');
 ?>
+    <?php $span = $all || !$week ? 'on ' . $e($date->format('l')) : 'this week'; ?>
+    <section class="tt-overlaps" aria-labelledby="tt-teachers-title">
+      <h3 id="tt-teachers-title">Teachers in two rooms at once <?= $span ?><?= $school !== '' ? ', ' . $e($schools[$school]['name']) : '' ?> <span><?= count($teacherOverlaps) ?></span></h3>
+      <?php if (!$teacherOverlaps): ?>
+      <p class="tt-none">No teacher is down for two rooms at once.</p>
+      <?php else: ?>
+      <div class="tt-wrap">
+        <table class="tt-overlap-list">
+          <thead><tr><th scope="col">Day</th><th scope="col">Time</th><th scope="col">Teacher</th><th scope="col">Classes</th></tr></thead>
+          <tbody>
+          <?php foreach ($teacherOverlaps as $o): ?>
+            <tr<?= !$all && in_array($room, array_column($o['entries'], 'room'), true) ? ' class="tt-here"' : '' ?>>
+              <td><?= $e($o['day']) ?></td>
+              <td class="tt-nowrap"><?= timetable_clock($o['from']) ?> to <?= timetable_clock($o['to']) ?></td>
+              <td><?= $e($o['person']) ?></td>
+              <td><?php foreach ($o['entries'] as $y): $u = $fullUlc[$y['room']] ?? ''; ?><span class="tt-overlap-entry"><a href="<?= $e(isset($ulcOf[$y['room']]) ? $link(['all' => null, 'ulc' => $u, 'room' => $y['room']]) : $link(['all' => null, 'school' => null, 'ulc' => $u, 'room' => $y['room']])) ?>"><?= $e(timetable_room_label($y['room'])) ?></a> <small><?= $e($u) ?></small> <?= $e($what($y['entry'])) ?> <small><?= $e(timetable_span_label($y['entry'])) ?></small></span><?php endforeach; ?></td>
+            </tr>
+          <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+      <?php endif; ?>
+    </section>
     <section class="tt-overlaps" aria-labelledby="tt-overlaps-title">
-      <h3 id="tt-overlaps-title">Every overlap <?= $all ? 'on ' . $e($date->format('l')) : ($week ? 'this week' : 'on ' . $e($date->format('l'))) ?><?= $school !== '' ? ' in ' . $e($schools[$school]['name']) . ' rooms' : '' ?> <span><?= count($every) ?></span></h3>
+      <h3 id="tt-overlaps-title">Rooms double-booked <?= $span ?><?= $school !== '' ? ', ' . $e($schools[$school]['name']) . ' rooms' : '' ?> <span><?= count($every) ?></span></h3>
       <?php if (!$every): ?>
       <p class="tt-none">No room is double-booked.</p>
       <?php else: ?>
@@ -722,7 +782,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
       <?php endif; ?>
     </section>
 <?php endif; ?>
-    <p class="tt-hint no-print"><?= $all ? 'Tap a room to open its week; hover a class for its details. ' . ($free ? 'A gap under half an hour is left out.' : '') : '' ?><?= $overlap ? 'An overlap is two or more bookings in one room at the same time, by the clock. ' : '' ?><?= $all || $overlap ? '' : ($free ? 'Free time runs 8.00 to 5.45; a gap under half an hour is left out. Hover a booked slot to see the class.' : (TIMETABLE_SOURCES ? 'Tap a class to see its attendance and the document it comes from.' : 'Tap a class with attendance to see it division by division.')) ?></p>
+    <p class="tt-hint no-print"><?= $all ? 'Tap a room to open its week; hover a class for its details. ' . ($free ? 'A gap under half an hour is left out.' : '') : '' ?><?= $overlap ? 'An overlap is two or more bookings in one room at the same time, or one teacher down for two rooms at the same time, by the clock. ' : '' ?><?= $all || $overlap ? '' : ($free ? 'Free time runs 8.00 to 5.45; a gap under half an hour is left out. Hover a booked slot to see the class.' : (TIMETABLE_SOURCES ? 'Tap a class to see its attendance and the document it comes from.' : 'Tap a class with attendance to see it division by division.')) ?></p>
     <p class="tt-source">Official timetable<?= $t['exported_at'] !== '' ? ' &middot; updated ' . $e($when($t['exported_at'])) : '' ?></p>
   </section>
 <?php endif; ?>

@@ -615,6 +615,59 @@ function timetable_overlaps(array $t, string $room, string $day): array {
     return $out;
 }
 
+// Where one teacher is down for two rooms at once, for the Overlapping slots
+// view: per person and day, each stretch they are in two places, as ['day',
+// 'from', 'to', 'person' (the name as the sheets spell it most), 'entries'],
+// each entry ['room' => ..., 'entry' => the booking]. One booking held in two
+// rooms (AIDS's "104/105 Lab", a Design calendar across two studios) is the
+// same class and subject in both, so it is not a clash.
+function timetable_teacher_overlaps(array $t): array {
+    $by = [];
+    $spell = [];
+    foreach ($t['rooms'] as $room => $entries) {
+        foreach ($t['days'] as $d) {
+            foreach (timetable_busy($t, (string) $room, $d) as [$s, $z, $e]) {
+                if ($e['blocked'] === '') foreach (preg_split('#\s*/\s*#', $e['faculty']) as $f) {
+                    $f = trim(preg_replace('/\s+/', ' ', $f));
+                    $p = timetable_person($f);
+                    if (!preg_match('/[a-z]/', $p) || preg_match('/\bfaculty\b/', $p)) continue;
+                    $spell[$p][$f] = ($spell[$p][$f] ?? 0) + 1;
+                    $by[$p][$d][] = [$s, $z, ['room' => (string) $room, 'entry' => $e]];
+                }
+            }
+        }
+    }
+    $out = [];
+    foreach ($by as $p => $days) {
+        arsort($spell[$p]);
+        $name = (string) array_key_first($spell[$p]);
+        foreach ($days as $d => $list) {
+            $pairs = [];
+            foreach ($list as $i => [$s1, $e1, $x]) {
+                foreach (array_slice($list, $i + 1) as [$s2, $e2, $y]) {
+                    if ($x['room'] === $y['room'] || min($e1, $e2) <= max($s1, $s2)) continue;
+                    if ($x['entry']['class'] === $y['entry']['class'] && $x['entry']['code'] === $y['entry']['code']) continue;
+                    $pairs[] = ['from' => max($s1, $s2), 'to' => min($e1, $e2), 'entries' => [$x, $y]];
+                }
+            }
+            usort($pairs, fn($a, $b) => [$a['from'], $a['to']] <=> [$b['from'], $b['to']]);
+            $mine = [];
+            foreach ($pairs as $q) {
+                $last = count($mine) - 1;
+                if ($last >= 0 && $q['from'] <= $mine[$last]['to']) {
+                    $mine[$last]['to'] = max($mine[$last]['to'], $q['to']);
+                    foreach ($q['entries'] as $x) if (!in_array($x, $mine[$last]['entries'])) $mine[$last]['entries'][] = $x;
+                } else {
+                    $mine[] = ['day' => $d, 'person' => $name] + $q;
+                }
+            }
+            array_push($out, ...$mine);
+        }
+    }
+    usort($out, fn($a, $b) => [array_search($a['day'], $t['days'], true), $a['from'], $a['person']] <=> [array_search($b['day'], $t['days'], true), $b['from'], $b['person']]);
+    return $out;
+}
+
 // One room's day as minutes: when it is booked (back-to-back and overlapping
 // classes merged into one stretch) and the gaps between.
 function timetable_free(array $t, string $room, string $day, int $open = TIMETABLE_OPEN, int $close = TIMETABLE_CLOSE): array {

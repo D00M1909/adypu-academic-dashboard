@@ -425,6 +425,20 @@ $ft['rooms']['C'] = [
 $o = timetable_overlaps($ft, 'C', 'Monday');
 assert(count($o) === 1 && [$o[0]['from'], $o[0]['to']] === [675, 735] && count($o[0]['entries']) === 3, json_encode($o));
 
+// A teacher down for two rooms at once is a clash, whatever the spelling, for
+// the time the two share; one booking held in two rooms (same class, same
+// subject) is not, and nor is the same teacher back to back.
+$tx = ['days' => ['Monday'], 'slots' => [], 'rooms' => [
+    '107' => [$e('Monday', '9.30 to 10.30', ['faculty' => 'Dr. Asha Rao']), $e('Monday', '11.30 to 12.30', ['faculty' => 'Asha Rao', 'code' => 'DB'])],
+    '208' => [$e('Monday', '10.00 to 11.00', ['faculty' => 'Prof. Asha Rao / Mr. Ben', 'code' => 'CN', 'class' => 'SY CSE B'])],
+    '104 Lab' => [$e('Monday', '11.30 to 12.30', ['faculty' => 'Asha Rao', 'code' => 'DB'])],
+    '105 Lab' => [$e('Monday', '12.30 to 1.30', ['faculty' => 'Asha Rao', 'code' => 'ML'])],
+]];
+$to = timetable_teacher_overlaps($tx);
+assert(count($to) === 1, json_encode($to));
+assert($to[0]['person'] === 'Asha Rao' && [$to[0]['from'], $to[0]['to']] === [600, 630], json_encode($to[0]));
+assert(array_column($to[0]['entries'], 'room') === ['107', '208']);
+
 // Faculty workload's picker: one entry per person whatever the spelling or
 // title, shared lectures counted for each teacher, a dean under their own
 // entry, the schools read off the classes, and a vacancy is nobody.
