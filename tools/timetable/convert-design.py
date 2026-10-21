@@ -9,7 +9,8 @@
 # the whole day (9:30 to 12:30 and 1:00 to 4:00) in the class's own room, named
 # once in the header ("Class Room No. 108 (First Floor)"). A subject cell merged
 # over both rows is the whole day; Interior Design fills the two separately.
-# A tab whose header names no room (Interior Design's) is printed and left out.
+# A tab whose header names no room is printed and left out, except Interior
+# Design's, which goes in its own room, ROOMLESS (the user's call, 21 Oct 2026).
 #
 # So each tab becomes a calendar, not bookings: its rooms, its subjects, and
 # for every date the subject of each session, which the room page turns into
@@ -21,6 +22,7 @@
 # initials ("DAF" is Designing Automotive Forms, "ESI: Module 01: ..." is
 # Elementary Sketching and Illustrations), or as neither. The course list under
 # the grid gives each course's name and its lead, who is the booking's teacher.
+# A course in TEAM_TAUGHT is taught by its whole team, lead included.
 import datetime, json, re, sys
 import openpyxl
 
@@ -48,16 +50,27 @@ def initials(name, stop=True):
 ROMAN = {1: 'I', 2: 'II', 3: 'III', 4: 'IV', 5: 'V', 6: 'VI'}
 # Codes no rule finds: "TW" is Two Wheeler, and AUX takes its X from "UX".
 ALIAS = {'TWSR': '2 Wheeler Sketching', 'AUX': 'Automotive UX'}
+# A programme whose sheet names no classroom: the room its classes are put in.
+ROOMLESS = {'Interior Design': 'Interior Design Studio'}
+# Courses the team teaches together, not the lead alone: the dean is on
+# Studio-II's team, and only the team says so.
+TEAM_TAUGHT = {'Interior Design Studio-II'}
 # Cell suffixes that are still the course, in its room.
 SUFFIX = re.compile(r'\s*(internal\s+presentati\w*|\.?\s*practice sessions)\s*$', re.I)
 
 
-def teacher(lead, team):
-    """The course lead, else its team: 'Name (Game Design)' -> 'Name', 'A and B' -> 'A / B'."""
-    who = re.sub(r'\(.*?\)', '', lead or team)
-    who = re.sub(r'\s*(/|,|\band\b)\s*', ' / ', who)
-    parts = [tidy(w) for w in who.split(' / ')]
-    return ' / '.join(w for w in parts if w and w.lower() not in ('new faculty', 'vf'))
+def teacher(lead, team, whole_team=False):
+    """The course lead, else its team: 'Name (Game Design)' -> 'Name', 'A and B' -> 'A / B'.
+    whole_team: the lead and the team, each person once."""
+    who = re.sub(r'\(.*?\)', '', f'{lead} / {team}' if whole_team else lead or team)
+    who = re.sub(r'\s*(/|,|&|\band\b)\s*', ' / ', who)
+    parts, seen = [], set()
+    for w in (tidy(w) for w in who.split(' / ')):
+        key = re.sub(r'^(prof|dr|ar)\b\.?\s*', '', w.lower())
+        if w and w.lower() not in ('new faculty', 'vf') and key not in seen:
+            seen.add(key)
+            parts.append(w)
+    return ' / '.join(parts)
 
 
 def course_name(s):
@@ -92,7 +105,7 @@ for ws in wb.worksheets:
     if not sem or not prog:
         print(f'{tab}: no semester or programme, skipped'); continue
     label = f'{level} {prog} Sem {sem.group(1)}'
-    rooms = room_list(header)
+    rooms = room_list(header) or ([ROOMLESS[prog]] if prog in ROOMLESS else [])
     if not rooms:
         print(f'{label}: the sheet names no classroom, left out'); continue
 
@@ -108,7 +121,7 @@ for ws in wb.worksheets:
     for r in range(course_row + 1, ws.max_row + 1):
         name = course_name(str(ws.cell(r, 1).value or ''))
         if not name or name.startswith('Prepared'): break
-        courses.append({'name': name, 'who': teacher(cell(r, hdr['Course Lead']), cell(r, hdr['Course Team'])),
+        courses.append({'name': name, 'who': teacher(cell(r, hdr['Course Lead']), cell(r, hdr['Course Team']), name in TEAM_TAUGHT),
                         'ini': (initials(name), initials(name, False))})
 
     def find(text):

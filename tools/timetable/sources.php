@@ -34,6 +34,7 @@ const SOURCE_DOCS = [
     'design-fashion' => ['des-fashion', 'School of Design - Fashion Design Timetable 2026-27.xlsx'],
     'design-product' => ['des-product', 'School of Design - Product Design Timetable 2026-27.xlsx'],
     'design-vcd' => ['des-vcd', 'School of Design - Visual Communication Design Timetable 2026-27.xlsx'],
+    'design-interior' => ['des-interior', 'School of Design - Interior Design Timetable 2026-27.xlsx'],
 ];
 
 // The document behind one source path, copied into $out, as the entry the
