@@ -235,11 +235,13 @@ function activity_leaderboard(array $form, array $app, string $from, string $to)
             $key = activity_person($name);
             if ($key === '') { $unnamed++; continue; }
             $r = &$rows[$key];
-            $r ??= ['name' => [], 'lectures' => 0, 'form' => 0, 'app' => 0, 'classes' => [], 'days' => [], 'schools' => [], 'last' => ''];
+            $r ??= ['name' => [], 'lectures' => 0, 'form' => 0, 'app' => 0, 'classes' => [], 'days' => [], 'schools' => [], 'last' => '', 'per_day' => [], 'by_class' => []];
             $r['name'][$name] = ($r['name'][$name] ?? 0) + 1;
             $r['lectures']++;
             $r[$via]++;
             $r['classes'][$class] = true;
+            $r['per_day'][$date] = ($r['per_day'][$date] ?? 0) + 1;
+            $r['by_class'][$class] = ($r['by_class'][$class] ?? 0) + 1;
             $r['days'][$date] = true;
             $school = explode('|', $class)[0];
             $r['schools'][$school] = ($r['schools'][$school] ?? 0) + 1;
