@@ -1564,7 +1564,8 @@ button.tt-entry + button.tt-entry { margin-top: 6px; border-top-left-radius: 0; 
 /* Overlapping slots: a double-booked cell is the one amber fill on the grid,
    everything else hatched or blank, and says when the overlap runs. */
 .tt-grid td.tt-overlap { background: var(--overlap-tint); box-shadow: inset 0 0 0 2px var(--att-warn); }
-.tt-overlap-when { display: block; margin-bottom: 4px; font-size: 11.5px; font-weight: 700; color: var(--overlap-ink); }
+.tt-overlap-when { display: block; margin-bottom: 4px; font-size: 11px; font-weight: 500; line-height: 1.35; color: var(--overlap-ink); }
+.tt-overlap-when:last-of-type { padding-bottom: 6px; margin-bottom: 6px; border-bottom: 1px dashed var(--att-warn); }
 .tt-overlap .tt-all-cell strong, .tt-overlap .tt-all-cell span { color: var(--overlap-ink); }
 .tt-key.tt-overlap { background: var(--overlap-tint); border-color: var(--att-warn); }
 .tt-chip-overlap i { background: var(--att-warn); opacity: 0.9; }

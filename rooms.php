@@ -242,6 +242,37 @@ page_head('Room timetable', 'page-wide', 'timetable');
     // so the cell can say when the overlap runs (it may start mid-period).
     $mine = [];
     foreach ($roomOverlaps[$room] ?? [] as $o) $mine[$o['day']][] = $o;
+    // What a cell's bookings clash with, one line per stretch: the bookings
+    // drawn in other rows (another school's clock) by name, since the cell
+    // does not show them, and a plain "Double-booked" when the clash is
+    // between bookings the cell already shows. Only the minutes this cell's
+    // own bookings are in, never the room's whole double-booked stretch.
+    $clashLines = function (array $entries, string $d) use ($t, $room): array {
+        $busy = timetable_busy($t, $room, $d);
+        $mine = array_values(array_filter($busy, fn($b) => in_array($b[2], $entries)));
+        $with = [];
+        $inside = null;
+        foreach ($busy as [$s, $z, $y]) {
+            foreach ($mine as [$s1, $z1, $x]) {
+                if ($x == $y || min($z, $z1) <= max($s, $s1)) continue;
+                $range = [max($s, $s1), min($z, $z1)];
+                if (in_array($y, $entries)) {
+                    $inside = $inside ? [min($inside[0], $range[0]), max($inside[1], $range[1])] : $range;
+                    continue;
+                }
+                $name = $y['blocked'] !== '' ? $y['blocked'] : trim($y['code'] . ($y['class'] !== '' ? " ({$y['class']})" : ''));
+                $key = implode('-', $range);
+                $with[$key]['range'] = $range;
+                if (!in_array($name, $with[$key]['names'] ?? [], true)) $with[$key]['names'][] = $name;
+                break;
+            }
+        }
+        ksort($with);
+        $clock = fn(array $r): string => timetable_clock($r[0]) . ' to ' . timetable_clock($r[1]);
+        $lines = array_map(fn($w) => 'Clashes ' . $clock($w['range']) . ' with ' . implode(' and ', $w['names']), array_values($with));
+        if ($inside) array_unshift($lines, 'Double-booked ' . $clock($inside));
+        return $lines;
+    };
     $overlapsOf = fn(array $entries, string $d): array => array_values(array_filter($mine[$d] ?? [],
         fn($o) => (bool) array_filter($entries, fn($x) => in_array($x, $o['entries']))));
     // And the teacher clashes a room's bookings are part of, with where else
@@ -667,11 +698,11 @@ page_head('Room timetable', 'page-wide', 'timetable');
                 // On Overlapping slots the cell says when the overlap runs,
                 // which can be less than the period (another clock's 10.00
                 // lecture against a 9.30 lab).
-                $overlapAt = $overlap ? implode(', ', array_map(fn($o) => timetable_clock($o['from']) . ' to ' . timetable_clock($o['to']), $overlapsOf($cell['entries'], $d))) : '';
+                $overlapAt = $overlap ? $clashLines($cell['entries'], $d) : [];
                 if ($overlap) $cls = 'tt-overlap';
             ?>
               <td class="<?= $cls ?>"<?= $clash && !$overlap ? ' title="Clash: two bookings in this slot"' : '' ?><?= $cell['rows'] > 1 ? ' rowspan="' . $cell['rows'] . '"' : '' ?>>
-                <?php if ($overlapAt !== ''): ?><span class="tt-overlap-when">Overlap <?= $e($overlapAt) ?></span><?php endif; ?>
+                <?php foreach ($overlapAt as $line): ?><span class="tt-overlap-when"><?= $e($line) ?></span><?php endforeach; ?>
                 <?php foreach ($overlap ? $teacherClash($room, $cell['entries'], $d) : [] as $o): ?><span class="tt-overlap-when">Teacher clash: <?= $e($clashNote($o, $room)) ?></span><?php endforeach; ?>
                 <?php foreach ($cell['entries'] as $x):
                     // A class opens its panel when there is something to show
