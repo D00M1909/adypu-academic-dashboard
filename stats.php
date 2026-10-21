@@ -143,7 +143,7 @@ $now = $rows[$today];
             <td><?= $r['views'] ?: '<span class="stat-nil">0</span>' ?></td>
             <td><?= $r['form'] ?: '<span class="stat-nil">0</span>' ?></td>
             <td><?= $r['app'] ?: '<span class="stat-nil">0</span>' ?></td>
-            <td><?= $r['schools'] ?: '<span class="stat-nil">0</span>' ?><?php if ($r['partners']): ?> <span class="stat-sub">+<?= $r['partners'] ?> kp</span><?php endif; ?></td>
+            <td><?= ($r['schools'] + $r['partners']) ?: '<span class="stat-nil">0</span>' ?></td>
             <td><?= $r['faculty'] ?: '<span class="stat-nil">0</span>' ?></td>
           </tr>
         <?php endforeach; ?>
