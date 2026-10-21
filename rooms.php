@@ -756,41 +756,6 @@ page_head('Room timetable', 'page-wide', 'timetable');
       <?php if ($attShown): ?><li><span class="tt-att tt-att-none tt-att-key">Not marked yet</span></li><?php endif; ?>
     </ul>
 <?php endif; endif; ?>
-<?php if ($overlap):
-    // Every overlap in view, room by room, so none is missed for not being
-    // in the room picked: the school's rooms (or every room) in every
-    // building, over the days shown.
-    $ulcOf = [];
-    foreach ($buildings as $b => $list) foreach ($list as $r) $ulcOf[(string) $r] = (string) $b;
-    $every = [];
-    foreach ($roomOverlaps as $r => $list) foreach ($list as $o) $every[] = ['room' => (string) $r] + $o;
-    usort($every, fn($a, $b) => [array_search($a['day'], $t['days'], true), $a['from'], $ulcOf[$a['room']], $a['room']] <=> [array_search($b['day'], $t['days'], true), $b['from'], $ulcOf[$b['room']], $b['room']]);
-    $what = fn(array $x): string => $x['blocked'] !== '' ? $x['blocked'] . ' (booked)' : trim("{$x['code']}, {$x['class']}", ', ');
-?>
-    <?php $span = $all || !$week ? 'on ' . $e($date->format('l')) : 'this week'; ?>
-    <section class="tt-overlaps" aria-labelledby="tt-overlaps-title">
-      <h3 id="tt-overlaps-title">Rooms double-booked <?= $span ?><?= $school !== '' ? ', ' . $e($schools[$school]['name']) . ' rooms' : '' ?> <span><?= count($every) ?></span></h3>
-      <?php if (!$every): ?>
-      <p class="tt-none">No room is double-booked.</p>
-      <?php else: ?>
-      <div class="tt-wrap">
-        <table class="tt-overlap-list">
-          <thead><tr><th scope="col">Day</th><th scope="col">Time</th><th scope="col">Room</th><th scope="col">Bookings</th></tr></thead>
-          <tbody>
-          <?php foreach ($every as $o): [$num, $name] = $roomParts($o['room']); ?>
-            <tr<?= !$all && $o['room'] === $room ? ' class="tt-here"' : '' ?>>
-              <td><?= $e($o['day']) ?></td>
-              <td class="tt-nowrap"><?= timetable_clock($o['from']) ?> to <?= timetable_clock($o['to']) ?></td>
-              <td><a href="<?= $e($link(['all' => null, 'ulc' => $ulcOf[$o['room']], 'room' => $o['room']])) ?>"><?= $e($num) ?></a> <small><?= $e($ulcOf[$o['room']]) ?></small></td>
-              <td><?php foreach ($o['entries'] as $x): ?><span class="tt-overlap-entry"><?= $e($what($x)) ?><?php if ($x['faculty'] !== ''): ?> <small><?= $e($x['faculty']) ?></small><?php endif; ?> <small><?= $e(timetable_span_label($x)) ?></small></span><?php endforeach; ?></td>
-            </tr>
-          <?php endforeach; ?>
-          </tbody>
-        </table>
-      </div>
-      <?php endif; ?>
-    </section>
-<?php endif; ?>
     <p class="tt-hint no-print"><?= $all ? 'Tap a room to open its week; hover a class for its details. ' . ($free ? 'A gap under half an hour is left out.' : '') : '' ?><?= $overlap ? 'An overlap is two or more bookings in one room at the same time, or one teacher down for two rooms at the same time, by the clock. ' : '' ?><?= $all || $overlap ? '' : ($free ? 'Free time runs 8.00 to 5.45; a gap under half an hour is left out. Hover a booked slot to see the class.' : (TIMETABLE_SOURCES ? 'Tap a class to see its attendance and the document it comes from.' : 'Tap a class with attendance to see it division by division.')) ?></p>
     <p class="tt-source">Official timetable<?= $t['exported_at'] !== '' ? ' &middot; updated ' . $e($when($t['exported_at'])) : '' ?></p>
   </section>

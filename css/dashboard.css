@@ -1569,19 +1569,6 @@ button.tt-entry + button.tt-entry { margin-top: 6px; border-top-left-radius: 0; 
 .tt-overlap .tt-all-cell strong, .tt-overlap .tt-all-cell span { color: var(--overlap-ink); }
 .tt-key.tt-overlap { background: var(--overlap-tint); border-color: var(--att-warn); }
 .tt-chip-overlap i { background: var(--att-warn); opacity: 0.9; }
-.tt-overlaps { margin-top: 22px; }
-.tt-overlaps h3 { margin: 0 0 10px; font-size: 15px; color: var(--ink); }
-.tt-overlaps h3 span { margin-left: 6px; padding: 1px 8px; border-radius: 999px; font-size: 12px; background: var(--overlap-tint); color: var(--overlap-ink); }
-.tt-overlap-list { width: 100%; border-collapse: collapse; font-size: 13px; }
-.tt-overlap-list th, .tt-overlap-list td { padding: 7px 10px; border-bottom: 1px solid var(--hairline); text-align: left; vertical-align: top; }
-.tt-overlap-list th { font-size: 12px; font-weight: 600; color: var(--ink-muted); background: var(--surface-raised); }
-.tt-overlap-list tbody tr:last-child td { border-bottom: 0; }
-.tt-overlap-list tr.tt-here td { background: var(--overlap-tint); }
-.tt-overlap-list small { color: var(--ink-muted); }
-.tt-overlap-list a { font-weight: 600; color: var(--ink); }
-.tt-overlap-entry { display: block; }
-.tt-overlap-entry + .tt-overlap-entry { margin-top: 3px; }
-.tt-nowrap { white-space: nowrap; }
 
 /* The All rooms switch: sits in the picker row as a control the height of the
    dropdowns, a small track and knob that turns red when on. */
@@ -1833,5 +1820,5 @@ button.tt-entry + button.tt-entry { margin-top: 6px; border-top-left-radius: 0; 
   .tt-wrap { overflow: visible; }
   .tt-grid { min-width: 0; font-size: 11px; }
   .tt-grid .tt-time { position: static; }
-  .tt-open, .tt-taken, .tt-overlap, .tt-overlap-list tr.tt-here td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .tt-open, .tt-taken, .tt-overlap { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
