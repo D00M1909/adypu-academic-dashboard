@@ -409,4 +409,38 @@ $rows = array_column(timetable_slots_with_gaps([
 assert($rows === ['8.00 to 9.30', '9.30 to 10.30', '10.15 to 11.15', '11.15 to 12.30', '12.30 to 1.30', '1.30 to 3.30', '3.30 to 5.30'], json_encode($rows));
 assert(array_column(timetable_slots_with_gaps([]), 'time') === ['8.00 to 5.45'], 'a room never booked is one free row');
 
+// Overlapping slots: only the time two bookings share, by the clock (another
+// school's 10.15 lecture against 9.30 overlaps 10.15 to 10.30), every booking
+// involved, and back to back is no overlap at all.
+$o = timetable_overlaps($ft, 'R', 'Monday');
+assert(count($o) === 1 && [$o[0]['from'], $o[0]['to']] === [615, 630] && count($o[0]['entries']) === 2, json_encode($o));
+assert(timetable_overlaps($ft, 'B', 'Monday') === [], 'back to back is not an overlap');
+assert(timetable_overlaps($ft, 'R', 'Tuesday') === [] && timetable_overlaps($ft, 'nowhere', 'Monday') === []);
+// Three classes handing over at 11.15 and 12.00 are one stretch with all three.
+$ft['rooms']['C'] = [
+    $e('Monday', '11.00 to 12.00'),
+    $e('Monday', '11.15 to 12.15', ['code' => 'CN']),
+    $e('Monday', '12.00 to 1.00', ['code' => 'DB']),
+];
+$o = timetable_overlaps($ft, 'C', 'Monday');
+assert(count($o) === 1 && [$o[0]['from'], $o[0]['to']] === [675, 735] && count($o[0]['entries']) === 3, json_encode($o));
+
+// Faculty workload's picker: one entry per person whatever the spelling or
+// title, shared lectures counted for each teacher, a dean under their own
+// entry, the schools read off the classes, and a vacancy is nobody.
+$fx = ['rooms' => ['1' => [
+    $e('Monday', '9.30 to 10.30', ['faculty' => 'Dr. Asha Rao', 'class' => 'B.Tech CSE Sem III']),
+    $e('Monday', '10.30 to 11.30', ['faculty' => 'Prof. Asha  Rao', 'class' => 'BBA Sem I']),
+    $e('Monday', '11.30 to 12.30', ['faculty' => 'Dr. Asha Rao / Dr. Deepa Joshi', 'class' => 'B.Tech Civil Sem III (T-A)']),
+    $e('Monday', '1.15 to 2.15', ['faculty' => 'Industry faculty', 'class' => 'B.Tech CSE Sem III']),
+    $e('Tuesday', '9.30 to 10.30', ['faculty' => 'Someone', 'blocked' => 'BBA Seminar']),
+]], 'calendars' => [['class' => 'B.Des Fashion Design Sem III', 'subjects' => [['Draping', 'Ms. Lina Roy']]]],
+    'deans' => timetable_parse_deans([['name' => 'Dr. Deepa A. Joshi', 'role' => 'Dean', 'as' => ['Dr. Deepa Joshi']]])];
+$fl = timetable_faculty($fx);
+assert(array_keys($fl) === ['asha-rao', 'deepa-a-joshi', 'lina-roy'], json_encode(array_keys($fl)));
+assert($fl['asha-rao']['name'] === 'Dr. Asha Rao' && $fl['asha-rao']['schools'] === ['eng', 'mgmt'], json_encode($fl['asha-rao']));
+assert($fl['deepa-a-joshi']['role'] === 'Dean' && $fl['lina-roy']['schools'] === ['design']);
+$fx['buildings'] = ['ULC 1' => ['1']];
+assert(count(timetable_teaching($fx, $fl['asha-rao'])) === 3, 'every spelling is the same person');
+
 echo "OK\n";

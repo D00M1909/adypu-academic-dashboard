@@ -277,6 +277,50 @@ function timetable_teaching(array $t, array $person): array {
     return $mine;
 }
 
+// Everyone who teaches, for the Faculty workload picker: id => the shape of a
+// dean (name, role, as, count_each_group) plus 'schools', the SCHOOLS keys of
+// the classes they teach. One person is every spelling timetable_person()
+// reads as the same name, shown as the spelling the sheets use most. A dean
+// keeps their own entry, spellings and role, so they appear once, under their
+// full name. Read from the weekly bookings and the calendars both, so the list
+// does not change from week to week.
+function timetable_faculty(array $t): array {
+    $seen = [];
+    $add = function (string $faculty, array $schools) use (&$seen) {
+        foreach (preg_split('#\s*/\s*#', $faculty) as $f) {
+            $f = trim(preg_replace('/\s+/', ' ', $f));
+            $p = timetable_person($f);
+            // "Industry faculty" is a seat to be filled, not a person.
+            if (!preg_match('/[a-z]/', $p) || preg_match('/\bfaculty\b/', $p)) continue;
+            $seen[$p]['spellings'][$f] = ($seen[$p]['spellings'][$f] ?? 0) + 1;
+            $seen[$p]['schools'] = array_merge($seen[$p]['schools'] ?? [], $schools);
+        }
+    };
+    foreach ($t['rooms'] as $entries) {
+        foreach ($entries as $e) if ($e['blocked'] === '') $add($e['faculty'], timetable_schools($e));
+    }
+    foreach ($t['calendars'] ?? [] as $c) {
+        foreach ($c['subjects'] as [, $f]) $add($f, timetable_schools(['blocked' => '', 'class' => $c['class']]));
+    }
+    $deanOf = [];
+    foreach ($t['deans'] ?? [] as $id => $d) foreach ($d['as'] as $a) $deanOf[$a] = $id;
+    $out = [];
+    foreach ($seen as $p => $s) {
+        if (isset($deanOf[$p])) {
+            $id = $deanOf[$p];
+            $out[$id] ??= $t['deans'][$id] + ['schools' => []];
+        } else {
+            $id = trim(preg_replace('/[^a-z0-9]+/', '-', $p), '-');
+            arsort($s['spellings']);
+            $out[$id] ??= ['name' => (string) array_key_first($s['spellings']), 'role' => '', 'as' => [], 'count_each_group' => false, 'schools' => []];
+            $out[$id]['as'][] = $p;
+        }
+        $out[$id]['schools'] = array_values(array_unique([...$out[$id]['schools'], ...$s['schools']]));
+    }
+    uasort($out, fn($a, $b) => strnatcasecmp(timetable_person($a['name']), timetable_person($b['name'])));
+    return $out;
+}
+
 // One booking's citations, each a document it is written in and where: the
 // tab and its cells [first row, first col, last row, last col] (0-based) for a
 // workbook, the page for a PDF, and any repair the build made. A citation of a
@@ -505,18 +549,7 @@ const TIMETABLE_CLOSE = 1065;
 // cannot be placed and is left out; a long one stops at a break, as on the
 // grid. Back-to-back classes stay separate pieces.
 function timetable_day_runs(array $t, string $room, string $day, int $open = TIMETABLE_OPEN, int $close = TIMETABLE_CLOSE): array {
-    $breaks = [];
-    foreach ($t['slots'] as $s) if ($s['break'] !== '' && ($m = timetable_minutes($s['time']))) $breaks[] = $m[0];
-    $busy = [];
-    foreach ($t['rooms'][$room] ?? [] as $e) {
-        if ($e['day'] !== $day || !($m = timetable_minutes($e['time']))) continue;
-        $end = timetable_end($e);
-        foreach ($breaks as $b) if ($b > $m[0] && $b < $end) $end = $b;
-        $s = max($m[0], $open);
-        $end = min($end, $close);
-        if ($end > $s) $busy[] = [$s, $end, $e];
-    }
-    usort($busy, fn($a, $b) => [$a[0], $a[1]] <=> [$b[0], $b[1]]);
+    $busy = timetable_busy($t, $room, $day, $open, $close);
     $runs = [];
     $at = $open;
     foreach ($busy as [$s, $end, $e]) {
@@ -532,6 +565,54 @@ function timetable_day_runs(array $t, string $room, string $day, int $open = TIM
     }
     if ($at < $close) $runs[] = ['from' => $at, 'to' => $close, 'entries' => []];
     return $runs;
+}
+
+// Each booking in one room on one day as [start, end, booking] in minutes,
+// sorted by start: clipped to $open and $close, and stopped at a break.
+function timetable_busy(array $t, string $room, string $day, int $open = TIMETABLE_OPEN, int $close = TIMETABLE_CLOSE): array {
+    $breaks = [];
+    foreach ($t['slots'] as $s) if ($s['break'] !== '' && ($m = timetable_minutes($s['time']))) $breaks[] = $m[0];
+    $busy = [];
+    foreach ($t['rooms'][$room] ?? [] as $e) {
+        if ($e['day'] !== $day || !($m = timetable_minutes($e['time']))) continue;
+        $end = timetable_end($e);
+        foreach ($breaks as $b) if ($b > $m[0] && $b < $end) $end = $b;
+        $s = max($m[0], $open);
+        $end = min($end, $close);
+        if ($end > $s) $busy[] = [$s, $end, $e];
+    }
+    usort($busy, fn($a, $b) => [$a[0], $a[1]] <=> [$b[0], $b[1]]);
+    return $busy;
+}
+
+// Where one room is double-booked on a day, for the Overlapping slots view:
+// each stretch when two or more bookings run in it at once, as ['from', 'to',
+// 'entries'] with every booking involved. By the clock, so a 9.30 lab and a
+// 10.00 lecture on another school's clock overlap from 10.00 to their first
+// end even though the grid draws them in different rows. A lecture written
+// separately for two groups in one hour counts, as on the grid's clash outline.
+function timetable_overlaps(array $t, string $room, string $day): array {
+    $busy = timetable_busy($t, $room, $day);
+    $pairs = [];
+    foreach ($busy as $i => [$s1, $e1, $x]) {
+        foreach (array_slice($busy, $i + 1) as [$s2, $e2, $y]) {
+            if (min($e1, $e2) > max($s1, $s2)) $pairs[] = ['from' => max($s1, $s2), 'to' => min($e1, $e2), 'entries' => [$x, $y]];
+        }
+    }
+    usort($pairs, fn($a, $b) => [$a['from'], $a['to']] <=> [$b['from'], $b['to']]);
+    $out = [];
+    foreach ($pairs as $p) {
+        $last = count($out) - 1;
+        // Stretches that touch are one: three classes handing over at 11.15
+        // and 12.00 are one double booking from 11.00 to 12.30.
+        if ($last >= 0 && $p['from'] <= $out[$last]['to']) {
+            $out[$last]['to'] = max($out[$last]['to'], $p['to']);
+            foreach ($p['entries'] as $e) if (!in_array($e, $out[$last]['entries'])) $out[$last]['entries'][] = $e;
+        } else {
+            $out[] = $p;
+        }
+    }
+    return $out;
 }
 
 // One room's day as minutes: when it is booked (back-to-back and overlapping
