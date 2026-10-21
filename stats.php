@@ -18,7 +18,8 @@ auth_require(true);
 // How many days the table lists: 14 unless a longer range is picked. Traffic
 // is kept for TRAFFIC_KEEP_DAYS, so that is the longest worth offering.
 const STATS_SPANS = [14, 30, 60, 90, TRAFFIC_KEEP_DAYS];
-$span = in_array((int) ($_GET['span'] ?? 14), STATS_SPANS, true) ? (int) $_GET['span'] : 14;
+$span = (int) ($_GET['span'] ?? 14);
+if (!in_array($span, STATS_SPANS, true)) $span = 14;
 
 // Straight from the two stores, not get_attendance_days(): that falls back to
 // sample rows on an empty install, and sample rows are not updates anyone sent.
