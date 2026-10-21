@@ -1,14 +1,10 @@
 <?php
-// Usage, for admins: how much the app is being used, in a handful of big
-// numbers. Today, then the last 7 days against the 7 before, then 30 days of
-// attendance as bars (Form and app stacked), then who is signed up, and the
-// detail underneath for when a number needs explaining.
+// Usage, for admins: how many people open the dashboard (includes/traffic.php)
+// and how many attendance updates are arriving, from both the Form and the app.
 //
-// "Lectures marked" are readings: one class, one day, one lecture. A lecture
-// filed both by the Form and in the app counts once, the same rule the
+// "Updates" are readings: one class, one day, one lecture. A Form row filed
+// twice for the same lecture is a correction and counts once, the same rule the
 // dashboard itself uses, so this page and the tiles can never disagree.
-// Visitors come from includes/traffic.php, accounts and sign-ins from
-// includes/activity.php.
 
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/page.php';
@@ -19,200 +15,164 @@ header('Cache-Control: no-store');
 auth_boot();
 auth_require(true);
 
-const STATS_DAYS = 30;
+const STATS_DAYS = 14;
 
 // Straight from the two stores, not get_attendance_days(): that falls back to
 // sample rows on an empty install, and sample rows are not updates anyone sent.
 $cache = read_attendance_cache() ?? [];
 $form = remap_legacy_days(is_array($cache['days'] ?? null) ? $cache['days'] : []);
 $app = remap_legacy_days(submitted('days'));
-$appNames = remap_legacy_days(submitted('faculty'));
 $merged = merge_readings($form, $app);
+$faculty = get_attendance_faculty();
 $traffic = traffic_days();
-$users = auth_data()['users'];
 
-// The distinct people on the app's saves over some days, by name.
-$teachersIn = function (array $days) use ($appNames): int {
-    $names = [];
-    foreach ($days as $d) foreach ((array) ($appNames[$d] ?? []) as $times) foreach ((array) $times as $n) $names[activity_person((string) $n)] = true;
-    unset($names['']);
-    return count($names);
-};
 $schoolKeys = array_flip(array_map('class_key', class_rows()));
-$count = fn(array $classes): int => array_sum(array_map(fn($r) => count((array) $r), $classes));
+$partnerKeys = array_flip(array_map('class_key', partner_rows()));
+
+$readings = fn(array $classes): int => array_sum(array_map(fn($r) => count((array) $r), $classes));
 
 $today = date('Y-m-d');
 $dates = [];
-for ($i = STATS_DAYS - 1; $i >= 0; $i--) $dates[] = date('Y-m-d', strtotime("-$i day"));
+for ($i = 0; $i < STATS_DAYS; $i++) $dates[] = date('Y-m-d', strtotime("-$i day"));
 
-// One row a day: what the numbers and the bars are made of.
 $rows = [];
 foreach ($dates as $d) {
-    $views = $traffic[$d]['views'] ?? [];
-    $all = $count($merged[$d] ?? []);
-    $inApp = $count($app[$d] ?? []);
+    $t = $traffic[$d] ?? [];
+    $views = $t['views'] ?? [];
+    $classes = $merged[$d] ?? [];
+    $names = [];
+    $dayFaculty = $faculty[$d] ?? [];
+    array_walk_recursive($dayFaculty, function ($n) use (&$names) { $names[strtolower(trim($n))] = true; });
     $rows[$d] = [
-        'lectures' => $all,
-        'app' => $inApp,
-        'form' => $all - $inApp,
-        'teachers' => $teachersIn([$d]),
-        'classes' => count(array_intersect_key($merged[$d] ?? [], $schoolKeys)),
-        'visitors' => (int) ($traffic[$d]['visitors'] ?? 0),
-        'views' => array_sum($views) - (int) ($views['push'] ?? 0),
-        'pages' => array_diff_key($views, ['push' => 1]),
+        'visitors' => (int) ($t['visitors'] ?? 0),
+        'views'    => array_sum($views) - (int) ($views['push'] ?? 0),
+        'pushes'   => (int) ($views['push'] ?? 0),
+        'form'     => $readings($form[$d] ?? []),
+        'app'      => $readings($app[$d] ?? []),
+        'schools'  => count(array_intersect_key($classes, $schoolKeys)),
+        'partners' => count(array_intersect_key($classes, $partnerKeys)),
+        'faculty'  => count($names),
     ];
 }
 
-// Sums over a run of days, and the change from the run before it.
-$sum = fn(array $days, string $k): int => array_sum(array_map(fn($d) => $rows[$d][$k] ?? 0, $days));
-$week = array_slice($dates, -7);
-$before = array_slice($dates, -14, 7);
-$change = function (int $now, int $then): string {
-    if ($then === 0) return $now > 0 ? 'new this week' : '';
-    $p = (int) round(100 * ($now - $then) / $then);
-    return ($p > 0 ? '+' : '') . $p . '% on the week before';
-};
-$share = fn(int $part, int $whole): int => $whole ? (int) round(100 * $part / $whole) : 0;
-
-// Accounts: who exists, who can mark, who has actually used it.
-$active = array_filter($users, fn($u) => ($u['status'] ?? '') === 'active' && empty($u['admin']));
-$pending = array_filter($users, fn($u) => ($u['status'] ?? '') === 'pending');
-$todayLog = activity_summary(activity_day($today));
-$signedInToday = count(array_filter(array_keys($todayLog), fn($k) => isset($active[$k]) && ($todayLog[$k]['signins'] + $todayLog[$k]['views'] + $todayLog[$k]['marks']) > 0));
-// Accounts that have filed in the app at all, by the name on their saves.
-$everNames = [];
-foreach ($appNames as $classes) foreach ((array) $classes as $times) foreach ((array) $times as $nm) $everNames[activity_person((string) $nm)] = true;
-$usedIt = count(array_filter($active, fn($u) => isset($everNames[activity_person((string) ($u['name'] ?? ''))])));
+// The day the per-school table describes: asked for, or today.
+$day = row_date($_GET['date'] ?? '') ?? $today;
+$dayClasses = $merged[$day] ?? [];
+$groups = [];
+foreach ([[class_rows(), 'Schools'], [partner_rows(), 'Knowledge partners']] as [$classRows, $section]) {
+    foreach ($classRows as $c) {
+        $g = &$groups[$section][$c['school']];
+        $g ??= ['classes' => 0, 'reported' => 0, 'readings' => 0];
+        $g['classes']++;
+        $key = class_key($c);
+        if (isset($dayClasses[$key])) {
+            $g['reported']++;
+            $g['readings'] += count((array) $dayClasses[$key]);
+        }
+        unset($g);
+    }
+}
 
 $push = is_array($cache['push'] ?? null) ? $cache['push'] : [];
 $pushedAt = $push['at'] ?? (is_file(ATTENDANCE_CACHE_FILE) ? date('Y-m-d H:i:s', filemtime(ATTENDANCE_CACHE_FILE)) : '');
 $pushAge = $pushedAt !== '' ? time() - strtotime($pushedAt) : null;
-$dropped = array_sum(array_map('intval', (array) ($push['skipped'] ?? [])));
 
-$t = $rows[$today];
-$peak = max([1, ...array_column($rows, 'lectures')]);
-$peakVisitors = max([1, ...array_column($rows, 'visitors')]);
+$firstCounted = $traffic ? array_key_first($traffic) : null;
+$fmtDay = fn(string $d): string => $d === $today ? 'Today' : date('D j M', strtotime($d));
 $e = fn($v): string => htmlspecialchars((string) $v);
-$n = fn(int $v): string => number_format($v);
 
-// The pages people open, over the 30 days, most first.
-$pageNames = ['dashboard' => 'Dashboard', 'rooms' => 'Timetable', 'mark' => 'Mark attendance', 'class' => 'Class details',
-    'login' => 'Sign in', 'account' => 'Your account', 'admin' => 'Faculty accounts', 'activity' => 'Activity', 'source' => 'Timetable sources'];
-$pages = [];
-foreach ($rows as $r) foreach ($r['pages'] as $p => $v) $pages[$p] = ($pages[$p] ?? 0) + $v;
-arsort($pages);
-$pagesTotal = max(1, array_sum($pages));
-
-page_head('Usage', 'page-wide');
-admin_tabs('usage');
+page_head('Usage', 'page-narrow');
+$now = $rows[$today];
 ?>
 <?php if ($pushAge !== null && $pushAge > 3 * 3600): ?>
   <?php page_notice('warn', 'No Form push has landed for ' . round($pushAge / 3600) . ' hours. Run pushStatus() in the Apps Script.'); ?>
 <?php endif; ?>
 
-<section class="card use-card">
-  <h2>Today <span class="use-date"><?= $e(date('l j M')) ?></span></h2>
-  <div class="use-hero">
-    <div class="use-num use-num-lead">
-      <span class="use-value"><?= $n($t['lectures']) ?></span>
-      <span class="use-label">Lectures marked</span>
-      <span class="use-note"><?= $n($t['app']) ?> in the app, <?= $n($t['form']) ?> by the Form</span>
-    </div>
-    <div class="use-num">
-      <span class="use-value"><?= $share($t['app'], $t['lectures']) ?><small>%</small></span>
-      <span class="use-label">Marked in the app</span>
-      <span class="use-bar" aria-hidden="true"><i style="width:<?= $share($t['app'], $t['lectures']) ?>%"></i></span>
-    </div>
-    <div class="use-num">
-      <span class="use-value"><?= $n($t['teachers']) ?></span>
-      <span class="use-label">Teachers marking in the app</span>
-      <span class="use-note"><?= $n($signedInToday) ?> of <?= $n(count($active)) ?> accounts signed in today</span>
-    </div>
-    <div class="use-num">
-      <span class="use-value"><?= $n($t['visitors']) ?></span>
-      <span class="use-label">People on the site</span>
-      <span class="use-note"><?= $n($t['views']) ?> pages opened</span>
-    </div>
+<section class="card">
+  <h2>Today</h2>
+  <div class="stat-grid">
+    <div class="stat"><span class="stat-value"><?= $now['visitors'] ?></span><span class="stat-label">Visitors</span></div>
+    <div class="stat"><span class="stat-value"><?= $now['views'] ?></span><span class="stat-label">Page views</span></div>
+    <div class="stat"><span class="stat-value"><?= $now['form'] + $now['app'] ?></span><span class="stat-label">Updates received</span></div>
+    <div class="stat"><span class="stat-value"><?= $now['schools'] ?><small>/<?= count($schoolKeys) ?></small></span><span class="stat-label">Classes reported</span></div>
   </div>
+  <p class="field-help">
+    <?php if ($pushedAt !== ''): ?>Last Form push <?= $e(date('j M, H:i', strtotime($pushedAt))) ?><?php if (isset($push['rows'])): ?>, <?= (int) $push['rows'] ?> rows<?php endif; ?>.<?php else: ?>No Form push has landed yet.<?php endif; ?>
+    <?= $now['partners'] ?> partner classes reported, <?= $now['faculty'] ?> faculty named.
+  </p>
 </section>
 
-<section class="card use-card">
-  <h2>Last 7 days</h2>
-  <div class="use-hero use-hero-week">
-    <?php
-      $wk = [
-          ['Lectures marked', $sum($week, 'lectures'), $sum($before, 'lectures')],
-          ['Marked in the app', $sum($week, 'app'), $sum($before, 'app')],
-          ['Teachers using the app', $teachersIn($week), $teachersIn($before)],
-          ['People on the site', $sum($week, 'visitors'), $sum($before, 'visitors')],
-      ];
-      foreach ($wk as [$label, $now, $then]): $c = $change($now, $then); ?>
-      <div class="use-num">
-        <span class="use-value"><?= $n($now) ?></span>
-        <span class="use-label"><?= $e($label) ?></span>
-        <?php if ($c !== ''): ?><span class="use-change<?= $now < $then ? ' is-down' : '' ?>"><?= $e($c) ?></span><?php endif; ?>
-      </div>
-    <?php endforeach; ?>
-  </div>
-</section>
-
-<section class="card use-card">
-  <h2>Lectures marked, last <?= STATS_DAYS ?> days</h2>
-  <div class="use-chart" role="img" aria-label="Lectures marked each day for <?= STATS_DAYS ?> days, app and Form">
-    <?php foreach ($rows as $d => $r): ?>
-      <a class="use-col<?= $d === $today ? ' is-today' : '' ?>" href="activity.php?day=<?= $e($d) ?>&amp;span=1"
-         title="<?= $e(date('D j M', strtotime($d)) . ": {$r['lectures']} lecture" . ($r['lectures'] === 1 ? '' : 's') . ", {$r['app']} in the app, {$r['form']} by the Form, {$r['visitors']} visitors") ?>">
-        <span class="use-stack" style="height:<?= round(100 * $r['lectures'] / $peak) ?>%">
-          <i class="use-form" style="flex-grow:<?= $r['form'] ?>"></i>
-          <i class="use-app" style="flex-grow:<?= $r['app'] ?>"></i>
-        </span>
-        <span class="use-tick"><?= date('N', strtotime($d)) === '1' || $d === $today ? $e(date('j M', strtotime($d))) : '' ?></span>
-      </a>
-    <?php endforeach; ?>
-  </div>
-  <ul class="tt-legend">
-    <li><i class="tt-key use-app"></i>In the app</li>
-    <li><i class="tt-key use-form"></i>By the Google Form</li>
-    <li>Tap a day for its activity.</li>
-  </ul>
-</section>
-
-<div class="use-pair">
-  <section class="card use-card">
-    <h2>Accounts</h2>
-    <div class="use-hero use-hero-small">
-      <div class="use-num"><span class="use-value"><?= $n(count($active)) ?></span><span class="use-label">Can mark</span></div>
-      <div class="use-num"><span class="use-value"><?= $n($usedIt) ?></span><span class="use-label">Have marked in the app</span></div>
-      <div class="use-num"><a class="use-value" href="admin.php"><?= $n(count($pending)) ?></a><span class="use-label">Waiting for approval</span></div>
-    </div>
-    <?php if (count($active) > $usedIt): ?>
-      <p class="field-help"><?= $n(count($active) - $usedIt) ?> approved account<?= count($active) - $usedIt === 1 ? ' has' : 's have' ?> never saved attendance. <a href="activity.php?span=30">See who on Activity.</a></p>
-    <?php endif; ?>
-  </section>
-
-  <section class="card use-card">
-    <h2>People on the site, last <?= STATS_DAYS ?> days</h2>
-    <div class="use-chart use-chart-small" role="img" aria-label="Visitors each day for <?= STATS_DAYS ?> days">
-      <?php foreach ($rows as $d => $r): ?>
-        <span class="use-col<?= $d === $today ? ' is-today' : '' ?>" title="<?= $e(date('D j M', strtotime($d)) . ": {$r['visitors']} visitors, {$r['views']} pages") ?>">
-          <span class="use-stack" style="height:<?= round(100 * $r['visitors'] / $peakVisitors) ?>%"><i class="use-visit"></i></span>
-        </span>
-      <?php endforeach; ?>
-    </div>
-    <?php if ($pages): ?>
-    <table class="stat-table stat-table-groups use-pages">
+<section class="card">
+  <h2>Last <?= STATS_DAYS ?> days</h2>
+  <div class="stat-table-wrap">
+    <table class="stat-table">
+      <thead>
+        <tr>
+          <th scope="col">Day</th>
+          <th scope="col">Visitors</th>
+          <th scope="col">Views</th>
+          <th scope="col" title="Form + app">Updates</th>
+          <th scope="col">Classes</th>
+          <th scope="col">Faculty</th>
+        </tr>
+      </thead>
       <tbody>
-        <?php foreach (array_slice($pages, 0, 5, true) as $p => $v): ?>
-          <tr><th scope="row"><?= $e($pageNames[$p] ?? ucfirst($p)) ?></th><td><?= $n($v) ?></td><td class="stat-sub"><?= $share($v, $pagesTotal) ?>%</td></tr>
+        <?php foreach ($rows as $d => $r): ?>
+          <tr<?= $d === $day ? ' class="is-selected"' : '' ?>>
+            <th scope="row"><a href="stats.php?date=<?= $e($d) ?>"><?= $e($fmtDay($d)) ?></a></th>
+            <td><?= $r['visitors'] ?: '<span class="stat-nil">0</span>' ?></td>
+            <td><?= $r['views'] ?: '<span class="stat-nil">0</span>' ?></td>
+            <td title="<?= $r['form'] ?> from the Form, <?= $r['app'] ?> from the app"><?= ($r['form'] + $r['app']) ?: '<span class="stat-nil">0</span>' ?></td>
+            <td><?= $r['schools'] ?: '<span class="stat-nil">0</span>' ?><?php if ($r['partners']): ?> <span class="stat-sub">+<?= $r['partners'] ?> kp</span><?php endif; ?></td>
+            <td><?= $r['faculty'] ?: '<span class="stat-nil">0</span>' ?></td>
+          </tr>
         <?php endforeach; ?>
       </tbody>
     </table>
-    <?php endif; ?>
-  </section>
-</div>
+  </div>
+  <p class="field-help">
+    Visitors are distinct browsers in a day; views are pages opened, not counting
+    the Form pushes (<?= $now['pushes'] ?> today) or the stylesheet and scripts the host's own
+    hit counter includes. Updates are one reading per class per lecture, so a
+    corrected Form row counts once. <?= $firstCounted ? 'Traffic counted since ' . $e(date('j M Y', strtotime($firstCounted))) . '.' : 'Traffic counting starts with the next visit.' ?>
+  </p>
+</section>
 
-<p class="field-help use-foot">
-  <?php if ($pushedAt !== ''): ?>Last Google Form push <?= $e(date('j M, H:i', strtotime($pushedAt))) ?><?php if (isset($push['rows'])): ?>, <?= (int) $push['rows'] ?> rows<?php endif; ?><?= $dropped ? ", $dropped dropped for naming no known class" : '' ?>.<?php else: ?>No Google Form push has landed yet.<?php endif; ?>
-  People are distinct browsers in a day, not counting bots or the Form pushes. Teachers in the app are counted by the name on their saves.
-</p>
+<section class="card">
+  <h2>Footer clicks, <?= $e($day === $today ? 'today' : date('j M', strtotime($day))) ?></h2>
+  <table class="stat-table stat-table-groups">
+    <thead><tr><th scope="col">Link</th><th scope="col">Clicks</th><th scope="col">Browsers</th><th scope="col">Last <?= STATS_DAYS ?> days</th></tr></thead>
+    <tbody>
+      <?php foreach (TRAFFIC_LINKS as $key => $label):
+        $total = 0;
+        foreach ($dates as $d) $total += (int) ($traffic[$d]['clicks'][$key] ?? 0); ?>
+        <tr>
+          <th scope="row"><?= $e($label) ?></th>
+          <td><?= ($traffic[$day]['clicks'][$key] ?? 0) ?: '<span class="stat-nil">0</span>' ?></td>
+          <td><?= ($traffic[$day]['clickers'][$key] ?? 0) ?: '<span class="stat-nil">0</span>' ?></td>
+          <td><?= $total ?: '<span class="stat-nil">0</span>' ?></td>
+        </tr>
+      <?php endforeach; ?>
+    </tbody>
+  </table>
+  <p class="field-help">Browsers are distinct browsers that clicked the link that day, so ten clicks from one person read as 10 clicks, 1 browser.</p>
+</section>
+
+<?php foreach ($groups as $section => $list): ?>
+<section class="card">
+  <h2><?= $e($section) ?>, <?= $e($day === $today ? 'today' : date('j M', strtotime($day))) ?></h2>
+  <table class="stat-table stat-table-groups">
+    <thead><tr><th scope="col"><?= $section === 'Schools' ? 'School' : 'Partner' ?></th><th scope="col">Classes reported</th><th scope="col">Updates</th></tr></thead>
+    <tbody>
+      <?php foreach ($list as $id => $g): ?>
+        <tr>
+          <th scope="row"><?= $e(preg_replace('/^School of /', '', group_name($id))) ?></th>
+          <td><?= $g['reported'] ?> <span class="stat-sub">of <?= $g['classes'] ?></span></td>
+          <td><?= $g['readings'] ?: '<span class="stat-nil">0</span>' ?></td>
+        </tr>
+      <?php endforeach; ?>
+    </tbody>
+  </table>
+</section>
+<?php endforeach; ?>
 <?php page_foot(); ?>

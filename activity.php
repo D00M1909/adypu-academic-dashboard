@@ -115,7 +115,6 @@ $describe = function (array $x) use ($short, $lag, $nameOf): string {
 };
 
 page_head('Activity', 'page-wide');
-admin_tabs('activity');
 ?>
 <section class="card">
   <form class="tt-bar act-filters" method="get">
