@@ -148,6 +148,7 @@ assert(slot('13:15') === '1:15 to 2:15 PM', 'after-lunch slot wrong: ' + slot('1
 // Straddling noon is the case a single trailing meridiem gets wrong.
 assert(slot('11:30') === '11:30 AM to 12:30 PM', 'noon slot wrong: ' + slot('11:30'));
 assert(slot('08:30') === '8:30 to 9:30 AM', 'early slot wrong: ' + slot('08:30'));
+assert(slot('day') === 'Whole day', 'whole-day slot wrong: ' + slot('day'));
 assert(slot('12:30') === '12:30 to 1:30 PM', 'midday slot wrong: ' + slot('12:30'));
 // Anything that is not a stored HH:MM is passed through untouched.
 assert(slot('') === '' && slot('no time') === 'no time', 'a missing time must not be dressed up');

@@ -244,6 +244,11 @@ assert(timetable_reading($days, 'd', 'k', $at130, [[750, 810]]) === null);
 assert(timetable_reading($days, 'd', 'k', ['time' => '12.30 to 1.30', 'span' => 1], [[810, 870]]) === 37);
 // One filed during the lecture beats an early one.
 assert(timetable_reading(['d' => ['k' => ['13:15' => 37, '13:40' => 40]]], 'd', 'k', $at130) === 40);
+// A whole-day reading stands for every lecture that day, but one filed for
+// the lecture itself beats it.
+assert(timetable_reading(['d' => ['k' => ['day' => 22]]], 'd', 'k', $at130) === 22);
+assert(timetable_reading(['d' => ['k' => ['day' => 22]]], 'd', 'k', ['time' => '9.30 to 12.30', 'span' => 3]) === 22);
+assert(timetable_reading(['d' => ['k' => ['13:40' => 40, 'day' => 22]]], 'd', 'k', $at130) === 40);
 $lt = timetable_lectures(['rooms' => ['1' => [['day' => 'Monday', 'time' => '1.30 to 2.30', 'span' => 2, 'classes' => ['A', 'B']]]]]);
 assert($lt['A']['Monday'] === [[810, 930]] && $lt['B']['Monday'] === [[810, 930]]);
 

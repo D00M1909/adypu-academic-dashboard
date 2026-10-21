@@ -118,13 +118,14 @@ $lag = function (int $m): string {
 $link = fn(array $over): string => 'activity.php?' . http_build_query(array_filter($over + ['who' => $who, 'day' => $day === $today ? '' : $day, 'span' => $span === 7 ? '' : $span, 'kind' => $kind === 'work' ? '' : $kind], fn($v) => $v !== '' && $v !== null));
 
 // One event's details as a line of plain text.
-$describe = function (array $x) use ($short, $lag, $nameOf): string {
+$when = fn(string $time): string => $time === WHOLE_DAY ? 'whole day' : $time;
+$describe = function (array $x) use ($short, $lag, $nameOf, $when): string {
     $d = $x['d'] ?? [];
     return match ($x['type']) {
-        'mark' => $short($d['class'] ?? '') . ', ' . date('j M', strtotime($d['date'] ?? $x['day'])) . ' ' . ($d['time'] ?? '')
+        'mark' => $short($d['class'] ?? '') . ', ' . date('j M', strtotime($d['date'] ?? $x['day'])) . ' ' . $when($d['time'] ?? '')
             . ': ' . ($d['present'] ?? '?') . '/' . ($d['strength'] ?? '?') . ' present'
             . (($d['how'] ?? '') === 'roster' ? ' (' . ($d['absent'] ?? 0) . ' ticked absent)' : ' (number typed)')
-            . ', filed ' . $lag((int) ($d['lag'] ?? 0))
+            . (isset($d['lag']) ? ', filed ' . $lag((int) $d['lag']) : '')
             . (isset($d['replaced']) ? '. Replaced ' . $d['replaced']['present'] . ' present' . (($d['replaced']['faculty'] ?? '') !== '' ? ' by ' . $d['replaced']['faculty'] : '') : ''),
         'mark_failed' => ($d['why'] ?? '') . ($d['class'] ?? '') !== '' ? ($d['why'] ?? '') . ' (' . $short($d['class'] ?? '') . ')' : ($d['why'] ?? ''),
         'signin', 'resume' => ucfirst($d['how'] ?? ''),
@@ -134,7 +135,7 @@ $describe = function (array $x) use ($short, $lag, $nameOf): string {
         'password' => !empty($d['ok']) ? 'Changed' : 'Refused: ' . ($d['why'] ?? ''),
         'admin' => ucfirst($d['action'] ?? '') . ' ' . (isset(SCHOOLS[$d['target'] ?? '']) ? SCHOOLS[$d['target']]['name'] . ' join code' : $nameOf((string) ($d['target'] ?? '')) . ' (' . ($d['target'] ?? '') . ')'),
         'view' => ($d['url'] ?? $d['page'] ?? ''),
-        'form' => $short($d['class'] ?? '') . ', ' . date('j M', strtotime($d['date'] ?? $x['day'])) . ($d['time'] !== '' ? ' ' . $d['time'] : '')
+        'form' => $short($d['class'] ?? '') . ', ' . date('j M', strtotime($d['date'] ?? $x['day'])) . ($d['time'] !== '' ? ' ' . $when($d['time']) : '')
             . ': ' . $d['present'] . ($d['strength'] ? '/' . $d['strength'] : '') . ' present'
             . (isset($d['lag']) ? ', submitted ' . $lag((int) $d['lag']) : ''),
         default => '',

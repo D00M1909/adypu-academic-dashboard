@@ -433,6 +433,17 @@ assert(row_time('2:15 PM') === '14:15', '12-hour time wrong: ' . row_time('2:15 
 assert(row_time('12:05 AM') === '00:05', 'midnight wrong: ' . row_time('12:05 AM'));
 assert(row_time('2026-08-26') === '' && row_time('99:99') === '', 'a bare date or junk must have no time');
 
+// A class that meets all day reports once: the Form's "Whole day" option files
+// it under WHOLE_DAY, which sorts after every clock and so is the day's number.
+assert(lecture_slot('Whole day') === WHOLE_DAY && lecture_slot(WHOLE_DAY) === WHOLE_DAY && lecture_slot('Full Day') === WHOLE_DAY && lecture_slot('2:15 PM') === '14:15');
+$wholeRows = parse_attendance_csv("timestamp,time of class,class,present,date\n" .
+    '"2026-08-26 17:00","Whole day","School of Law / 2nd Year / A","24","2026-08-26"' . "\n" .
+    '"2026-08-26 09:12","09:00","School of Law / 2nd Year / A","20","2026-08-26"' . "\n");
+$wholeDays = day_map($wholeRows);
+assert($wholeDays['2026-08-26']['law|2nd Year||A'] === ['09:00' => 20, WHOLE_DAY => 24],
+    'whole-day reading misfiled: ' . json_encode($wholeDays['2026-08-26']['law|2nd Year||A']));
+assert(day_present($wholeDays['2026-08-26']['law|2nd Year||A']) === 24, 'a whole-day reading should be the day number');
+
 // --- Percentages divide by the classes that reported ------------------------
 // Diluting by classes that never filled the form in reads as an empty
 // university at 9am rather than as a missing form. attendance_pct pairs with

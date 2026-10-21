@@ -34,7 +34,7 @@ $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $class = parse_class_label((string) ($_POST['class'] ?? ''));
     $date  = row_date((string) ($_POST['date'] ?? ''));
-    $time  = row_time((string) ($_POST['time'] ?? ''));
+    $time  = lecture_slot((string) ($_POST['time'] ?? ''));
 
     if (($me['status'] ?? '') !== 'active') {
         $error = 'Your account is still waiting for approval.';
@@ -77,8 +77,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'strength' => (int) $class['strength'],
                 'absent' => count($absent),
                 'how' => $roster ? 'roster' : 'count',
-                'lag' => (int) round((time() - strtotime("$date $at")) / 60),
-            ] + ($before ? ['replaced' => $before] : []));
+            ] + ($at === WHOLE_DAY ? [] : ['lag' => (int) round((time() - strtotime("$date $at")) / 60)])
+              + ($before ? ['replaced' => $before] : []));
             setcookie(LAST_CLASS_COOKIE, (string) $_POST['class'], [
                 'expires' => time() + 180 * 86400, 'path' => '/', 'samesite' => 'Lax',
             ]);
@@ -109,7 +109,10 @@ $date = row_date((string) ($_GET['date'] ?? '')) ?? date('Y-m-d');
 // Defaulting to the hour, not the minute, so a correction filed a few minutes
 // later lands on the same lecture and replaces it rather than inventing a
 // second one — the same rule the Form's own fallback follows.
-$time = row_time((string) ($_GET['time'] ?? '')) ?: date('H:00');
+$time = lecture_slot((string) ($_GET['time'] ?? '')) ?: date('H:00');
+// The Whole day switch, for a class that meets all day: one reading for the day.
+if (!empty($_GET['whole'])) $time = WHOLE_DAY;
+$wholeDay = $time === WHOLE_DAY;
 
 $roster = $class ? roster_for($class) : [];
 // The sticky bar repeats the selection, because the picker card scrolls away
@@ -144,7 +147,7 @@ if (($me['status'] ?? '') !== 'active') {
 
 <?php page_notice('warn', $error); ?>
 <?php if ($saved !== null): ?>
-  <?php page_notice('ok', "Saved. $saved present in " . ($class ? class_label($class['school'], $class['year'], $class['branch'], $class['division']) : 'that class') . " at $time."); ?>
+  <?php page_notice('ok', "Saved. $saved present in " . ($class ? class_label($class['school'], $class['year'], $class['branch'], $class['division']) : 'that class') . ($wholeDay ? " for the whole day." : " at $time.")); ?>
 <?php endif; ?>
 
 <form class="card picker" method="get" id="picker">
@@ -174,8 +177,13 @@ if (($me['status'] ?? '') !== 'active') {
     <span><label for="p-date">Date</label>
       <input id="p-date" name="date" type="date" value="<?= htmlspecialchars($date) ?>" max="<?= date('Y-m-d') ?>"></span>
     <span><label for="p-time">Lecture</label>
-      <input id="p-time" name="time" type="time" value="<?= htmlspecialchars($time) ?>"></span>
+      <input id="p-time" name="time" type="time" value="<?= $wholeDay ? date('H:00') : htmlspecialchars($time) ?>"<?= $wholeDay ? ' disabled' : '' ?>></span>
   </div>
+  <?php // Off again, the disabled time is not sent and the lecture falls back to this hour. ?>
+  <label class="tt-switch picker-whole">
+    <input type="checkbox" name="whole" value="1"<?= $wholeDay ? ' checked' : '' ?>>
+    <span class="tt-switch-track" aria-hidden="true"></span>Whole day
+  </label>
 
   <button class="btn-quiet" type="submit" id="picker-go">Load class list</button>
 </form>
@@ -253,7 +261,7 @@ if (($me['status'] ?? '') !== 'active') {
   <div class="mark-bar" id="mark-bar">
     <p class="mark-context">
       <span class="mark-context-class"><?= htmlspecialchars($shortLabel) ?></span>
-      <span class="mark-context-when"><?= htmlspecialchars(date('j M', strtotime($date)) . ' at ' . date('g:i a', strtotime($time))) ?></span>
+      <span class="mark-context-when"><?= htmlspecialchars(date('j M', strtotime($date)) . ($wholeDay ? ', whole day' : ' at ' . date('g:i a', strtotime($time)))) ?></span>
     </p>
     <div class="mark-bar-row">
       <?php /* No count without a roster: there is nothing to count, and the

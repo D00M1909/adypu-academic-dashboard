@@ -112,6 +112,8 @@ window.Charts = (function () {
   // ponytail: one-hour slots assumed. Store the end beside the start in
   // day_map() if a two-hour lab ever has to read correctly.
   function slotLabel(time) {
+    // WHOLE_DAY in includes/attendance.php: one reading for a class that met all day.
+    if (time === 'day') return 'Whole day';
     var bits = /^(\d{1,2}):(\d{2})$/.exec(time);
     if (!bits) return time;
     var start = Number(bits[1]), end = (start + 1) % 24;

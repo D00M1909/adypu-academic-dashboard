@@ -831,7 +831,10 @@ function timetable_reading(array $days, string $date, string $key, array $entry,
     if (!$m || $end === null) return null;
     $found = null;
     $during = null;
+    $allDay = null;
     foreach ((array) ($days[$date][$key] ?? []) as $time => $present) {
+        // WHOLE_DAY in includes/attendance.php, which this file does not load.
+        if ((string) $time === 'day') $allDay = (int) $present;
         if (!preg_match('/^(\d{2}):(\d{2})$/', (string) $time, $t)) continue;
         $at = (int) $t[1] * 60 + (int) $t[2];
         if ($at >= $m[0] && $at < $end) {
@@ -842,8 +845,9 @@ function timetable_reading(array $days, string $date, string $key, array $entry,
             if (!$taken) $found = (int) $present;
         }
     }
-    // One filed during the lecture beats one filed before it.
-    return $during ?? $found;
+    // One filed during the lecture beats one filed before it, and either beats
+    // a reading for the whole day, which stands for every lecture that day.
+    return $during ?? $found ?? $allDay;
 }
 
 // For timetable_reading()'s $busy: every class's lectures as

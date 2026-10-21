@@ -135,6 +135,18 @@ function row_time(string $value): string {
     return $hour < 24 ? sprintf('%02d:%s', $hour, $m[2]) : '';
 }
 
+// The slot of a reading for the whole day: a class that meets all day (Design's
+// studios) reports once, from the Form's "Whole day" option or the app's
+// switch. Not a clock, so it sorts after every one and is the day's latest
+// reading, and timetable_reading() counts it for every lecture that day.
+const WHOLE_DAY = 'day';
+
+// row_time(), or WHOLE_DAY for "Whole day" (also "Full day", "Entire day") and
+// for WHOLE_DAY itself, which is what the app posts back.
+function lecture_slot(string $value): string {
+    return $value === WHOLE_DAY || preg_match('/\b(whole|full|entire)\s+day\b/i', $value) ? WHOLE_DAY : row_time($value);
+}
+
 // Which lecture a reading belongs to. Each faculty member takes attendance for
 // their own lecture, so one class reports several times a day; without a slot
 // they all key on the day and the last submission silently replaces the rest.
@@ -153,7 +165,7 @@ function row_time(string $value): string {
 function row_slot(array $header, array $fields): string {
     foreach ($header as $i => $name) {
         if (!str_starts_with($name, 'time') || str_starts_with($name, 'timestamp')) continue;
-        $time = row_time((string) ($fields[$i] ?? ''));
+        $time = lecture_slot((string) ($fields[$i] ?? ''));
         if ($time !== '') return $time;
     }
     $stamp = row_time(first_value($header, $fields, 'timestamp'));

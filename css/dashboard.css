@@ -1128,6 +1128,7 @@ input:focus-visible, select:focus-visible {
 .picker #picker-go { width: 100%; margin-top: 16px; }
 
 /* ---------- Marking ----------
+.picker .picker-whole { margin-top: 12px; }
    The bar sticks to the bottom rather than the top: a thumb reaches it, and it
    means the running count and Submit are both reachable without scrolling back
    up past seventy names. */
