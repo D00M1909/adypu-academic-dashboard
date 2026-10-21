@@ -15,7 +15,10 @@ header('Cache-Control: no-store');
 auth_boot();
 auth_require(true);
 
-const STATS_DAYS = 14;
+// How many days the table lists: 14 unless a longer range is picked. Traffic
+// is kept for TRAFFIC_KEEP_DAYS, so that is the longest worth offering.
+const STATS_SPANS = [14, 30, 60, 90, TRAFFIC_KEEP_DAYS];
+$span = in_array((int) ($_GET['span'] ?? 14), STATS_SPANS, true) ? (int) $_GET['span'] : 14;
 
 // Straight from the two stores, not get_attendance_days(): that falls back to
 // sample rows on an empty install, and sample rows are not updates anyone sent.
@@ -34,7 +37,7 @@ $readings = fn(array $classes): int => array_sum(array_map(fn($r) => count((arra
 
 $today = date('Y-m-d');
 $dates = [];
-for ($i = 0; $i < STATS_DAYS; $i++) $dates[] = date('Y-m-d', strtotime("-$i day"));
+for ($i = 0; $i < $span; $i++) $dates[] = date('Y-m-d', strtotime("-$i day"));
 
 $rows = [];
 foreach ($dates as $d) {
@@ -121,7 +124,17 @@ $now = $rows[$today];
 </section>
 
 <section class="card">
-  <h2>Last <?= STATS_DAYS ?> days</h2>
+  <div class="stat-head">
+    <h2>Last <?= $span ?> days</h2>
+    <form method="get" class="stat-span no-print">
+      <?php if ($day !== $today): ?><input type="hidden" name="date" value="<?= $e($day) ?>"><?php endif; ?>
+      <label class="sr-only" for="stat-span">Days to show</label>
+      <select id="stat-span" name="span" onchange="this.form.submit()">
+        <?php foreach (STATS_SPANS as $n): ?><option value="<?= $n ?>"<?= $n === $span ? ' selected' : '' ?>>Last <?= $n ?> days</option><?php endforeach; ?>
+      </select>
+      <noscript><button class="btn-quiet" type="submit">Show</button></noscript>
+    </form>
+  </div>
   <div class="stat-table-wrap">
     <table class="stat-table">
       <thead>
@@ -138,7 +151,7 @@ $now = $rows[$today];
       <tbody>
         <?php foreach ($rows as $d => $r): ?>
           <tr<?= $d === $day ? ' class="is-selected"' : '' ?>>
-            <th scope="row"><a href="stats.php?date=<?= $e($d) ?>"><?= $e($fmtDay($d)) ?></a></th>
+            <th scope="row"><a href="stats.php?<?= $e(http_build_query(['date' => $d] + ($span === 14 ? [] : ['span' => $span]))) ?>"><?= $e($fmtDay($d)) ?></a></th>
             <td><?= $r['visitors'] ?: '<span class="stat-nil">0</span>' ?></td>
             <td><?= $r['views'] ?: '<span class="stat-nil">0</span>' ?></td>
             <td><?= $r['form'] ?: '<span class="stat-nil">0</span>' ?></td>
@@ -180,7 +193,7 @@ $now = $rows[$today];
 <section class="card">
   <h2>Footer clicks, <?= $e($day === $today ? 'today' : date('j M', strtotime($day))) ?></h2>
   <table class="stat-table stat-table-groups">
-    <thead><tr><th scope="col">Link</th><th scope="col">Clicks</th><th scope="col">Browsers</th><th scope="col">Last <?= STATS_DAYS ?> days</th></tr></thead>
+    <thead><tr><th scope="col">Link</th><th scope="col">Clicks</th><th scope="col">Browsers</th><th scope="col">Last <?= $span ?> days</th></tr></thead>
     <tbody>
       <?php foreach (TRAFFIC_LINKS as $key => $label):
         $total = 0;

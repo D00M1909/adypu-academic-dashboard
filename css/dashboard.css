@@ -1863,3 +1863,9 @@ button.tt-entry + button.tt-entry { margin-top: 6px; border-top-left-radius: 0; 
 .act-peak { position: absolute; left: 0; top: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--ink-muted); }
 .act-chart .act-days { height: 80px; }
 .act-axis { display: flex; justify-content: space-between; margin-top: 4px; font-size: 11px; color: var(--ink-muted); }
+
+/* Usage: the range picker sits on the right of the table's heading. */
+.stat-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.stat-head h2 { margin-bottom: 0; }
+.stat-span select { width: auto; min-height: 0; padding-top: 6px; padding-bottom: 6px; font-size: 14px; }
+.stat-head + .stat-table-wrap { margin-top: 10px; }
