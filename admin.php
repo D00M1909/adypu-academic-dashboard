@@ -21,6 +21,8 @@ $temp = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = auth_key((string) ($_POST['email'] ?? ''));
     $action = (string) ($_POST['action'] ?? '');
+    // Every admin action is logged under the admin who took it, once it has
+    // run ($ok set), so a refused one is never recorded as done.
     if (!csrf_ok()) {
         $error = 'That form expired. Please try again.';
     } elseif ($action === 'rotate') {
@@ -32,6 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 return $d;
             });
             $ok = SCHOOLS[$school]['name'] . ' now has the code ' . $code . '. The old one stops working immediately.';
+            activity_log('admin', $me['email'], ['action' => 'rotate', 'target' => $school]);
         }
     } elseif ($email !== '' && auth_find($email)) {
         // An admin locking themselves out of the only admin account is a trip
@@ -74,6 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $ok = 'Read this to them now. It is not shown again.';
                 break;
         }
+        if ($ok !== '') activity_log('admin', $me['email'], ['action' => $action, 'target' => $email]);
     }
 }
 

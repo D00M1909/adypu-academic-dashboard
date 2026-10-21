@@ -9,6 +9,7 @@
 // nothing on disk can be matched back to an address or across two days.
 
 require_once __DIR__ . '/store.php';
+require_once __DIR__ . '/activity.php';
 
 // How far back the daily totals go. Roughly 200 bytes a day.
 const TRAFFIC_KEEP_DAYS = 120;
@@ -34,6 +35,8 @@ function traffic_is_bot(string $ua): bool {
 // $page is a literal from our own source ('dashboard', 'mark', ...). A failure
 // here must never cost the page it is counting, so everything is swallowed.
 function traffic_hit(string $page, ?string $ip = null, ?string $ua = null, ?string $today = null): void {
+    // A signed-in account's page views go to its own log as well (activity.php).
+    if ($page !== 'push') activity_view($page);
     // Every form on these pages posts and then redirects to a GET, so counting
     // the POST too would count each save or sign-in twice.
     if ($page !== 'push' && ($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') return;

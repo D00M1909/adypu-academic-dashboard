@@ -620,12 +620,19 @@ function get_attendance(?string $from = null, ?string $to = null): array {
 //
 // The absentee roll numbers go to their own per-day file. They are not needed to
 // draw a percentage, and this file is read on every single dashboard request.
-function record_attendance(array $class, string $date, string $time, int $present, string $faculty, array $absent = []): bool {
+// $before is filled with what the save replaced, ['present', 'faculty'], or
+// null when that lecture had no reading from the app yet: the activity log
+// keeps it, so a reading overwritten by someone else can be traced.
+function record_attendance(array $class, string $date, string $time, int $present, string $faculty, array $absent = [], ?array &$before = null): bool {
     require_once __DIR__ . '/store.php';
     $key = class_key($class);
     $present = max(0, min((int) $class['strength'], $present));
 
-    $ok = store_update('submissions', function (array $d) use ($date, $key, $time, $present, $faculty) {
+    $before = null;
+    $ok = store_update('submissions', function (array $d) use ($date, $key, $time, $present, $faculty, &$before) {
+        if (isset($d['days'][$date][$key][$time])) {
+            $before = ['present' => (int) $d['days'][$date][$key][$time], 'faculty' => (string) ($d['faculty'][$date][$key][$time] ?? '')];
+        }
         $d['days'][$date][$key][$time] = $present;
         if ($faculty !== '') $d['faculty'][$date][$key][$time] = $faculty;
         return $d;

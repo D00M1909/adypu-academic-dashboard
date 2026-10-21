@@ -14,6 +14,7 @@ auth_boot();
 traffic_hit('login');
 
 if (isset($_GET['logout'])) {
+    if (activity_who() !== '') activity_log('signout', activity_who());
     auth_logout();
     header('Location: login.php?bye=1');
     exit;

@@ -64,7 +64,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $present = (int) ($_POST['present'] ?? 0);
         }
 
-        if (record_attendance($class, $date, $time ?: date('H:00'), $present, (string) $me['name'], $absent)) {
+        $at = $time ?: date('H:00');
+        if (record_attendance($class, $date, $at, $present, (string) $me['name'], $absent, $before)) {
+            // Everything about the save, for the Activity page: what was
+            // filed, for when, how long after the lecture, and whose reading
+            // it replaced if the lecture already had one.
+            activity_log('mark', $me['email'], [
+                'class' => (string) $_POST['class'],
+                'date' => $date,
+                'time' => $at,
+                'present' => $present,
+                'strength' => (int) $class['strength'],
+                'absent' => count($absent),
+                'how' => $roster ? 'roster' : 'count',
+                'lag' => (int) round((time() - strtotime("$date $at")) / 60),
+            ] + ($before ? ['replaced' => $before] : []));
             setcookie(LAST_CLASS_COOKIE, (string) $_POST['class'], [
                 'expires' => time() + 180 * 86400, 'path' => '/', 'samesite' => 'Lax',
             ]);
@@ -76,6 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $error = 'Could not save that. Please try again, and tell us if it keeps happening.';
     }
+    if ($error !== '') activity_log('mark_failed', $me['email'], ['why' => $error, 'class' => (string) ($_POST['class'] ?? ''), 'date' => (string) ($_POST['date'] ?? ''), 'time' => (string) ($_POST['time'] ?? '')]);
 }
 
 // --- What we are looking at -------------------------------------------------

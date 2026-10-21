@@ -25,7 +25,7 @@ function account_menu(): string {
     $initial = mb_strtoupper(mb_substr($name, 0, 1));
 
     $links = '';
-    if (!empty($u['admin'])) $links .= '<a href="admin.php">Faculty accounts</a><a href="stats.php">Usage</a>';
+    if (!empty($u['admin'])) $links .= '<a href="admin.php">Faculty accounts</a><a href="stats.php">Usage</a><a href="activity.php">Activity</a>';
     $links .= '<a href="account.php">Your account</a>'
             . '<a class="account-panel-out" href="login.php?logout=1">Sign out</a>';
 

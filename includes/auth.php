@@ -14,6 +14,7 @@
 
 require_once __DIR__ . '/store.php';
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/activity.php';
 // For SCHOOLS, which a signup has to validate its school against.
 require_once __DIR__ . '/attendance.php';
 
@@ -97,6 +98,7 @@ function auth_user(): ?array {
     }
     $u = auth_find($_SESSION['email']);
     if (!$u || ($u['status'] ?? '') === 'disabled') {
+        activity_log('signout', auth_key($_SESSION['email']), ['why' => $u ? 'account disabled' : 'account deleted']);
         auth_logout();
         return null;
     }
@@ -145,13 +147,16 @@ function auth_login(string $email, string $password): string {
         session_regenerate_id(true);
         $_SESSION['email'] = $key;
         $_SESSION['is_config_admin'] = true;
+        activity_log('signin', $key, ['how' => 'password', 'account' => 'config admin']);
         return '';
     }
 
     if ($u && ($u['locked'] ?? 0) > time()) {
+        activity_log('signin_failed', $key, ['why' => 'locked out']);
         return 'Too many attempts. Try again in ' . max(1, (int) ceil((($u['locked'] - time()) / 60))) . ' minutes.';
     }
     if (!$u || ($u['status'] ?? '') === 'disabled' || !password_verify($password, $u['hash'] ?? '')) {
+        activity_log('signin_failed', $key, ['why' => !$u ? 'no such account' : (($u['status'] ?? '') === 'disabled' ? 'account disabled' : 'wrong password')]);
         if ($u) {
             $fails = (int) ($u['fails'] ?? 0) + 1;
             auth_put($key, [
@@ -167,6 +172,7 @@ function auth_login(string $email, string $password): string {
     unset($_SESSION['is_config_admin']);
     auth_put($key, ['fails' => 0, 'locked' => 0, 'seen' => date('Y-m-d H:i')]);
     auth_remember($key);
+    activity_log('signin', $key, ['how' => 'password']);
     return '';
 }
 
@@ -202,6 +208,9 @@ function auth_resume(): void {
     if (!$u || empty($u['remember']) || ($u['status'] ?? '') === 'disabled') return;
     if (!hash_equals($u['remember'], hash('sha256', $token))) return;
     $_SESSION['email'] = auth_key($key);
+    // A new session picked up from the 30 day cookie: as good as a sign-in,
+    // and the only one most phones will ever log.
+    activity_log('resume', auth_key($key), ['how' => 'remembered on this device']);
 }
 
 // --- Signing up -------------------------------------------------------------
@@ -248,6 +257,7 @@ function auth_signup(string $name, string $email, string $password, string $scho
         'fails'    => 0,
         'locked'   => 0,
     ]);
+    activity_log('signup', $key, ['name' => $name, 'school' => $school, 'status' => $active ? 'active (join code)' : 'pending', 'code' => $given === '' ? 'none' : ($active ? 'right' : 'wrong')]);
     return '';
 }
 
@@ -266,7 +276,10 @@ function auth_change_password(string $email, string $current, string $new): stri
     $verified = $bootstrap
         ? password_verify($current, ADMIN_HASH)
         : ($u !== null && password_verify($current, $u['hash'] ?? ''));
-    if (!$verified) return 'Your current password is not right.';
+    if (!$verified) {
+        activity_log('password', $key, ['ok' => false, 'why' => 'current password wrong']);
+        return 'Your current password is not right.';
+    }
     if (strlen($new) < AUTH_MIN_PASSWORD) return 'The new password needs at least ' . AUTH_MIN_PASSWORD . ' characters.';
     if ($new === $current) return 'That is the password you already have.';
 
@@ -288,6 +301,7 @@ function auth_change_password(string $email, string $current, string $new): stri
     // that should end a session someone else may be holding.
     auth_put($key, ['remember' => '']);
     auth_remember($key);
+    activity_log('password', $key, ['ok' => true]);
     return '';
 }
 
