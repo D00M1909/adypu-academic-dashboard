@@ -95,7 +95,8 @@ $keyLabel = fn(string $k): string => implode(' / ', array_filter(array_slice(exp
 $logFrom = activity_first_day();
 // The day's Google Form entries join the app's events in the one log, newest
 // first, from the row-by-row record each push now leaves (form_log()).
-$formDay = activity_form_day($day, $users, $accountOf);
+$formLog = store_read('formlog');
+$formDay = activity_form_day($formLog, $day, $users, $accountOf);
 $dayEvents = array_merge($dayEvents, array_filter($formDay, $keep));
 usort($dayEvents, fn($a, $b) => $b['t'] <=> $a['t']);
 
@@ -184,6 +185,8 @@ page_head('Activity', 'page-wide');
     <div class="stat"><span class="stat-value"><?= array_sum(array_column($daySummary, 'overwrites')) ?></span><span class="stat-label">Saves that replaced one</span></div>
     <div class="stat"><span class="stat-value"><?= $failedToday ?></span><span class="stat-label">Failed sign-ins</span></div>
   </div>
+  <?php // Says where the Form entries come from and how fresh they are, so a "+ 0" can be told apart from a log that was never written. ?>
+  <p class="field-help"><?php if (empty($formLog['at'])): ?>No Google Form log yet. It is written by each Form push to api/ingest.php, every 5 minutes; run pushNow() in the Apps Script to send one now.<?php else: ?>Google Form entries from the push at <?= $e(date('j M, H:i', strtotime($formLog['at']))) ?>, <?= count((array) ($formLog['rows'] ?? [])) ?> rows in the sheet. Counted by the day they were submitted.<?php endif; ?></p>
 </section>
 
 <?php if ($who !== ''):

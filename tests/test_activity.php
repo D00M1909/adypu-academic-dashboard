@@ -88,10 +88,10 @@ assert(count($log) === 3 && $log[0]['at'] === '2026-10-21 09:52' && $log[0]['ema
 assert($log[1]['at'] === '2026-10-21 14:30' && $log[1]['date'] === '2026-10-20', 'submitted a day after the class met');
 store_update('formlog', fn() => ['rows' => $log]);
 $users = ['asha@adypu.edu.in' => ['name' => 'Asha Rao'], 'ben@adypu.edu.in' => ['name' => 'Ben Das']];
-$form = activity_form_day('2026-10-21', $users, ['asha rao' => 'asha@adypu.edu.in', 'ben das' => 'ben@adypu.edu.in']);
+$form = activity_form_day(store_read('formlog'), '2026-10-21', $users, ['asha rao' => 'asha@adypu.edu.in', 'ben das' => 'ben@adypu.edu.in']);
 assert(array_column($form, 'who') === ['asha@adypu.edu.in', 'ben@adypu.edu.in'], json_encode($form));
 assert($form[0]['type'] === 'form' && $form[0]['t'] === '09:52:00' && $form[0]['d']['lag'] === 52 && $form[1]['d']['lag'] === 25 * 60 + 30);
-$form = activity_form_day('2026-10-20', [], []);
+$form = activity_form_day(store_read('formlog'), '2026-10-20', [], []);
 assert(count($form) === 1 && $form[0]['who'] === '' && $form[0]['name'] === 'Ravi K', 'no account: listed under the name');
 
 echo "OK\n";

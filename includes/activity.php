@@ -203,10 +203,11 @@ function activity_summary(array $events): array {
 // One day's Google Form entries as events, so the Activity log can list them
 // beside the app's: by the row's submission time, under the account whose
 // email (if the Form collects it) or name matches, else under the name alone.
-// $accountOf maps activity_person(name) => account email.
-function activity_form_day(string $day, array $users, array $accountOf): array {
+// $log is store_read('formlog'); $accountOf maps activity_person(name) =>
+// account email.
+function activity_form_day(array $log, string $day, array $users, array $accountOf): array {
     $out = [];
-    foreach ((array) (store_read('formlog')['rows'] ?? []) as $r) {
+    foreach ((array) ($log['rows'] ?? []) as $r) {
         if (!str_starts_with((string) ($r['at'] ?? ''), $day)) continue;
         $who = isset($users[$r['email'] ?? '']) ? $r['email'] : ($accountOf[activity_person((string) ($r['name'] ?? ''))] ?? '');
         $at = strlen($r['at']) > 10 ? substr($r['at'], 11, 5) . ':00' : '';
