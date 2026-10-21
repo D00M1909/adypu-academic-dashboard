@@ -1856,3 +1856,10 @@ button.tt-entry + button.tt-entry { margin-top: 6px; border-top-left-radius: 0; 
 .act-board.is-folded tr.act-more { display: none; }
 .act-board-toggle { display: block; margin: 10px auto 0; }
 @media print { .act-board.is-folded tr.act-more { display: table-row; } }
+/* An account's lectures per day: the peak written at the top left, so a tall
+   bar has a number to read against, and dates under the first, middle and
+   last bars. */
+.act-chart { position: relative; padding-left: 28px; }
+.act-peak { position: absolute; left: 0; top: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--ink-muted); }
+.act-chart .act-days { height: 80px; }
+.act-axis { display: flex; justify-content: space-between; margin-top: 4px; font-size: 11px; color: var(--ink-muted); }

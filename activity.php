@@ -24,7 +24,10 @@ $today = date('Y-m-d');
 $day = row_date((string) ($_GET['day'] ?? '')) ?? $today;
 if ($day > $today) $day = $today;
 $span = in_array((int) ($_GET['span'] ?? 7), [1, 7, 30, 90], true) ? (int) ($_GET['span'] ?? 7) : 7;
-$from = date('Y-m-d', strtotime("$day -" . ($span - 1) . ' days'));
+// The leaderboard, the accounts table and an account's record always cover
+// the last $span days up to today; the Day picker moves only the day's log.
+// Tying both to one date made the leaderboard jump whenever a day was picked.
+$from = date('Y-m-d', strtotime("$today -" . ($span - 1) . ' days'));
 
 // Everyone with an account, plus the config admin, who has no stored record
 // until their first password change.
@@ -46,8 +49,8 @@ $kinds = [
 ];
 $kind = isset($kinds[(string) ($_GET['kind'] ?? '')]) ? (string) $_GET['kind'] : 'work';
 
-$events = activity_range($from, $day);
-$summary = activity_summary($events);
+$events = activity_range(min($from, $day), $today);
+$summary = activity_summary(array_filter($events, fn($x) => $x['day'] >= $from));
 $dayEvents = array_reverse(array_filter($events, fn($x) => $x['day'] === $day
     && ($who === '' || $x['who'] === $who)
     && match ($kind) {
@@ -70,7 +73,7 @@ $failedToday = count(array_filter($events, fn($x) => $x['day'] === $day && $x['t
 $cache = read_attendance_cache() ?? [];
 [$board, $unnamed] = activity_leaderboard(
     remap_legacy_days(is_array($cache['faculty'] ?? null) ? $cache['faculty'] : []),
-    remap_legacy_days(submitted('faculty')), $from, $day);
+    remap_legacy_days(submitted('faculty')), $from, $today);
 // A name that is also an account's links to that account's record.
 $accountOf = [];
 foreach ($users as $k => $u) $accountOf[activity_person((string) ($u['name'] ?? ''))] = $k;
@@ -141,13 +144,13 @@ page_head('Activity', 'page-wide');
         </select>
       </div>
       <div class="tt-pick">
-        <label for="act-day">Day</label>
+        <label for="act-day">Log for</label>
         <input id="act-day" type="date" name="day" value="<?= $e($day) ?>" max="<?= $today ?>" onchange="this.form.submit()">
       </div>
       <div class="tt-pick">
-        <label for="act-span">Accounts over</label>
+        <label for="act-span">Leaderboard over</label>
         <select id="act-span" name="span" onchange="this.form.submit()">
-          <?php foreach ([1 => 'That day', 7 => '7 days', 30 => '30 days', 90 => '90 days'] as $n => $l): ?>
+          <?php foreach ([1 => 'Today', 7 => 'Last 7 days', 30 => 'Last 30 days', 90 => 'Last 90 days'] as $n => $l): ?>
             <option value="<?= $n ?>"<?= $n === $span ? ' selected' : '' ?>><?= $l ?></option>
           <?php endforeach; ?>
         </select>
@@ -172,8 +175,90 @@ page_head('Activity', 'page-wide');
   </div>
 </section>
 
+<?php if ($who !== ''):
+    $u = $users[$who];
+    $s = $summary[$who] ?? null;
+    $lb = $boardOf[$who] ?? null;
+    $mine = array_filter($events, fn($x) => $x['who'] === $who && $x['day'] >= $from);
+    // Saves per day across the window, for the strip of bars.
+    $perDay = [];
+    for ($d = $from; $d <= $today; $d = date('Y-m-d', strtotime("$d +1 day"))) $perDay[$d] = 0;
+    $classes = [];
+    $places = [];
+    foreach ($mine as $x) {
+        if ($x['type'] === 'mark') {
+        }
+        if ($x['type'] !== 'signin_failed') {
+            $p = &$places[$x['device'] . '|' . $x['ip']];
+            $p ??= ['device' => $x['device'], 'ip' => $x['ip'], 'first' => $x['day'] . ' ' . $x['t'], 'last' => '', 'n' => 0];
+            $p['last'] = $x['day'] . ' ' . $x['t'];
+            $p['n']++;
+            unset($p);
+        }
+    }
+    foreach ($lb['per_day'] ?? [] as $d => $n) if (isset($perDay[$d])) $perDay[$d] = $n;
+    foreach ($lb['by_class'] ?? [] as $c => $n) $classes[$keyLabel($c)] = $n;
+    arsort($classes);
+    $peak = max([1, ...$perDay]);
+?>
 <section class="card">
-  <h2>Most active faculty, <?= $span === 1 ? $e(date('j M', strtotime($day))) : 'last ' . $span . ' days' ?> <span class="count-pill"><?= count($board) ?></span></h2>
+  <h2><?= $e($u['name'] ?? $who) ?> <span class="status status-<?= $e($u['status'] ?? 'pending') ?>"><?= $e($u['status'] ?? 'pending') ?></span><?php if (!empty($u['admin'])): ?> <span class="status status-admin">admin</span><?php endif; ?></h2>
+  <p class="field-help act-facts"><?= $e($who) ?> &middot; <?= $e(SCHOOLS[$u['school'] ?? '']['name'] ?? 'No school') ?>
+    <?php if (!empty($u['created'])): ?>&middot; account made <?= $e($u['created']) ?><?php endif; ?>
+    <?php if (!empty($u['seen'])): ?>&middot; last password sign-in <?= $e($u['seen']) ?><?php endif; ?></p>
+  <dl class="tt-stats act-person">
+    <div title="From the attendance itself, Form and app, as on the leaderboard"><dt>Lectures marked</dt><dd><?= $lb['lectures'] ?? 0 ?></dd></div>
+    <div><dt>Classes</dt><dd><?= $lb['classes'] ?? 0 ?></dd></div>
+    <div><dt>Days marking</dt><dd><?= $lb['days'] ?? 0 ?> <small>of <?= $span ?></small></dd></div>
+    <div title="Saves filed more than a day after the lecture"><dt>Filed late</dt><dd><?= $s['late'] ?? 0 ?></dd></div>
+    <div title="Saves that replaced a reading already there"><dt>Replaced</dt><dd><?= $s['overwrites'] ?? 0 ?></dd></div>
+    <div><dt>Pages opened</dt><dd><?= $s['views'] ?? 0 ?></dd></div>
+    <div><dt>Failed sign-ins</dt><dd><?= $s['failed'] ?? 0 ?></dd></div>
+  </dl>
+  <p class="field-help act-note">Lectures, classes and days are from the attendance itself, Form and app. Filed late, replaced, pages and sign-ins are from the activity log, which starts <?= $e(date('j M', strtotime($logFrom ?? $today))) ?>.</p>
+  <?php if ($span > 1): ?>
+  <h3 class="act-h3">Lectures marked each day, last <?= $span ?> days</h3>
+  <?php if (!array_sum($perDay)): ?>
+  <p class="field-help">No lectures marked under this name in the last <?= $span ?> days.</p>
+  <?php else: ?>
+  <?php // One bar a day, today on the right. Tapping one opens that day's log below; it never changes the leaderboard. ?>
+  <div class="act-chart">
+    <span class="act-peak"><?= $peak ?></span>
+    <div class="act-days" role="img" aria-label="Lectures marked each day, <?= $e($from) ?> to <?= $e($today) ?>, most in a day <?= $peak ?>">
+      <?php foreach ($perDay as $d => $n): ?>
+        <a href="<?= $e($link(['day' => $d])) ?>#act-log" class="act-day<?= $d === $day ? ' is-selected' : '' ?><?= $n ? '' : ' is-zero' ?>" title="<?= $e(date('D j M', strtotime($d)) . ": $n lecture" . ($n === 1 ? '' : 's') . '. Tap for that day\'s log.') ?>"><i style="height:<?= round(100 * $n / $peak) ?>%"></i></a>
+      <?php endforeach; ?>
+    </div>
+    <div class="act-axis"><span><?= $e(date('j M', strtotime($from))) ?></span><span><?= $e(date('j M', strtotime($from . ' +' . intdiv($span, 2) . ' days'))) ?></span><span>Today</span></div>
+  </div>
+  <?php endif; ?>
+  <?php endif; ?>
+  <div class="act-cols">
+    <div>
+      <h3 class="act-h3">Classes marked</h3>
+      <?php if (!$classes): ?><p class="field-help">None in this window.</p><?php else: ?>
+      <table class="stat-table stat-table-groups"><tbody>
+        <?php foreach ($classes as $c => $n): ?><tr><th scope="row"><?= $e($c) ?></th><td><?= $n ?></td></tr><?php endforeach; ?>
+      </tbody></table>
+      <?php endif; ?>
+    </div>
+    <div>
+      <h3 class="act-h3">Devices and addresses</h3>
+      <?php if (!$places): ?><p class="field-help">None in this window.</p><?php else: ?>
+      <table class="stat-table stat-table-groups">
+        <thead><tr><th scope="col">Device</th><th scope="col">Address</th><th scope="col">First</th><th scope="col">Last</th></tr></thead>
+        <tbody>
+        <?php foreach ($places as $p): ?><tr><th scope="row"><?= $e($p['device']) ?></th><td class="act-mono"><?= $e($p['ip']) ?></td><td><?= $e($ago($p['first'])) ?></td><td><?= $e($ago($p['last'])) ?></td></tr><?php endforeach; ?>
+        </tbody>
+      </table>
+      <?php endif; ?>
+    </div>
+  </div>
+</section>
+<?php endif; ?>
+
+<section class="card">
+  <h2>Most active faculty, <?= $span === 1 ? 'today' : 'last ' . $span . ' days' ?> <span class="count-pill"><?= count($board) ?></span></h2>
   <?php if (!$board): ?>
     <p class="field-help">Nobody's name is on any attendance in this window.</p>
   <?php else: ?>
@@ -224,81 +309,9 @@ page_head('Activity', 'page-wide');
   <p class="field-help">Counts every lecture with a name on it, from the Google Form's Faculty name and from saves in the app. A lecture filed both ways counts once, for the app. Names are matched ignoring titles and spacing, so "Dr. A Rao" and "a rao" are one person; a misspelt name counts as someone else.<?= $unnamed ? ' ' . $unnamed . ' lecture' . ($unnamed === 1 ? ' has' : 's have') . ' no name on it and count for nobody.' : '' ?></p>
 </section>
 
-<?php if ($who !== ''):
-    $u = $users[$who];
-    $s = $summary[$who] ?? null;
-    $lb = $boardOf[$who] ?? null;
-    $mine = array_filter($events, fn($x) => $x['who'] === $who);
-    // Saves per day across the window, for the strip of bars.
-    $perDay = [];
-    for ($d = $from; $d <= $day; $d = date('Y-m-d', strtotime("$d +1 day"))) $perDay[$d] = 0;
-    $classes = [];
-    $places = [];
-    foreach ($mine as $x) {
-        if ($x['type'] === 'mark') {
-        }
-        if ($x['type'] !== 'signin_failed') {
-            $p = &$places[$x['device'] . '|' . $x['ip']];
-            $p ??= ['device' => $x['device'], 'ip' => $x['ip'], 'first' => $x['day'] . ' ' . $x['t'], 'last' => '', 'n' => 0];
-            $p['last'] = $x['day'] . ' ' . $x['t'];
-            $p['n']++;
-            unset($p);
-        }
-    }
-    foreach ($lb['per_day'] ?? [] as $d => $n) if (isset($perDay[$d])) $perDay[$d] = $n;
-    foreach ($lb['by_class'] ?? [] as $c => $n) $classes[$keyLabel($c)] = $n;
-    arsort($classes);
-    $peak = max([1, ...$perDay]);
-?>
-<section class="card">
-  <h2><?= $e($u['name'] ?? $who) ?> <span class="status status-<?= $e($u['status'] ?? 'pending') ?>"><?= $e($u['status'] ?? 'pending') ?></span><?php if (!empty($u['admin'])): ?> <span class="status status-admin">admin</span><?php endif; ?></h2>
-  <p class="field-help act-facts"><?= $e($who) ?> &middot; <?= $e(SCHOOLS[$u['school'] ?? '']['name'] ?? 'No school') ?>
-    <?php if (!empty($u['created'])): ?>&middot; account made <?= $e($u['created']) ?><?php endif; ?>
-    <?php if (!empty($u['seen'])): ?>&middot; last password sign-in <?= $e($u['seen']) ?><?php endif; ?></p>
-  <dl class="tt-stats act-person">
-    <div title="From the attendance itself, Form and app, as on the leaderboard"><dt>Lectures marked</dt><dd><?= $lb['lectures'] ?? 0 ?></dd></div>
-    <div><dt>Classes</dt><dd><?= $lb['classes'] ?? 0 ?></dd></div>
-    <div><dt>Days marking</dt><dd><?= $lb['days'] ?? 0 ?> <small>of <?= $span ?></small></dd></div>
-    <div title="Saves filed more than a day after the lecture"><dt>Filed late</dt><dd><?= $s['late'] ?? 0 ?></dd></div>
-    <div title="Saves that replaced a reading already there"><dt>Replaced</dt><dd><?= $s['overwrites'] ?? 0 ?></dd></div>
-    <div><dt>Pages opened</dt><dd><?= $s['views'] ?? 0 ?></dd></div>
-    <div><dt>Failed sign-ins</dt><dd><?= $s['failed'] ?? 0 ?></dd></div>
-  </dl>
-  <p class="field-help act-note">Lectures, classes and days are from the attendance itself, Form and app. Filed late, replaced, pages and sign-ins are from the activity log, which starts <?= $e(date('j M', strtotime($logFrom ?? $today))) ?>.</p>
-  <?php if ($span > 1): ?>
-  <h3 class="act-h3">Lectures marked per day</h3>
-  <div class="act-days" role="img" aria-label="Lectures marked per day, <?= $e($from) ?> to <?= $e($day) ?>">
-    <?php foreach ($perDay as $d => $n): ?>
-      <a href="<?= $e($link(['day' => $d])) ?>" class="act-day<?= $d === $day ? ' is-selected' : '' ?><?= $n ? '' : ' is-zero' ?>" title="<?= $e(date('D j M', strtotime($d)) . ": $n lecture" . ($n === 1 ? '' : 's')) ?>"><i style="height:<?= round(100 * $n / $peak) ?>%"></i></a>
-    <?php endforeach; ?>
-  </div>
-  <?php endif; ?>
-  <div class="act-cols">
-    <div>
-      <h3 class="act-h3">Classes marked</h3>
-      <?php if (!$classes): ?><p class="field-help">None in this window.</p><?php else: ?>
-      <table class="stat-table stat-table-groups"><tbody>
-        <?php foreach ($classes as $c => $n): ?><tr><th scope="row"><?= $e($c) ?></th><td><?= $n ?></td></tr><?php endforeach; ?>
-      </tbody></table>
-      <?php endif; ?>
-    </div>
-    <div>
-      <h3 class="act-h3">Devices and addresses</h3>
-      <?php if (!$places): ?><p class="field-help">None in this window.</p><?php else: ?>
-      <table class="stat-table stat-table-groups">
-        <thead><tr><th scope="col">Device</th><th scope="col">Address</th><th scope="col">First</th><th scope="col">Last</th></tr></thead>
-        <tbody>
-        <?php foreach ($places as $p): ?><tr><th scope="row"><?= $e($p['device']) ?></th><td class="act-mono"><?= $e($p['ip']) ?></td><td><?= $e($ago($p['first'])) ?></td><td><?= $e($ago($p['last'])) ?></td></tr><?php endforeach; ?>
-        </tbody>
-      </table>
-      <?php endif; ?>
-    </div>
-  </div>
-</section>
-<?php endif; ?>
 
-<section class="card">
-  <h2><?= $e($day === $today ? 'Today' : date('l j M', strtotime($day))) ?><?= $who !== '' ? ', ' . $e($nameOf($who)) : '' ?> <span class="count-pill"><?= count($dayEvents) ?></span></h2>
+<section class="card" id="act-log">
+  <h2><?= $day === $today ? 'Log for today' : 'Log for ' . $e(date('l j M', strtotime($day))) ?><?= $who !== '' ? ', ' . $e($nameOf($who)) : '' ?> <span class="count-pill"><?= count($dayEvents) ?></span></h2>
   <?php if (!$dayEvents): ?>
     <p class="field-help">Nothing logged<?= $kind !== 'all' ? ' of this kind' : '' ?> on this day.</p>
   <?php else: ?>
@@ -323,7 +336,7 @@ page_head('Activity', 'page-wide');
 </section>
 
 <section class="card">
-  <h2>Accounts, <?= $span === 1 ? $e(date('j M', strtotime($day))) : 'last ' . $span . ' days' ?></h2>
+  <h2>Accounts, <?= $span === 1 ? 'today' : 'last ' . $span . ' days' ?></h2>
   <div class="stat-table-wrap">
     <table class="stat-table act-accounts">
       <thead>
@@ -368,7 +381,7 @@ page_head('Activity', 'page-wide');
     </table>
   </div>
   <?php if ($quiet): ?>
-  <p class="field-help"><b><?= count($quiet) ?> active faculty account<?= count($quiet) === 1 ? ' has' : 's have' ?> not saved any attendance <?= $span === 1 ? 'that day' : "in the last $span days" ?>:</b>
+  <p class="field-help"><b><?= count($quiet) ?> active faculty account<?= count($quiet) === 1 ? ' has' : 's have' ?> not saved any attendance <?= $span === 1 ? 'today' : "in the last $span days" ?>:</b>
     <?= $e(implode(', ', array_map(fn($u) => $u['name'] ?? '', $quiet))) ?>.</p>
   <?php endif; ?>
   <p class="field-help">Lectures, classes and days come from the attendance itself, so they go back as far as it does. Late, replaced, pages, sign-ins, devices and addresses come from the activity log, recorded from <?= $e(date('j M Y', strtotime($logFrom ?? $today))) ?> and kept for <?= ACTIVITY_KEEP_DAYS ?> days.</p>
