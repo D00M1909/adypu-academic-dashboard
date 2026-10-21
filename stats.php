@@ -24,6 +24,7 @@ $form = remap_legacy_days(is_array($cache['days'] ?? null) ? $cache['days'] : []
 $app = remap_legacy_days(submitted('days'));
 $merged = merge_readings($form, $app);
 $faculty = get_attendance_faculty();
+$appFaculty = remap_legacy_days(submitted('faculty'));
 $traffic = traffic_days();
 
 $schoolKeys = array_flip(array_map('class_key', class_rows()));
@@ -40,18 +41,28 @@ foreach ($dates as $d) {
     $t = $traffic[$d] ?? [];
     $views = $t['views'] ?? [];
     $classes = $merged[$d] ?? [];
-    $names = [];
-    $dayFaculty = $faculty[$d] ?? [];
-    array_walk_recursive($dayFaculty, function ($n) use (&$names) { $names[strtolower(trim($n))] = true; });
+    // One person per name, titles and spacing aside (activity_person()), so
+    // "Dr. A Rao" on the Form and "a rao" in the app are one faculty member.
+    $people = function (array $byClass): int {
+        $names = [];
+        foreach ($byClass as $times) foreach ((array) $times as $n) $names[activity_person((string) $n)] = true;
+        unset($names['']);
+        return count($names);
+    };
+    $all = $readings($classes);
+    $inApp = $readings($app[$d] ?? []);
     $rows[$d] = [
         'visitors' => (int) ($t['visitors'] ?? 0),
         'views'    => array_sum($views) - (int) ($views['push'] ?? 0),
         'pushes'   => (int) ($views['push'] ?? 0),
-        'form'     => $readings($form[$d] ?? []),
-        'app'      => $readings($app[$d] ?? []),
+        // Form and app add up to the day's lectures: one filed both ways
+        // counts once, for the app, as on the dashboard.
+        'form'     => $all - $inApp,
+        'app'      => $inApp,
         'schools'  => count(array_intersect_key($classes, $schoolKeys)),
         'partners' => count(array_intersect_key($classes, $partnerKeys)),
-        'faculty'  => count($names),
+        'faculty'  => $people($faculty[$d] ?? []),
+        'teachers' => $people($appFaculty[$d] ?? []),
     ];
 }
 
@@ -76,6 +87,8 @@ foreach ([[class_rows(), 'Schools'], [partner_rows(), 'Knowledge partners']] as 
 $push = is_array($cache['push'] ?? null) ? $cache['push'] : [];
 $pushedAt = $push['at'] ?? (is_file(ATTENDANCE_CACHE_FILE) ? date('Y-m-d H:i:s', filemtime(ATTENDANCE_CACHE_FILE)) : '');
 $pushAge = $pushedAt !== '' ? time() - strtotime($pushedAt) : null;
+// Form rows the last push could not match to a class (a stale dropdown option).
+$dropped = array_sum(array_map('intval', (array) ($push['skipped'] ?? [])));
 
 $firstCounted = $traffic ? array_key_first($traffic) : null;
 $fmtDay = fn(string $d): string => $d === $today ? 'Today' : date('D j M', strtotime($d));
@@ -97,8 +110,13 @@ $now = $rows[$today];
     <div class="stat"><span class="stat-value"><?= $now['schools'] ?><small>/<?= count($schoolKeys) ?></small></span><span class="stat-label">Classes reported</span></div>
   </div>
   <p class="field-help">
-    <?php if ($pushedAt !== ''): ?>Last Form push <?= $e(date('j M, H:i', strtotime($pushedAt))) ?><?php if (isset($push['rows'])): ?>, <?= (int) $push['rows'] ?> rows<?php endif; ?>.<?php else: ?>No Form push has landed yet.<?php endif; ?>
+    <?php if ($pushedAt !== ''): ?>Last Form push <?= $e(date('j M, H:i', strtotime($pushedAt))) ?><?php if (isset($push['rows'])): ?>, <?= (int) $push['rows'] ?> rows<?php endif; ?><?php if ($dropped): ?>, <b><?= $dropped ?> dropped</b> for naming no known class<?php endif; ?>.<?php else: ?>No Form push has landed yet.<?php endif; ?>
     <?= $now['partners'] ?> partner classes reported, <?= $now['faculty'] ?> faculty named.
+  </p>
+  <p class="field-help">
+    <?php $total = $now['form'] + $now['app']; ?>
+    <?= $now['app'] ?> marked in the app<?= $total ? ' (' . round(100 * $now['app'] / $total) . '%)' : '' ?>,
+    <?= $now['teachers'] ?> teacher<?= $now['teachers'] === 1 ? '' : 's' ?> used the app today. <a href="activity.php">Who, on Activity.</a>
   </p>
 </section>
 
@@ -111,7 +129,8 @@ $now = $rows[$today];
           <th scope="col">Day</th>
           <th scope="col">Visitors</th>
           <th scope="col">Views</th>
-          <th scope="col" title="Form + app">Updates</th>
+          <th scope="col" title="Lectures marked through the Google Form">Form</th>
+          <th scope="col" title="Lectures marked in the app; one filed both ways counts here">App</th>
           <th scope="col">Classes</th>
           <th scope="col">Faculty</th>
         </tr>
@@ -122,7 +141,8 @@ $now = $rows[$today];
             <th scope="row"><a href="stats.php?date=<?= $e($d) ?>"><?= $e($fmtDay($d)) ?></a></th>
             <td><?= $r['visitors'] ?: '<span class="stat-nil">0</span>' ?></td>
             <td><?= $r['views'] ?: '<span class="stat-nil">0</span>' ?></td>
-            <td title="<?= $r['form'] ?> from the Form, <?= $r['app'] ?> from the app"><?= ($r['form'] + $r['app']) ?: '<span class="stat-nil">0</span>' ?></td>
+            <td><?= $r['form'] ?: '<span class="stat-nil">0</span>' ?></td>
+            <td><?= $r['app'] ?: '<span class="stat-nil">0</span>' ?></td>
             <td><?= $r['schools'] ?: '<span class="stat-nil">0</span>' ?><?php if ($r['partners']): ?> <span class="stat-sub">+<?= $r['partners'] ?> kp</span><?php endif; ?></td>
             <td><?= $r['faculty'] ?: '<span class="stat-nil">0</span>' ?></td>
           </tr>
@@ -138,6 +158,25 @@ $now = $rows[$today];
   </p>
 </section>
 
+
+<?php foreach ($groups as $section => $list): ?>
+<section class="card">
+  <h2><?= $e($section) ?>, <?= $e($day === $today ? 'today' : date('j M', strtotime($day))) ?></h2>
+  <table class="stat-table stat-table-groups">
+    <thead><tr><th scope="col"><?= $section === 'Schools' ? 'School' : 'Partner' ?></th><th scope="col">Classes reported</th><th scope="col">Reported</th><th scope="col">Updates</th></tr></thead>
+    <tbody>
+      <?php foreach ($list as $id => $g): ?>
+        <tr>
+          <th scope="row"><?= $e(preg_replace('/^School of /', '', group_name($id))) ?></th>
+          <td><?= $g['reported'] ?> <span class="stat-sub">of <?= $g['classes'] ?></span></td>
+          <td><?= $g['classes'] ? round(100 * $g['reported'] / $g['classes']) . '%' : '<span class="stat-nil">-</span>' ?></td>
+          <td><?= $g['readings'] ?: '<span class="stat-nil">0</span>' ?></td>
+        </tr>
+      <?php endforeach; ?>
+    </tbody>
+  </table>
+</section>
+<?php endforeach; ?>
 <section class="card">
   <h2>Footer clicks, <?= $e($day === $today ? 'today' : date('j M', strtotime($day))) ?></h2>
   <table class="stat-table stat-table-groups">
@@ -157,22 +196,4 @@ $now = $rows[$today];
   </table>
   <p class="field-help">Browsers are distinct browsers that clicked the link that day, so ten clicks from one person read as 10 clicks, 1 browser.</p>
 </section>
-
-<?php foreach ($groups as $section => $list): ?>
-<section class="card">
-  <h2><?= $e($section) ?>, <?= $e($day === $today ? 'today' : date('j M', strtotime($day))) ?></h2>
-  <table class="stat-table stat-table-groups">
-    <thead><tr><th scope="col"><?= $section === 'Schools' ? 'School' : 'Partner' ?></th><th scope="col">Classes reported</th><th scope="col">Updates</th></tr></thead>
-    <tbody>
-      <?php foreach ($list as $id => $g): ?>
-        <tr>
-          <th scope="row"><?= $e(preg_replace('/^School of /', '', group_name($id))) ?></th>
-          <td><?= $g['reported'] ?> <span class="stat-sub">of <?= $g['classes'] ?></span></td>
-          <td><?= $g['readings'] ?: '<span class="stat-nil">0</span>' ?></td>
-        </tr>
-      <?php endforeach; ?>
-    </tbody>
-  </table>
-</section>
-<?php endforeach; ?>
 <?php page_foot(); ?>
