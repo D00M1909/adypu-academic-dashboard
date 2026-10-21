@@ -1869,3 +1869,4 @@ button.tt-entry + button.tt-entry { margin-top: 6px; border-top-left-radius: 0; 
 .stat-head h2 { margin-bottom: 0; }
 .stat-span select { width: auto; min-height: 0; padding-top: 6px; padding-bottom: 6px; font-size: 14px; }
 .stat-head + .stat-table-wrap { margin-top: 10px; }
+.act-log tr.act-form .act-type { color: var(--lab-ink); }

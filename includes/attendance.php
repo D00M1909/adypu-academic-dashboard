@@ -292,6 +292,15 @@ function parse_attendance_csv(string $csv, ?array &$skipped = null): array {
             // at all, which is how every row before Aug 2026 behaves.
             'time'    => row_slot($header, $fields),
         ];
+        // When the row was submitted and, if the Form collects it, by which
+        // address: for the Form log on the Activity page (form_log()), never
+        // for a count. The sheet's own Timestamp, in the Form's time zone.
+        $stamp = first_value($header, $fields, 'timestamp');
+        $on = row_date($stamp);
+        $rows[count($rows) - 1] += [
+            'submitted' => $on !== null && row_time($stamp) !== '' ? "$on " . row_time($stamp) : ($on ?? ''),
+            'email' => strtolower(first_value($header, $fields, 'email')),
+        ];
     }
     return $rows;
 }
@@ -367,6 +376,24 @@ function faculty_map(array $rows): array {
     }
     ksort($names);
     return $names;
+}
+
+// The Form's own log, one entry per row in sheet order: who submitted it,
+// when, for which class and lecture, and the count. api/ingest.php writes it
+// to data/formlog.php on every push (a full replace, like the cache), and the
+// Activity page lists it beside the app's saves. Private, unlike the cache: it
+// ties a name to a time and a class, row by row.
+function form_log(array $rows): array {
+    return array_map(fn($r) => [
+        'at' => (string) ($r['submitted'] ?? ''),
+        'name' => trim((string) ($r['faculty'] ?? '')),
+        'email' => (string) ($r['email'] ?? ''),
+        'class' => class_label($r['school'], $r['year'], $r['branch'], $r['division']),
+        'date' => $r['date'],
+        'time' => (string) ($r['time'] ?? ''),
+        'present' => (int) $r['present'],
+        'strength' => (int) ($r['strength'] ?? 0),
+    ], $rows);
 }
 
 // Which dates a request actually covers. A missing end defaults to the newest

@@ -42,7 +42,8 @@ if ($who !== '' && !isset($users[$who])) $who = '';
 $kinds = [
     'work' => 'Everything but page views',
     'all' => 'Everything',
-    'mark' => 'Attendance saves',
+    'mark' => 'Attendance, app and Form',
+    'form' => 'Google Form entries',
     'sign' => 'Sign-ins and sign-outs',
     'signin_failed' => 'Failed sign-ins',
     'admin' => 'Admin actions',
@@ -51,15 +52,16 @@ $kind = isset($kinds[(string) ($_GET['kind'] ?? '')]) ? (string) $_GET['kind'] :
 
 $events = activity_range(min($from, $day), $today);
 $summary = activity_summary(array_filter($events, fn($x) => $x['day'] >= $from));
-$dayEvents = array_reverse(array_filter($events, fn($x) => $x['day'] === $day
-    && ($who === '' || $x['who'] === $who)
+// Which of the day's events the log lists, for the account and Show picked.
+$keep = fn(array $x): bool => ($who === '' || $x['who'] === $who)
     && match ($kind) {
         'all' => true,
         'work' => $x['type'] !== 'view',
-        'mark' => in_array($x['type'], ['mark', 'mark_failed'], true),
+        'mark' => in_array($x['type'], ['mark', 'mark_failed', 'form'], true),
         'sign' => in_array($x['type'], ['signin', 'resume', 'signout', 'signup', 'password'], true),
         default => $x['type'] === $kind,
-    }));
+    };
+$dayEvents = array_filter($events, fn($x) => $x['day'] === $day && $keep($x));
 $daySummary = activity_summary(array_filter($events, fn($x) => $x['day'] === $day));
 $failedToday = count(array_filter($events, fn($x) => $x['day'] === $day && $x['type'] === 'signin_failed'));
 
@@ -90,6 +92,11 @@ $quiet = array_filter($users, fn($u, $k) => ($u['status'] ?? '') === 'active' &&
 // "eng|2nd Year|CSE|A" as "2nd Year / CSE / A": the school is on the card already.
 $keyLabel = fn(string $k): string => implode(' / ', array_filter(array_slice(explode('|', $k), 1), 'strlen'));
 $logFrom = activity_first_day();
+// The day's Google Form entries join the app's events in the one log, newest
+// first, from the row-by-row record each push now leaves (form_log()).
+$formDay = activity_form_day($day, $users, $accountOf);
+$dayEvents = array_merge($dayEvents, array_filter($formDay, $keep));
+usort($dayEvents, fn($a, $b) => $b['t'] <=> $a['t']);
 
 $nameOf = fn(string $k): string => (string) ($users[$k]['name'] ?? $k);
 $short = fn(string $label): string => preg_replace('/^(School of [^\/]+|[^\/]+) \/ /', '', $label);
@@ -125,6 +132,9 @@ $describe = function (array $x) use ($short, $lag, $nameOf): string {
         'password' => !empty($d['ok']) ? 'Changed' : 'Refused: ' . ($d['why'] ?? ''),
         'admin' => ucfirst($d['action'] ?? '') . ' ' . (isset(SCHOOLS[$d['target'] ?? '']) ? SCHOOLS[$d['target']]['name'] . ' join code' : $nameOf((string) ($d['target'] ?? '')) . ' (' . ($d['target'] ?? '') . ')'),
         'view' => ($d['url'] ?? $d['page'] ?? ''),
+        'form' => $short($d['class'] ?? '') . ', ' . date('j M', strtotime($d['date'] ?? $x['day'])) . ($d['time'] !== '' ? ' ' . $d['time'] : '')
+            . ': ' . $d['present'] . ($d['strength'] ? '/' . $d['strength'] : '') . ' present'
+            . (isset($d['lag']) ? ', submitted ' . $lag((int) $d['lag']) : ''),
         default => '',
     };
 };
@@ -169,7 +179,7 @@ page_head('Activity', 'page-wide');
 
   <div class="stat-grid act-stats">
     <div class="stat"><span class="stat-value"><?= count($daySummary) ?></span><span class="stat-label">Accounts active <?= $day === $today ? 'today' : 'that day' ?></span></div>
-    <div class="stat"><span class="stat-value"><?= array_sum(array_column($daySummary, 'marks')) ?></span><span class="stat-label">Attendance saves</span></div>
+    <div class="stat"><span class="stat-value"><?= array_sum(array_column($daySummary, 'marks')) ?> <small>+ <?= count($formDay) ?></small></span><span class="stat-label">Saves in the app + Form entries</span></div>
     <div class="stat"><span class="stat-value"><?= array_sum(array_column($daySummary, 'overwrites')) ?></span><span class="stat-label">Saves that replaced one</span></div>
     <div class="stat"><span class="stat-value"><?= $failedToday ?></span><span class="stat-label">Failed sign-ins</span></div>
   </div>
@@ -322,7 +332,7 @@ page_head('Activity', 'page-wide');
       <?php foreach ($dayEvents as $x): ?>
         <tr class="act-<?= $e($x['type']) ?>">
           <th scope="row" class="act-mono"><?= $e($x['t']) ?></th>
-          <td><?php if (isset($users[$x['who']])): ?><a href="<?= $e($link(['who' => $x['who']])) ?>"><?= $e($nameOf($x['who'])) ?></a><?php else: ?><span class="stat-sub"><?= $e($x['who'] ?: 'nobody') ?></span><?php endif; ?></td>
+          <td><?php if (isset($users[$x['who']])): ?><a href="<?= $e($link(['who' => $x['who']])) ?>"><?= $e($nameOf($x['who'])) ?></a><?php else: ?><?php if ($x['type'] === 'form' && ($x['name'] ?? '') !== ''): ?><?= $e($x['name']) ?> <span class="stat-sub">no account</span><?php else: ?><span class="stat-sub"><?= $e($x['who'] ?: 'nobody') ?></span><?php endif; ?><?php endif; ?></td>
           <td><span class="act-type"><?= $e(ACTIVITY_TYPES[$x['type']] ?? $x['type']) ?></span></td>
           <td class="act-detail"><?= $e($describe($x)) ?></td>
           <td title="<?= $e($x['ua'] ?? '') ?>"><?= $e($x['device'] ?? '') ?></td>

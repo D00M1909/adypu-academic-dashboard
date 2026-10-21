@@ -75,6 +75,13 @@ if (@file_put_contents($tmp, json_encode($payload)) === false || !@rename($tmp, 
     @unlink($tmp);
     fail(500, 'could not write the cache file — check that cache/ is writable');
 }
+// The row-by-row log for the Activity page, in data/ behind the guard line
+// rather than in the public cache. A failure here costs the log, never the push.
+require_once __DIR__ . '/../includes/store.php';
+try {
+    store_update('formlog', fn() => ['at' => date('Y-m-d H:i:s'), 'rows' => form_log($rows)]);
+} catch (Throwable $e) {
+}
 traffic_hit('push');
 
 // Reported over the default view's range (the newest day with data), which is

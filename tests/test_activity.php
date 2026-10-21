@@ -72,4 +72,26 @@ assert($rows[0]['school'] === 'law' && $rows[0]['last'] === '2026-10-21');
 assert($rows[1]['lectures'] === 2 && $rows[1]['app'] === 1 && $rows[1]['form'] === 1);
 assert($unnamed === 1, 'a lecture with no name counts for nobody, and is counted as such');
 
+// --- The Google Form log -------------------------------------------------------
+// Each pushed row keeps who submitted it and when, for the Activity page: the
+// sheet's Timestamp (not the class's date), the Form's email if it collects
+// one, and the strength from the structure. Matched to an account by email
+// first, then by name; an unknown name still shows, under itself.
+require_once __DIR__ . '/../includes/attendance.php';
+require_once __DIR__ . '/../includes/structure.php';
+$csv = "Timestamp,Email address,Date,Time,Faculty name,Class,Present\n"
+    . "21/10/2026 09:52:10,ASHA@adypu.edu.in,21/10/2026,09:00,Dr. Asha Rao,School of Engineering / 1st Year / Core / A,50\n"
+    . "21/10/2026 14:30:00,,20/10/2026,13:00,Ben Das,School of Engineering / 1st Year / Core / B,40\n"
+    . "20/10/2026 16:00:00,,20/10/2026,15:00,Ravi K,School of Engineering / 1st Year / Core / A,30\n";
+$log = form_log(parse_attendance_csv($csv));
+assert(count($log) === 3 && $log[0]['at'] === '2026-10-21 09:52' && $log[0]['email'] === 'asha@adypu.edu.in' && $log[0]['strength'] > 0, json_encode($log[0]));
+assert($log[1]['at'] === '2026-10-21 14:30' && $log[1]['date'] === '2026-10-20', 'submitted a day after the class met');
+store_update('formlog', fn() => ['rows' => $log]);
+$users = ['asha@adypu.edu.in' => ['name' => 'Asha Rao'], 'ben@adypu.edu.in' => ['name' => 'Ben Das']];
+$form = activity_form_day('2026-10-21', $users, ['asha rao' => 'asha@adypu.edu.in', 'ben das' => 'ben@adypu.edu.in']);
+assert(array_column($form, 'who') === ['asha@adypu.edu.in', 'ben@adypu.edu.in'], json_encode($form));
+assert($form[0]['type'] === 'form' && $form[0]['t'] === '09:52:00' && $form[0]['d']['lag'] === 52 && $form[1]['d']['lag'] === 25 * 60 + 30);
+$form = activity_form_day('2026-10-20', [], []);
+assert(count($form) === 1 && $form[0]['who'] === '' && $form[0]['name'] === 'Ravi K', 'no account: listed under the name');
+
 echo "OK\n";
