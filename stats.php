@@ -178,12 +178,14 @@ $now = $rows[$today];
       </tbody>
     </table>
   </div>
-  <p class="field-help">
-    Visitors are distinct browsers in a day; views are pages opened, not counting
-    the Form pushes (<?= $now['pushes'] ?> today) or the stylesheet and scripts the host's own
-    hit counter includes. Form and App count every entry submitted that day,
-    re-submissions and corrections included. <?= $firstCounted ? 'Traffic counted since ' . $e(date('j M Y', strtotime($firstCounted))) . '.' : 'Traffic counting starts with the next visit.' ?>
+  <p class="field-help stat-key">
+    <span><strong>Visitors</strong> different browsers that day</span>
+    <span><strong>Views</strong> pages opened, Form pushes not included</span>
+    <span><strong>Form, App</strong> entries filed, re-submissions included</span>
+    <span><strong>Classes</strong> school classes that reported</span>
+    <span><strong>Faculty</strong> people named on entries</span>
   </p>
+  <p class="field-help"><?= $firstCounted ? 'Counting since ' . $e(date('j M Y', strtotime($firstCounted))) . '.' : 'Counting starts with the next visit.' ?></p>
 </section>
 
 
