@@ -171,3 +171,14 @@ function page_notice(string $kind, string $text): void {
     printf('<p class="notice notice-%s"><svg aria-hidden="true"><use href="#icon-%s"/></svg><span>%s</span></p>',
         htmlspecialchars($kind), $icon, htmlspecialchars($text));
 }
+
+// The two admin pages as tabs, so they read as one place: Usage for how much
+// the app is used, Activity for who did what.
+function admin_tabs(string $current): void {
+    $tabs = ['usage' => ['stats.php', 'Usage'], 'activity' => ['activity.php', 'Activity']];
+    echo '<nav class="tt-seg admin-tabs no-print" aria-label="Admin">';
+    foreach ($tabs as $k => [$href, $label]) {
+        printf('<a href="%s"%s>%s</a>', $href, $k === $current ? ' aria-current="page"' : '', $label);
+    }
+    echo '</nav>';
+}
