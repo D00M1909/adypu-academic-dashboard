@@ -5,9 +5,10 @@
 // replaced, failed sign-ins, admin actions, and which accounts have not marked
 // anything at all.
 //
-// Four parts: a leaderboard of who files the most attendance, Form and app
-// together; every account over the last N days; one day's events, newest
-// first; and, with an account picked, that account's own record.
+// In this order, under the filters: the picked account's own record (when one
+// is picked); one day's events, app and Google Form, newest first; a
+// leaderboard of who files the most attendance, Form and app together; and
+// every account over the last N days.
 
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/page.php';
@@ -267,6 +268,31 @@ page_head('Activity', 'page-wide');
 </section>
 <?php endif; ?>
 
+<section class="card" id="act-log">
+  <h2><?= $day === $today ? 'Log for today' : 'Log for ' . $e(date('l j M', strtotime($day))) ?><?= $who !== '' ? ', ' . $e($nameOf($who)) : '' ?> <span class="count-pill"><?= count($dayEvents) ?></span></h2>
+  <?php if (!$dayEvents): ?>
+    <p class="field-help">Nothing logged<?= $kind !== 'all' ? ' of this kind' : '' ?> on this day.</p>
+  <?php else: ?>
+  <div class="stat-table-wrap">
+    <table class="stat-table act-log">
+      <thead><tr><th scope="col">Time</th><th scope="col">Account</th><th scope="col">What</th><th scope="col">Details</th><th scope="col">Device</th><th scope="col">Address</th></tr></thead>
+      <tbody>
+      <?php foreach ($dayEvents as $x): ?>
+        <tr class="act-<?= $e($x['type']) ?>">
+          <th scope="row" class="act-mono"><?= $e($x['t']) ?></th>
+          <td><?php if (isset($users[$x['who']])): ?><a href="<?= $e($link(['who' => $x['who']])) ?>"><?= $e($nameOf($x['who'])) ?></a><?php else: ?><?php if ($x['type'] === 'form' && ($x['name'] ?? '') !== ''): ?><?= $e($x['name']) ?> <span class="stat-sub">no account</span><?php else: ?><span class="stat-sub"><?= $e($x['who'] ?: 'nobody') ?></span><?php endif; ?><?php endif; ?></td>
+          <td><span class="act-type"><?= $e(ACTIVITY_TYPES[$x['type']] ?? $x['type']) ?></span></td>
+          <td class="act-detail"><?= $e($describe($x)) ?></td>
+          <td title="<?= $e($x['ua'] ?? '') ?>"><?= $e($x['device'] ?? '') ?></td>
+          <td class="act-mono" title="<?= $e(isset($x['fwd']) ? 'Forwarded for ' . $x['fwd'] : '') ?>"><?= $e($x['ip'] ?? '') ?></td>
+        </tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+  </div>
+  <?php endif; ?>
+</section>
+
 <section class="card">
   <h2>Most active faculty, <?= $span === 1 ? 'today' : 'last ' . $span . ' days' ?> <span class="count-pill"><?= count($board) ?></span></h2>
   <?php if (!$board): ?>
@@ -319,31 +345,6 @@ page_head('Activity', 'page-wide');
   <p class="field-help">Counts every lecture with a name on it, from the Google Form's Faculty name and from saves in the app. A lecture filed both ways counts once, for the app. Names are matched ignoring titles and spacing, so "Dr. A Rao" and "a rao" are one person; a misspelt name counts as someone else.<?= $unnamed ? ' ' . $unnamed . ' lecture' . ($unnamed === 1 ? ' has' : 's have') . ' no name on it and count for nobody.' : '' ?></p>
 </section>
 
-
-<section class="card" id="act-log">
-  <h2><?= $day === $today ? 'Log for today' : 'Log for ' . $e(date('l j M', strtotime($day))) ?><?= $who !== '' ? ', ' . $e($nameOf($who)) : '' ?> <span class="count-pill"><?= count($dayEvents) ?></span></h2>
-  <?php if (!$dayEvents): ?>
-    <p class="field-help">Nothing logged<?= $kind !== 'all' ? ' of this kind' : '' ?> on this day.</p>
-  <?php else: ?>
-  <div class="stat-table-wrap">
-    <table class="stat-table act-log">
-      <thead><tr><th scope="col">Time</th><th scope="col">Account</th><th scope="col">What</th><th scope="col">Details</th><th scope="col">Device</th><th scope="col">Address</th></tr></thead>
-      <tbody>
-      <?php foreach ($dayEvents as $x): ?>
-        <tr class="act-<?= $e($x['type']) ?>">
-          <th scope="row" class="act-mono"><?= $e($x['t']) ?></th>
-          <td><?php if (isset($users[$x['who']])): ?><a href="<?= $e($link(['who' => $x['who']])) ?>"><?= $e($nameOf($x['who'])) ?></a><?php else: ?><?php if ($x['type'] === 'form' && ($x['name'] ?? '') !== ''): ?><?= $e($x['name']) ?> <span class="stat-sub">no account</span><?php else: ?><span class="stat-sub"><?= $e($x['who'] ?: 'nobody') ?></span><?php endif; ?><?php endif; ?></td>
-          <td><span class="act-type"><?= $e(ACTIVITY_TYPES[$x['type']] ?? $x['type']) ?></span></td>
-          <td class="act-detail"><?= $e($describe($x)) ?></td>
-          <td title="<?= $e($x['ua'] ?? '') ?>"><?= $e($x['device'] ?? '') ?></td>
-          <td class="act-mono" title="<?= $e(isset($x['fwd']) ? 'Forwarded for ' . $x['fwd'] : '') ?>"><?= $e($x['ip'] ?? '') ?></td>
-        </tr>
-      <?php endforeach; ?>
-      </tbody>
-    </table>
-  </div>
-  <?php endif; ?>
-</section>
 
 <section class="card">
   <h2>Accounts, <?= $span === 1 ? 'today' : 'last ' . $span . ' days' ?></h2>
