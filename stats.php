@@ -40,6 +40,23 @@ $today = date('Y-m-d');
 $dates = [];
 for ($i = 0; $i < $span; $i++) $dates[] = date('Y-m-d', strtotime("-$i day"));
 
+// Every entry, not every lecture: a Form row re-submitted or filed today for
+// yesterday's class counts today, once per submission (the user's call, 21
+// Oct 2026: the bigger number, the same one Activity shows). Form rows by the
+// day the sheet's Timestamp says, from the log each push writes (form_log());
+// app saves by the day they were made, from the activity log. Before that log
+// began, a day's app entries are its app readings, the closest there is.
+$formEntries = [];
+foreach ((array) (store_read('formlog')['rows'] ?? []) as $r) {
+    $on = substr((string) ($r['at'] ?? ''), 0, 10);
+    if ($on !== '') $formEntries[$on] = ($formEntries[$on] ?? 0) + 1;
+}
+$logFrom = activity_first_day();
+$appEntries = [];
+foreach ($logFrom === null ? [] : activity_range(max($logFrom, end($dates)), $today) as $x) {
+    if ($x['type'] === 'mark') $appEntries[$x['day']] = ($appEntries[$x['day']] ?? 0) + 1;
+}
+
 $rows = [];
 foreach ($dates as $d) {
     $t = $traffic[$d] ?? [];
@@ -53,16 +70,13 @@ foreach ($dates as $d) {
         unset($names['']);
         return count($names);
     };
-    $all = $readings($classes);
     $inApp = $readings($app[$d] ?? []);
     $rows[$d] = [
         'visitors' => (int) ($t['visitors'] ?? 0),
         'views'    => array_sum($views) - (int) ($views['push'] ?? 0),
         'pushes'   => (int) ($views['push'] ?? 0),
-        // Form and app add up to the day's lectures: one filed both ways
-        // counts once, for the app, as on the dashboard.
-        'form'     => $all - $inApp,
-        'app'      => $inApp,
+        'form'     => $formEntries[$d] ?? 0,
+        'app'      => $logFrom !== null && $d >= $logFrom ? ($appEntries[$d] ?? 0) : $inApp,
         'schools'  => count(array_intersect_key($classes, $schoolKeys)),
         'partners' => count(array_intersect_key($classes, $partnerKeys)),
         'faculty'  => $people($faculty[$d] ?? []),
@@ -143,8 +157,8 @@ $now = $rows[$today];
           <th scope="col">Day</th>
           <th scope="col">Visitors</th>
           <th scope="col">Views</th>
-          <th scope="col" title="Lectures marked through the Google Form">Form</th>
-          <th scope="col" title="Lectures marked in the app; one filed both ways counts here">App</th>
+          <th scope="col" title="Every Google Form entry submitted that day">Form</th>
+          <th scope="col" title="Every attendance save in the app that day">App</th>
           <th scope="col">Classes</th>
           <th scope="col">Faculty</th>
         </tr>
@@ -167,8 +181,8 @@ $now = $rows[$today];
   <p class="field-help">
     Visitors are distinct browsers in a day; views are pages opened, not counting
     the Form pushes (<?= $now['pushes'] ?> today) or the stylesheet and scripts the host's own
-    hit counter includes. Updates are one reading per class per lecture, so a
-    corrected Form row counts once. <?= $firstCounted ? 'Traffic counted since ' . $e(date('j M Y', strtotime($firstCounted))) . '.' : 'Traffic counting starts with the next visit.' ?>
+    hit counter includes. Form and App count every entry submitted that day,
+    re-submissions and corrections included. <?= $firstCounted ? 'Traffic counted since ' . $e(date('j M Y', strtotime($firstCounted))) . '.' : 'Traffic counting starts with the next visit.' ?>
   </p>
 </section>
 
