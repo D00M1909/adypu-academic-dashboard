@@ -768,28 +768,6 @@ page_head('Room timetable', 'page-wide', 'timetable');
     $what = fn(array $x): string => $x['blocked'] !== '' ? $x['blocked'] . ' (booked)' : trim("{$x['code']}, {$x['class']}", ', ');
 ?>
     <?php $span = $all || !$week ? 'on ' . $e($date->format('l')) : 'this week'; ?>
-    <section class="tt-overlaps" aria-labelledby="tt-teachers-title">
-      <h3 id="tt-teachers-title">Teachers in two rooms at once <?= $span ?><?= $school !== '' ? ', ' . $e($schools[$school]['name']) : '' ?> <span><?= count($teacherOverlaps) ?></span></h3>
-      <?php if (!$teacherOverlaps): ?>
-      <p class="tt-none">No teacher is down for two rooms at once.</p>
-      <?php else: ?>
-      <div class="tt-wrap">
-        <table class="tt-overlap-list">
-          <thead><tr><th scope="col">Day</th><th scope="col">Time</th><th scope="col">Teacher</th><th scope="col">Classes</th></tr></thead>
-          <tbody>
-          <?php foreach ($teacherOverlaps as $o): ?>
-            <tr<?= !$all && in_array($room, array_column($o['entries'], 'room'), true) ? ' class="tt-here"' : '' ?>>
-              <td><?= $e($o['day']) ?></td>
-              <td class="tt-nowrap"><?= timetable_clock($o['from']) ?> to <?= timetable_clock($o['to']) ?></td>
-              <td><?= $e($o['person']) ?></td>
-              <td><?php foreach ($o['entries'] as $y): $u = $fullUlc[$y['room']] ?? ''; ?><span class="tt-overlap-entry"><a href="<?= $e(isset($ulcOf[$y['room']]) ? $link(['all' => null, 'ulc' => $u, 'room' => $y['room']]) : $link(['all' => null, 'school' => null, 'ulc' => $u, 'room' => $y['room']])) ?>"><?= $e(timetable_room_label($y['room'])) ?></a> <small><?= $e($u) ?></small> <?= $e($what($y['entry'])) ?> <small><?= $e(timetable_span_label($y['entry'])) ?></small></span><?php endforeach; ?></td>
-            </tr>
-          <?php endforeach; ?>
-          </tbody>
-        </table>
-      </div>
-      <?php endif; ?>
-    </section>
     <section class="tt-overlaps" aria-labelledby="tt-overlaps-title">
       <h3 id="tt-overlaps-title">Rooms double-booked <?= $span ?><?= $school !== '' ? ', ' . $e($schools[$school]['name']) . ' rooms' : '' ?> <span><?= count($every) ?></span></h3>
       <?php if (!$every): ?>
