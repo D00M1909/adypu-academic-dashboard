@@ -5,9 +5,9 @@
 // replaced, failed sign-ins, admin actions, and which accounts have not marked
 // anything at all.
 //
-// In this order, under the filters: the picked account's own record (when one
-// is picked); one day's events, app and Google Form, newest first; a
-// leaderboard of who files the most attendance, Form and app together; and
+// Under the filters, the picked account's own record (when one is picked),
+// then one of three tabs: one day's events, app and Google Form, newest first;
+// a leaderboard of who files the most attendance, Form and app together; and
 // every account over the last N days.
 
 require_once __DIR__ . '/includes/auth.php';
@@ -50,6 +50,9 @@ $kinds = [
     'admin' => 'Admin actions',
 ];
 $kind = isset($kinds[(string) ($_GET['kind'] ?? '')]) ? (string) $_GET['kind'] : 'work';
+// One section at a time, so the leaderboard is not a scroll past the log.
+$tabs = ['log' => 'Log', 'board' => 'Leaderboard', 'accounts' => 'Accounts'];
+$tab = isset($tabs[(string) ($_GET['tab'] ?? '')]) ? (string) $_GET['tab'] : 'log';
 
 $events = activity_range(min($from, $day), $today);
 $summary = activity_summary(array_filter($events, fn($x) => $x['day'] >= $from));
@@ -115,7 +118,7 @@ $lag = function (int $m): string {
     if ($m < 24 * 60) return round($m / 60) . ' h after';
     return round($m / 1440) . ' days after';
 };
-$link = fn(array $over): string => 'activity.php?' . http_build_query(array_filter($over + ['who' => $who, 'day' => $day === $today ? '' : $day, 'span' => $span === 7 ? '' : $span, 'kind' => $kind === 'work' ? '' : $kind], fn($v) => $v !== '' && $v !== null));
+$link = fn(array $over): string => 'activity.php?' . http_build_query(array_filter($over + ['tab' => $tab === 'log' ? '' : $tab, 'who' => $who, 'day' => $day === $today ? '' : $day, 'span' => $span === 7 ? '' : $span, 'kind' => $kind === 'work' ? '' : $kind], fn($v) => $v !== '' && $v !== null));
 
 // One event's details as a line of plain text.
 $when = fn(string $time): string => $time === WHOLE_DAY ? 'whole day' : $time;
@@ -146,6 +149,12 @@ page_head('Activity', 'page-wide');
 ?>
 <section class="card">
   <form class="tt-bar act-filters" method="get">
+    <nav class="tt-seg act-tabs" aria-label="Section">
+      <?php foreach ($tabs as $k => $l): ?>
+        <a href="<?= $e($link(['tab' => $k === 'log' ? '' : $k])) ?>"<?= $k === $tab ? ' aria-current="page"' : '' ?>><?= $l ?><?php if ($k === 'board' && $board): ?> <small><?= count($board) ?></small><?php endif; ?></a>
+      <?php endforeach; ?>
+    </nav>
+    <?php if ($tab !== 'log'): ?><input type="hidden" name="tab" value="<?= $e($tab) ?>"><?php endif; ?>
     <div class="tt-bar-row">
       <div class="tt-pick">
         <label for="act-who">Account</label>
@@ -156,18 +165,24 @@ page_head('Activity', 'page-wide');
           <?php endforeach; ?>
         </select>
       </div>
+      <?php // Each tab shows only the pickers that change it; the others ride along hidden. ?>
+      <?php if ($tab === 'log'): ?>
       <div class="tt-pick">
         <label for="act-day">Log for</label>
         <input id="act-day" type="date" name="day" value="<?= $e($day) ?>" max="<?= $today ?>" onchange="this.form.submit()">
       </div>
+      <?php elseif ($day !== $today): ?><input type="hidden" name="day" value="<?= $e($day) ?>"><?php endif; ?>
+      <?php if ($tab !== 'log' || $who !== ''): ?>
       <div class="tt-pick">
-        <label for="act-span">Leaderboard over</label>
+        <label for="act-span"><?= $tab === 'accounts' ? 'Over' : ($tab === 'board' ? 'Leaderboard over' : 'Record over') ?></label>
         <select id="act-span" name="span" onchange="this.form.submit()">
           <?php foreach ([1 => 'Today', 7 => 'Last 7 days', 30 => 'Last 30 days', 90 => 'Last 90 days'] as $n => $l): ?>
             <option value="<?= $n ?>"<?= $n === $span ? ' selected' : '' ?>><?= $l ?></option>
           <?php endforeach; ?>
         </select>
       </div>
+      <?php elseif ($span !== 7): ?><input type="hidden" name="span" value="<?= $span ?>"><?php endif; ?>
+      <?php if ($tab === 'log'): ?>
       <div class="tt-pick">
         <label for="act-kind">Show</label>
         <select id="act-kind" name="kind" onchange="this.form.submit()">
@@ -176,10 +191,12 @@ page_head('Activity', 'page-wide');
           <?php endforeach; ?>
         </select>
       </div>
+      <?php elseif ($kind !== 'work'): ?><input type="hidden" name="kind" value="<?= $e($kind) ?>"><?php endif; ?>
     </div>
     <noscript><button class="btn-quiet" type="submit">Show</button></noscript>
   </form>
 
+  <?php if ($tab === 'log'): ?>
   <div class="stat-grid act-stats">
     <div class="stat"><span class="stat-value"><?= count($daySummary) ?></span><span class="stat-label">Accounts active <?= $day === $today ? 'today' : 'that day' ?></span></div>
     <div class="stat"><span class="stat-value"><?= array_sum(array_column($daySummary, 'marks')) ?> <small>+ <?= count($formDay) ?></small></span><span class="stat-label">Saves in the app + Form entries</span></div>
@@ -188,6 +205,7 @@ page_head('Activity', 'page-wide');
   </div>
   <?php // Says where the Form entries come from and how fresh they are, so a "+ 0" can be told apart from a log that was never written. ?>
   <p class="field-help"><?php if (empty($formLog['at'])): ?>No Google Form log yet. It is written by each Form push to api/ingest.php, every 5 minutes; run pushNow() in the Apps Script to send one now.<?php else: ?>Google Form entries from the push at <?= $e(date('j M, H:i', strtotime($formLog['at']))) ?>, <?= count((array) ($formLog['rows'] ?? [])) ?> rows in the sheet. Counted by the day they were submitted.<?php endif; ?></p>
+  <?php endif; ?>
 </section>
 
 <?php if ($who !== ''):
@@ -241,7 +259,7 @@ page_head('Activity', 'page-wide');
     <span class="act-peak"><?= $peak ?></span>
     <div class="act-days" role="img" aria-label="Lectures marked each day, <?= $e($from) ?> to <?= $e($today) ?>, most in a day <?= $peak ?>">
       <?php foreach ($perDay as $d => $n): ?>
-        <a href="<?= $e($link(['day' => $d])) ?>#act-log" class="act-day<?= $d === $day ? ' is-selected' : '' ?><?= $n ? '' : ' is-zero' ?>" title="<?= $e(date('D j M', strtotime($d)) . ": $n lecture" . ($n === 1 ? '' : 's') . '. Tap for that day\'s log.') ?>"><i style="height:<?= round(100 * $n / $peak) ?>%"></i></a>
+        <a href="<?= $e($link(['day' => $d, 'tab' => ''])) ?>#act-log" class="act-day<?= $d === $day ? ' is-selected' : '' ?><?= $n ? '' : ' is-zero' ?>" title="<?= $e(date('D j M', strtotime($d)) . ": $n lecture" . ($n === 1 ? '' : 's') . '. Tap for that day\'s log.') ?>"><i style="height:<?= round(100 * $n / $peak) ?>%"></i></a>
       <?php endforeach; ?>
     </div>
     <div class="act-axis"><span><?= $e(date('j M', strtotime($from))) ?></span><span><?= $e(date('j M', strtotime($from . ' +' . intdiv($span, 2) . ' days'))) ?></span><span>Today</span></div>
@@ -272,6 +290,7 @@ page_head('Activity', 'page-wide');
 </section>
 <?php endif; ?>
 
+<?php if ($tab === 'log'): ?>
 <section class="card" id="act-log">
   <h2><?= $day === $today ? 'Log for today' : 'Log for ' . $e(date('l j M', strtotime($day))) ?><?= $who !== '' ? ', ' . $e($nameOf($who)) : '' ?> <span class="count-pill"><?= count($dayEvents) ?></span></h2>
   <?php if (!$dayEvents): ?>
@@ -296,7 +315,9 @@ page_head('Activity', 'page-wide');
   </div>
   <?php endif; ?>
 </section>
+<?php endif; ?>
 
+<?php if ($tab === 'board'): ?>
 <section class="card">
   <h2>Most active faculty, <?= $span === 1 ? 'today' : 'last ' . $span . ' days' ?> <span class="count-pill"><?= count($board) ?></span></h2>
   <?php if (!$board): ?>
@@ -348,8 +369,9 @@ page_head('Activity', 'page-wide');
   <?php endif; ?>
   <p class="field-help">Counts every lecture with a name on it, from the Google Form's Faculty name and from saves in the app. A lecture filed both ways counts once, for the app. Names are matched ignoring titles and spacing, so "Dr. A Rao" and "a rao" are one person; a misspelt name counts as someone else.<?= $unnamed ? ' ' . $unnamed . ' lecture' . ($unnamed === 1 ? ' has' : 's have') . ' no name on it and count for nobody.' : '' ?></p>
 </section>
+<?php endif; ?>
 
-
+<?php if ($tab === 'accounts'): ?>
 <section class="card">
   <h2>Accounts, <?= $span === 1 ? 'today' : 'last ' . $span . ' days' ?></h2>
   <div class="stat-table-wrap">
@@ -401,5 +423,6 @@ page_head('Activity', 'page-wide');
   <?php endif; ?>
   <p class="field-help">Lectures, classes and days come from the attendance itself, so they go back as far as it does. Late, replaced, pages, sign-ins, devices and addresses come from the activity log, recorded from <?= $e(date('j M Y', strtotime($logFrom ?? $today))) ?> and kept for <?= ACTIVITY_KEEP_DAYS ?> days.</p>
 </section>
+<?php endif; ?>
 <script src="js/combo.js?v=<?= filemtime(__DIR__ . '/js/combo.js') ?>"></script>
 <?php page_foot(); ?>
