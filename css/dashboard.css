@@ -1349,6 +1349,10 @@ input:focus-visible, select:focus-visible {
 .stat-table tbody th a:hover { color: var(--red-ink); text-decoration: underline; }
 .stat-table tr.is-selected th, .stat-table tr.is-selected td { background: var(--red-tint); }
 .stat-table-groups tbody th { white-space: normal; }
+/* Faculty workload list: number, name, hours. The name takes the room. */
+.tt-load th:first-child, .tt-load td.tt-load-n { width: 4.5em; text-align: left; padding-left: 0; color: var(--ink-muted); font-family: 'IBM Plex Mono', monospace; }
+.tt-load th:nth-child(2), .tt-load tbody th { width: 100%; text-align: left; white-space: normal; }
+.tt-load td small { font-size: 12px; color: var(--ink-muted); }
 .stat-nil { color: var(--ink-faint); }
 .stat-sub { font-size: 12px; color: var(--ink-muted); }
 
@@ -1828,6 +1832,11 @@ button.tt-entry + button.tt-entry { margin-top: 6px; border-top-left-radius: 0; 
   .tt-grid { min-width: 0; font-size: 11px; }
   .tt-grid .tt-time { position: static; }
   .tt-open, .tt-taken, .tt-overlap { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .stat-table-wrap { overflow: visible; margin: 0; padding: 0; }
+  .tt-load { font-size: 12px; }
+  .tt-load th, .tt-load td { padding: 5px 6px; }
+  .tt-load tbody th a { color: inherit; }
+  .tt-load tr { break-inside: avoid; }
 }
 
 /* Activity (admin): who did what. The filters reuse the timetable's picker

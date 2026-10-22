@@ -60,10 +60,13 @@ if ($facultyView && !$shownFaculty) {
     $shownFaculty = $faculty;
 }
 $facultyId = (string) ($_GET['faculty'] ?? '');
-if (!isset($shownFaculty[$facultyId])) $facultyId = (string) (array_key_first($shownFaculty) ?? '');
+// "All faculty" heads the Faculty picker: everyone in the school with their
+// weekly workload, one row each, for printing as a list.
+$facultyAll = $facultyView && $facultyId === 'all' && $shownFaculty;
+if (!$facultyAll && !isset($shownFaculty[$facultyId])) $facultyId = (string) (array_key_first($shownFaculty) ?? '');
 // Whose week is drawn: a dean's or a faculty member's, or nobody's (a room).
-$person = $dean ?? ($facultyView ? $shownFaculty[$facultyId] ?? null : null);
-$facultyView = $facultyView && $person;
+$person = $dean ?? ($facultyView && !$facultyAll ? $shownFaculty[$facultyId] ?? null : null);
+$facultyView = $facultyView && ($person || $facultyAll);
 // Free slots is the room view with its free time marked, for a teacher
 // looking for somewhere to hold an extra class.
 $free = !$person && $view === 'free';
@@ -74,7 +77,7 @@ $overlap = !$person && $view === 'overlap';
 // All rooms: every room's day side by side, a row each, for seeing the whole
 // campus (or one building) at a glance. One day at a time: a week of ninety
 // rooms is too long a page to read.
-$all = !$person && ($_GET['all'] ?? '') === '1';
+$all = !$person && !$facultyAll && ($_GET['all'] ?? '') === '1';
 // A school's rooms are the ones it teaches in at all, so they are picked
 // before the week drops the bookings that do not run in it.
 if ($t && $school !== '' && !$person) $t = timetable_for_school($t, $school);
@@ -222,7 +225,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
     // A small building's rooms are chips, one tap each, with how full each
     // is this week; a big one (ULC 1 has 50) keeps the dropdown.
     $chips = [];
-    if (!$person && !$all && count($rooms) <= 16) {
+    if (!$person && !$all && !$facultyAll && count($rooms) <= 16) {
         foreach ($rooms as $r) {
             $v = ['days' => $days, 'slots' => timetable_room_slots($t, $r)] + $t;
             [$u, $n] = timetable_usage($v, timetable_grid($v, $r));
@@ -418,6 +421,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
         <div class="tt-pick">
           <label for="tt-faculty">Faculty</label>
           <select id="tt-faculty" name="faculty" onchange="this.form.submit()" data-combo>
+            <option value="all"<?= $facultyAll ? ' selected' : '' ?>>All faculty (workload list)</option>
             <?php foreach ($shownFaculty as $id => $p): ?>
               <option value="<?= $e($id) ?>"<?= $id === $facultyId ? ' selected' : '' ?>><?= $e($p['name']) ?></option>
             <?php endforeach; ?>
@@ -477,7 +481,38 @@ page_head('Room timetable', 'page-wide', 'timetable');
       <noscript><button class="btn-quiet" type="submit">Show</button></noscript>
     </form>
 
-<?php if ($all):
+<?php if ($facultyAll):
+    // Everyone the school's classes name, with their whole week's teaching
+    // hours: every school they teach in, the same figure their own page shows.
+    $workloads = [];
+    foreach ($shownFaculty as $id => $p) {
+        $load = timetable_hours(timetable_teaching($fullWeek, $p), $p['count_each_group'] ?? false);
+        $workloads[$id] = $load == round($load) ? (string) (int) $load : number_format($load, 1);
+    }
+    $schoolName = $school === '' ? 'All schools' : ($schools[$school]['name'] ?? $school); ?>
+    <div class="tt-head">
+      <h2 class="tt-room"><?= $e($schoolName) ?> <span>Faculty workload &middot; <?= count($shownFaculty) ?> faculty</span></h2>
+      <span class="tt-when-print">Week of <?= $e($monday->format('j M Y')) ?></span>
+      <span class="tt-actions no-print">
+        <button class="btn-quiet tt-print" type="button" onclick="window.print()">Export PDF</button>
+      </span>
+    </div>
+    <div class="stat-table-wrap">
+      <table class="stat-table tt-load">
+        <thead><tr><th scope="col">Sr. No.</th><th scope="col">Name</th><th scope="col">Weekly workload</th></tr></thead>
+        <tbody>
+          <?php $i = 0; foreach ($shownFaculty as $id => $p): ?>
+          <tr>
+            <td class="tt-load-n"><?= ++$i ?></td>
+            <th scope="row"><a href="<?= $e($link(['faculty' => $id])) ?>"><?= $e($p['name']) ?></a></th>
+            <td><?= $e($workloads[$id]) ?> <small>hour<?= $workloads[$id] === '1' ? '' : 's' ?></small></td>
+          </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+    <p class="field-help no-print">Teaching hours in the week of <?= $e($monday->format('j M')) ?>, across every school each person teaches in. Tap a name for their timetable.</p>
+<?php elseif ($all):
     // Every room's day as one row. The columns are quarter hours from 8.00 to
     // 5.45, so a class sits where it really starts and ends whatever clock
     // its school keeps, and spans as many columns as it lasts.
@@ -769,10 +804,10 @@ page_head('Room timetable', 'page-wide', 'timetable');
 <script type="application/json" id="tt-panel-data"><?= json_encode($panel, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?></script>
 <script src="js/rooms.js?v=<?= filemtime(__DIR__ . '/js/rooms.js') ?>"></script>
 <?php endif; ?>
-<?php if ($room !== '' || $person || $all): ?>
+<?php if ($room !== '' || $person || $all || $facultyAll): ?>
 <script>
   // The saved PDF is named after document.title, so name it after the room (or the dean) and day.
-  document.title = <?= json_encode($all ? ($free ? 'Free slots ' : ($overlap ? 'Overlaps ' : 'Timetable ')) . ($ulc === '' ? 'all rooms' : $ulc) . ' ' . $date->format('l j M Y') : ($person ? 'Timetable ' . $person['name'] : ($free ? 'Free slots room ' : ($overlap ? 'Overlaps room ' : 'Room ')) . timetable_room_label($room) . ' ' . $ulc) . ' ' . ($week ? 'week of ' . $date->modify('monday this week')->format('j M Y') : $date->format('l j M Y')), JSON_HEX_TAG) ?>;
+  document.title = <?= json_encode($facultyAll ? 'Faculty workload ' . ($school === '' ? 'all schools' : ($schools[$school]['name'] ?? $school)) . ' week of ' . $monday->format('j M Y') : ($all ? ($free ? 'Free slots ' : ($overlap ? 'Overlaps ' : 'Timetable ')) . ($ulc === '' ? 'all rooms' : $ulc) . ' ' . $date->format('l j M Y') : ($person ? 'Timetable ' . $person['name'] : ($free ? 'Free slots room ' : ($overlap ? 'Overlaps room ' : 'Room ')) . timetable_room_label($room) . ' ' . $ulc) . ' ' . ($week ? 'week of ' . $date->modify('monday this week')->format('j M Y') : $date->format('l j M Y'))), JSON_HEX_TAG) ?>;
 </script>
 <?php endif; ?>
 <?php // The Room and Dean pickers become searchable; without it they stay plain selects. ?>
