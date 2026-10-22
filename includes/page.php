@@ -160,6 +160,9 @@ document.querySelector('.site-footer').addEventListener('mouseup', function (e) 
   if (a && e.button < 2 && navigator.sendBeacon) navigator.sendBeacon('api/click.php', new URLSearchParams({l: a.dataset.link}));
 });
 </script>
+<!-- The "Back to ADYPU Compass" button and the feedback note, shared by every
+     ADYPU site and served from the Compass site, so they change in one place. -->
+<script src="https://adypu.pages.dev/embed/compass-link.js" defer></script>
 <?php
 }
 
