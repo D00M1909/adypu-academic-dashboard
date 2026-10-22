@@ -151,7 +151,7 @@ page_head('Activity', 'page-wide');
   <form class="tt-bar act-filters" method="get">
     <nav class="tt-seg act-tabs" aria-label="Section">
       <?php foreach ($tabs as $k => $l): ?>
-        <a href="<?= $e($link(['tab' => $k === 'log' ? '' : $k])) ?>"<?= $k === $tab ? ' aria-current="page"' : '' ?>><?= $l ?><?php if ($k === 'board' && $board): ?> <small><?= count($board) ?></small><?php endif; ?></a>
+        <a href="<?= $e($link(['tab' => $k === 'log' ? '' : $k])) ?>"<?= $k === $tab ? ' aria-current="page"' : '' ?>><?= $l ?></a>
       <?php endforeach; ?>
     </nav>
     <?php if ($tab !== 'log'): ?><input type="hidden" name="tab" value="<?= $e($tab) ?>"><?php endif; ?>
