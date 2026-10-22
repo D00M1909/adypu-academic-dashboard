@@ -463,14 +463,19 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
   margin-bottom: 14px;
 }
 .section-title h2 { margin: 0; font-size: 15px; font-weight: 700; }
-.scope-tabs { display: flex; gap: 20px; border-bottom: 1px solid var(--hairline); }
+/* Underlined, not pills: this is the section's own heading, picking what the
+   grid below is about, and the pills above it pick the dates. The rule runs
+   the full row so the reporting count sits on it as part of the heading. */
+.section-title:has(.scope-tabs) { border-bottom: 1px solid var(--hairline); }
+.section-title:has(.scope-tabs) .section-meta { padding-bottom: 10px; }
+.scope-tabs { display: flex; gap: 24px; }
 .scope-tabs a {
-  padding-bottom: 8px; margin-bottom: -1px;
+  padding-bottom: 10px; margin-bottom: -1px;
   font-size: 15px; font-weight: 700; color: var(--ink-faint); text-decoration: none;
   box-shadow: inset 0 -2px 0 transparent;
   transition: color 0.12s var(--ease-out), box-shadow 0.12s var(--ease-out);
 }
-.scope-tabs a:hover { color: var(--ink-muted); }
+.scope-tabs a:hover { color: var(--ink-muted); box-shadow: inset 0 -2px 0 var(--hairline); }
 .scope-tabs a[aria-current="page"] { color: var(--ink); box-shadow: inset 0 -2px 0 var(--red-ink); }
 .section-meta { font-size: 12.5px; color: var(--ink-muted); font-weight: 500; }
 
@@ -738,11 +743,11 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
   box-shadow: 0 0 0 100vmax var(--surface), 0 1px 0 100vmax var(--hairline);
   clip-path: inset(-2px -100vmax -1px -100vmax);
 }
-/* One segmented control: four answers to one question. */
+/* One segmented control: four answers to one question. Grey like every
+   other tab on the site (.tt-seg); the summary beside it names the range. */
 .range-presets {
   display: flex; flex-wrap: wrap; gap: 2px; padding: 3px;
-  background: var(--surface-raised); border: 1px solid var(--hairline); border-radius: 11px;
-  box-shadow: var(--shadow-sm);
+  background: var(--surface); border: 1px solid var(--hairline); border-radius: 10px;
 }
 .range-preset {
   font: inherit;
@@ -751,7 +756,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
   color: var(--ink-muted);
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: 7px;
   padding: 6px 13px;
   cursor: pointer;
   white-space: nowrap;
@@ -760,12 +765,12 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
 .range-preset:hover { color: var(--ink); }
 .chip-narrow { display: none; }
 .range-preset.is-active {
-  color: #fff;
-  background: var(--red-primary);
-  border-color: var(--red-primary);
+  color: var(--red-ink);
+  background: var(--surface-raised);
   font-weight: 600;
+  box-shadow: var(--shadow-sm);
 }
-.range-preset.is-active:hover { color: #fff; background: var(--red-secondary); }
+:root[data-theme="dark"] .range-preset.is-active { background: #2a3544; }
 /* A custom range lights no chip, so the inputs carry the state on their own. */
 .range-bar:not(:has(.is-active)) .range-dates label { color: var(--red-ink); font-weight: 600; }
 .range-dates {
@@ -831,7 +836,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 28px; }
   .range-preset { font-size: 12.5px; padding: 6px 10px; }
   .chip-wide { display: none; }
   .chip-narrow { display: inline; }
-  .range-more[aria-expanded="true"] { color: #fff; background: var(--red-primary); border-color: var(--red-primary); }
+  .range-more[aria-expanded="true"] { color: var(--ink); background: var(--surface-raised); box-shadow: var(--shadow-sm); }
 }
 
 /* 360px is the common Android width, and the five chips spill to a second row
@@ -1422,7 +1427,7 @@ input:focus-visible, select:focus-visible {
 .tt-seg::-webkit-scrollbar { display: none; }
 .tt-seg a { padding: 6px 14px; border-radius: 7px; font-size: 14px; font-weight: 500; color: var(--ink-muted); text-decoration: none; white-space: nowrap; }
 .tt-seg a:hover { color: var(--ink); }
-.tt-seg a[aria-current] { background: var(--surface-raised); color: var(--ink); font-weight: 600; box-shadow: var(--shadow-sm); }
+.tt-seg a[aria-current] { background: var(--surface-raised); color: var(--red-ink); font-weight: 600; box-shadow: var(--shadow-sm); }
 :root[data-theme="dark"] .tt-seg a[aria-current] { background: #2a3544; }
 .tt-week { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-left: auto; }
 .tt-step { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--hairline); background: var(--surface); color: var(--ink); font-size: 18px; line-height: 1; text-decoration: none; }
@@ -1730,7 +1735,7 @@ button.tt-entry + button.tt-entry { margin-top: 6px; border-top-left-radius: 0; 
   .brand-logo img { height: 34px; }
   .app-header h1 { color: var(--ink); font-size: 18px; }
   .site-nav, .scope-tabs a:not([aria-current]) { display: none; }
-  .scope-tabs { border: 0; }
+  .scope-tabs, .section-title:has(.scope-tabs) { border: 0; }
   /* On paper the one tab left is the section's heading, not a control: no
      underline, and no focus ring if it was the last thing clicked. */
   .scope-tabs a[aria-current] { box-shadow: none; outline: none; padding-bottom: 0; }
