@@ -5,6 +5,9 @@
 // "Updates" are readings: one class, one day, one lecture. A Form row filed
 // twice for the same lecture is a correction and counts once, the same rule the
 // dashboard itself uses, so this page and the tiles can never disagree.
+//
+// Today's figures sit on top; under them, one tab at a time: the last N days,
+// one day by school, by knowledge partner, and the footer's link clicks.
 
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/page.php';
@@ -86,6 +89,10 @@ foreach ($dates as $d) {
 
 // The day the per-school table describes: asked for, or today.
 $day = row_date($_GET['date'] ?? '') ?? $today;
+if ($day > $today) $day = $today;
+$tabs = ['days' => 'By day', 'schools' => 'Schools', 'partners' => 'Partners', 'clicks' => 'Footer clicks'];
+$tab = isset($tabs[(string) ($_GET['tab'] ?? '')]) ? (string) $_GET['tab'] : 'days';
+$link = fn(array $over): string => 'stats.php?' . http_build_query(array_filter($over + ['tab' => $tab === 'days' ? '' : $tab, 'date' => $day === $today ? '' : $day, 'span' => $span === 14 ? '' : $span], fn($v) => $v !== '' && $v !== null));
 $dayClasses = $merged[$day] ?? [];
 $groups = [];
 foreach ([[class_rows(), 'Schools'], [partner_rows(), 'Knowledge partners']] as [$classRows, $section]) {
@@ -119,6 +126,35 @@ $now = $rows[$today];
   <?php page_notice('warn', 'No Form push has landed for ' . round($pushAge / 3600) . ' hours. Run pushStatus() in the Apps Script.'); ?>
 <?php endif; ?>
 
+<?php // The tabs and their pickers head whichever tab's card is showing.
+ob_start(); ?>
+  <form class="tt-bar act-filters no-print" method="get">
+    <nav class="tt-seg page-tabs" aria-label="Section">
+      <?php foreach ($tabs as $k => $l): ?>
+        <a href="<?= $e($link(['tab' => $k === 'days' ? '' : $k])) ?>"<?= $k === $tab ? ' aria-current="page"' : '' ?>><?= $l ?></a>
+      <?php endforeach; ?>
+    </nav>
+    <?php if ($tab !== 'days'): ?><input type="hidden" name="tab" value="<?= $e($tab) ?>"><?php endif; ?>
+    <?php // Each tab shows only the pickers that change it; the others ride along hidden. ?>
+    <div class="tt-bar-row">
+      <?php if ($tab !== 'days'): ?>
+      <div class="tt-pick">
+        <label for="stat-date">Day</label>
+        <input id="stat-date" type="date" name="date" value="<?= $e($day) ?>" max="<?= $today ?>" onchange="this.form.submit()">
+      </div>
+      <?php elseif ($day !== $today): ?><input type="hidden" name="date" value="<?= $e($day) ?>"><?php endif; ?>
+      <?php if ($tab === 'days' || $tab === 'clicks'): ?>
+      <div class="tt-pick">
+        <label for="stat-span"><?= $tab === 'days' ? 'Show' : 'Total over' ?></label>
+        <select id="stat-span" name="span" onchange="this.form.submit()">
+          <?php foreach (STATS_SPANS as $n): ?><option value="<?= $n ?>"<?= $n === $span ? ' selected' : '' ?>>Last <?= $n ?> days</option><?php endforeach; ?>
+        </select>
+      </div>
+      <?php elseif ($span !== 14): ?><input type="hidden" name="span" value="<?= $span ?>"><?php endif; ?>
+    </div>
+    <noscript><button class="btn-quiet" type="submit">Show</button></noscript>
+  </form>
+<?php $bar = ob_get_clean(); ?>
 <section class="card">
   <h2>Today</h2>
   <div class="stat-grid">
@@ -138,18 +174,10 @@ $now = $rows[$today];
   </p>
 </section>
 
+<?php if ($tab === 'days'): ?>
 <section class="card">
-  <div class="stat-head">
-    <h2>Last <?= $span ?> days</h2>
-    <form method="get" class="stat-span no-print">
-      <?php if ($day !== $today): ?><input type="hidden" name="date" value="<?= $e($day) ?>"><?php endif; ?>
-      <label class="sr-only" for="stat-span">Days to show</label>
-      <select id="stat-span" name="span" onchange="this.form.submit()">
-        <?php foreach (STATS_SPANS as $n): ?><option value="<?= $n ?>"<?= $n === $span ? ' selected' : '' ?>>Last <?= $n ?> days</option><?php endforeach; ?>
-      </select>
-      <noscript><button class="btn-quiet" type="submit">Show</button></noscript>
-    </form>
-  </div>
+<?= $bar ?>
+  <h2>Last <?= $span ?> days</h2>
   <div class="stat-table-wrap">
     <table class="stat-table">
       <thead>
@@ -166,7 +194,7 @@ $now = $rows[$today];
       <tbody>
         <?php foreach ($rows as $d => $r): ?>
           <tr<?= $d === $day ? ' class="is-selected"' : '' ?>>
-            <th scope="row"><a href="stats.php?<?= $e(http_build_query(['date' => $d] + ($span === 14 ? [] : ['span' => $span]))) ?>"><?= $e($fmtDay($d)) ?></a></th>
+            <th scope="row"><?php // A day opens its school breakdown. ?><a href="<?= $e($link(['date' => $d === $today ? '' : $d, 'tab' => 'schools'])) ?>"><?= $e($fmtDay($d)) ?></a></th>
             <td><?= $r['visitors'] ?: '<span class="stat-nil">0</span>' ?></td>
             <td><?= $r['views'] ?: '<span class="stat-nil">0</span>' ?></td>
             <td><?= $r['form'] ?: '<span class="stat-nil">0</span>' ?></td>
@@ -187,10 +215,11 @@ $now = $rows[$today];
   </p>
   <p class="field-help"><?= $firstCounted ? 'Counting since ' . $e(date('j M Y', strtotime($firstCounted))) . '.' : 'Counting starts with the next visit.' ?></p>
 </section>
+<?php endif; ?>
 
-
-<?php foreach ($groups as $section => $list): ?>
+<?php foreach ($groups as $section => $list): if ($tab !== ($section === 'Schools' ? 'schools' : 'partners')) continue; ?>
 <section class="card">
+<?= $bar ?>
   <h2><?= $e($section) ?>, <?= $e($day === $today ? 'today' : date('j M', strtotime($day))) ?></h2>
   <table class="stat-table stat-table-groups">
     <thead><tr><th scope="col"><?= $section === 'Schools' ? 'School' : 'Partner' ?></th><th scope="col">Classes reported</th><th scope="col">Reported</th><th scope="col">Updates</th></tr></thead>
@@ -207,7 +236,9 @@ $now = $rows[$today];
   </table>
 </section>
 <?php endforeach; ?>
+<?php if ($tab === 'clicks'): ?>
 <section class="card">
+<?= $bar ?>
   <h2>Footer clicks, <?= $e($day === $today ? 'today' : date('j M', strtotime($day))) ?></h2>
   <table class="stat-table stat-table-groups">
     <thead><tr><th scope="col">Link</th><th scope="col">Clicks</th><th scope="col">Browsers</th><th scope="col">Last <?= $span ?> days</th></tr></thead>
@@ -226,4 +257,5 @@ $now = $rows[$today];
   </table>
   <p class="field-help">Browsers are distinct browsers that clicked the link that day, so ten clicks from one person read as 10 clicks, 1 browser.</p>
 </section>
+<?php endif; ?>
 <?php page_foot(); ?>

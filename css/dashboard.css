@@ -1842,7 +1842,7 @@ button.tt-entry + button.tt-entry { margin-top: 6px; border-top-left-radius: 0; 
 /* Activity (admin): who did what. The filters reuse the timetable's picker
    row; the rest are stat tables with a few additions. */
 .act-filters { margin-bottom: 14px; }
-.act-tabs { margin-bottom: 12px; width: fit-content; }
+.page-tabs { margin-bottom: 12px; width: fit-content; }
 .act-stats { margin-top: 4px; }
 .act-mono { font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; }
 .act-type { font-size: 12px; font-weight: 600; color: var(--ink-muted); }
@@ -1882,8 +1882,4 @@ button.tt-entry + button.tt-entry { margin-top: 6px; border-top-left-radius: 0; 
 .act-axis { display: flex; justify-content: space-between; margin-top: 4px; font-size: 11px; color: var(--ink-muted); }
 
 /* Usage: the range picker sits on the right of the table's heading. */
-.stat-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.stat-head h2 { margin-bottom: 0; }
-.stat-span select { width: auto; min-height: 0; padding-top: 6px; padding-bottom: 6px; font-size: 14px; }
-.stat-head + .stat-table-wrap { margin-top: 10px; }
 .act-log tr.act-form .act-type { color: var(--lab-ink); }

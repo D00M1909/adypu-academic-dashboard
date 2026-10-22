@@ -149,7 +149,7 @@ page_head('Activity', 'page-wide');
 ?>
 <section class="card">
   <form class="tt-bar act-filters" method="get">
-    <nav class="tt-seg act-tabs" aria-label="Section">
+    <nav class="tt-seg page-tabs" aria-label="Section">
       <?php foreach ($tabs as $k => $l): ?>
         <a href="<?= $e($link(['tab' => $k === 'log' ? '' : $k])) ?>"<?= $k === $tab ? ' aria-current="page"' : '' ?>><?= $l ?></a>
       <?php endforeach; ?>
