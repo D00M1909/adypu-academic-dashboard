@@ -821,14 +821,21 @@ const TIMETABLE_EARLY = 30;
 
 // The reading a class filed for one lecture: the latest on that date whose
 // time falls between the lecture's start and end, or up to TIMETABLE_EARLY
-// minutes before its start. An early one counts only if the class has no other
-// lecture running then ($busy: [start, end) minutes of that class's other
-// lectures that day), so one reading never shows on two lectures. Null when
-// none did. $days is get_attendance_days(): date => class key => time => present.
+// minutes before its start. Null when none did. $days is get_attendance_days():
+// date => class key => time => present.
+//
+// One reading never shows on two lectures. When another of the class's
+// lectures that day ($busy: [start, end) minutes, this one may be among them)
+// could claim it too, it goes to the lecture its hour overlaps most: the
+// Form's "13:15 - 14:15" is the 1.30 lecture, not the 12.30 one it starts in
+// (found 22 Oct 2026, a dean's 1.30 and 2.30 lectures read as not marked while
+// the lectures before them carried his numbers). A tie stays with the lecture
+// the reading starts in.
 function timetable_reading(array $days, string $date, string $key, array $entry, array $busy = []): ?int {
     $m = timetable_minutes($entry['time']);
     $end = timetable_end($entry);
     if (!$m || $end === null) return null;
+    $overlap = fn(int $at, int $a, int $z): int => max(0, min($at + 60, $z) - max($at, $a));
     $found = null;
     $during = null;
     $allDay = null;
@@ -837,13 +844,18 @@ function timetable_reading(array $days, string $date, string $key, array $entry,
         if ((string) $time === 'day') $allDay = (int) $present;
         if (!preg_match('/^(\d{2}):(\d{2})$/', (string) $time, $t)) continue;
         $at = (int) $t[1] * 60 + (int) $t[2];
-        if ($at >= $m[0] && $at < $end) {
-            $during = (int) $present;
-        } elseif ($at >= $m[0] - TIMETABLE_EARLY && $at < $m[0]) {
-            $taken = false;
-            foreach ($busy as [$a, $z]) if ($at >= $a && $at < $z) $taken = true;
-            if (!$taken) $found = (int) $present;
+        if ($at < $m[0] - TIMETABLE_EARLY || $at >= $end) continue;
+        $in = $at >= $m[0];
+        $mine = $overlap($at, $m[0], $end);
+        $taken = false;
+        foreach ($busy as [$a, $z]) {
+            if (($a === $m[0] && $z === $end) || $at < $a - TIMETABLE_EARLY || $at >= $z) continue;
+            $theirs = $overlap($at, $a, $z);
+            if ($theirs > $mine || ($theirs === $mine && $at >= $a && !$in)) $taken = true;
         }
+        if ($taken) continue;
+        if ($in) $during = (int) $present;
+        else $found = (int) $present;
     }
     // One filed during the lecture beats one filed before it, and either beats
     // a reading for the whole day, which stands for every lecture that day.

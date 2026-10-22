@@ -239,9 +239,22 @@ $at130 = ['time' => '1.30 to 2.30', 'span' => 1];
 assert(timetable_reading($days, 'd', 'k', $at130) === 37);
 assert(timetable_reading($days, 'd', 'k', ['time' => '1.45 to 2.45', 'span' => 1]) === 37);
 assert(timetable_reading($days, 'd', 'k', ['time' => '2.00 to 3.00', 'span' => 1]) === null);
-// ...but not when the class is in another lecture then: it is that one's.
-assert(timetable_reading($days, 'd', 'k', $at130, [[750, 810]]) === null);
-assert(timetable_reading($days, 'd', 'k', ['time' => '12.30 to 1.30', 'span' => 1], [[810, 870]]) === 37);
+// ...even with the class in another lecture then: the Form's "13:15 - 14:15"
+// covers 45 minutes of the 1.30 lecture and 15 of the 12.30 one, so it is the
+// 1.30's (a CSE division's 12.30 and 1.30, read wrong until 22 Oct 2026).
+assert(timetable_reading($days, 'd', 'k', $at130, [[750, 810], [810, 870]]) === 37);
+assert(timetable_reading($days, 'd', 'k', ['time' => '12.30 to 1.30', 'span' => 1], [[750, 810], [810, 870]]) === null);
+// "14:15 - 15:15" likewise belongs to 2.30, not the 1.30 it starts in.
+$days215 = ['d' => ['k' => ['14:15' => 39]]];
+$both = [[810, 870], [870, 930]];
+assert(timetable_reading($days215, 'd', 'k', ['time' => '2.30 to 3.30', 'span' => 1], $both) === 39);
+assert(timetable_reading($days215, 'd', 'k', $at130, $both) === null);
+// With no lecture after it, a reading filed late in one still counts for it.
+assert(timetable_reading($days, 'd', 'k', ['time' => '12.30 to 1.30', 'span' => 1], [[750, 810]]) === 37);
+// A tie stays with the lecture the reading starts in: 13:00 is half of each.
+$days1300 = ['d' => ['k' => ['13:00' => 30]]];
+assert(timetable_reading($days1300, 'd', 'k', ['time' => '12.30 to 1.30', 'span' => 1], [[750, 810], [810, 870]]) === 30);
+assert(timetable_reading($days1300, 'd', 'k', $at130, [[750, 810], [810, 870]]) === null);
 // One filed during the lecture beats an early one.
 assert(timetable_reading(['d' => ['k' => ['13:15' => 37, '13:40' => 40]]], 'd', 'k', $at130) === 40);
 // A whole-day reading stands for every lecture that day, but one filed for
