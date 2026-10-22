@@ -1128,7 +1128,6 @@ input:focus-visible, select:focus-visible {
 .picker { margin-top: 8px; }
 .picker-when { display: flex; gap: 12px; }
 .picker-when > span { flex: 1; min-width: 0; }
-.picker .picker-whole { margin-top: 12px; }
 .picker #picker-go { width: 100%; margin-top: 16px; }
 
 /* ---------- Marking ----------
