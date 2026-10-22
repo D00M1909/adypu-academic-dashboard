@@ -1412,6 +1412,10 @@ input:focus-visible, select:focus-visible {
 .page-main .tt-pick select { width: auto; min-width: 100%; max-width: 100%; }
 /* A two-way switch drawn from links, since every choice reloads the page. */
 .tt-seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: 10px; background: var(--surface); border: 1px solid var(--hairline); }
+/* Five views do not fit a phone: the bar scrolls sideways inside itself rather
+   than widen the page (iOS then zoomed the whole site out to fit it). */
+.tt-seg { position: relative; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.tt-seg::-webkit-scrollbar { display: none; }
 .tt-seg a { padding: 6px 14px; border-radius: 7px; font-size: 14px; font-weight: 500; color: var(--ink-muted); text-decoration: none; white-space: nowrap; }
 .tt-seg a:hover { color: var(--ink); }
 .tt-seg a[aria-current] { background: var(--surface-raised); color: var(--ink); font-weight: 600; box-shadow: var(--shadow-sm); }

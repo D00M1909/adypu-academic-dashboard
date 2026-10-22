@@ -126,3 +126,14 @@
     if (e.persisted && creep) finish();
   });
 })();
+
+// A segmented bar too wide for a phone scrolls sideways (.tt-seg in the CSS).
+// Open it on the current choice, or the view being looked at can sit hidden
+// past the right edge. Only the bar scrolls, never the page.
+(function () {
+  Array.prototype.forEach.call(document.querySelectorAll('.tt-seg [aria-current]'), function (a) {
+    var bar = a.parentNode;
+    if (bar.scrollWidth <= bar.clientWidth) return;
+    bar.scrollLeft = a.offsetLeft - (bar.clientWidth - a.offsetWidth) / 2;
+  });
+})();
