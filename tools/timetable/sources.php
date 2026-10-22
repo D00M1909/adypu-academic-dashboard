@@ -25,6 +25,7 @@ const SOURCE_DOCS = [
     'ece' => ['eng-ece', 'School of Engineering - ECE Timetable 2026-27.xlsx'],
     'firstyear' => ['eng-firstyear', 'School of Engineering - First Year Timetable 2026-27.pdf'],
     'mechanical' => ['eng-mech', 'School of Engineering - Mechanical, AE and Robotics Timetable 2026-27.xlsx'],
+    'cyber' => ['eng-cyber', 'School of Engineering - Cyber Security Timetable 2026-27.pdf'],
     'management' => ['mgmt', 'School of Management - Timetable 2026-27.xlsx'],
     'science-sem1' => ['sci-sem1', 'School of Science - Semester I Timetable 2026-27.xlsx'],
     'science-sem3' => ['sci-sem3', 'School of Science - Semester III Timetable 2026-27.xlsx'],

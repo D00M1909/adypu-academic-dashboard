@@ -192,7 +192,27 @@ function timetable_parse(string $json): array|string {
         'calendars' => $calendars,
         'docs' => $docs,
         'deans' => timetable_parse_deans($raw['deans'] ?? []),
+        'extra' => timetable_parse_extra($raw['extra'] ?? []),
     ];
+}
+
+// Teaching a person has that no timetable places at a time and room (an MDMC
+// course whose hours the sheet leaves to the minor's teachers): name as the
+// timetable spells it, hours a week, and what for. Added to their workload.
+function timetable_parse_extra(mixed $list): array {
+    $out = [];
+    foreach ((array) $list as $x) {
+        $name = is_array($x) && is_scalar($x['name'] ?? null) ? trim((string) $x['name']) : '';
+        $hours = is_numeric($x['hours'] ?? null) ? (float) $x['hours'] : 0.0;
+        if ($name === '' || $hours <= 0) continue;
+        $out[] = ['person' => timetable_person($name), 'hours' => $hours, 'what' => is_scalar($x['what'] ?? null) ? trim((string) $x['what']) : ''];
+    }
+    return $out;
+}
+
+// A person's extra hours (timetable_parse_extra()), matched by any of their spellings.
+function timetable_extra(array $t, array $person): array {
+    return array_values(array_filter($t['extra'] ?? [], fn($x) => in_array($x['person'], $person['as'] ?? [], true)));
 }
 
 // The people the Dean picker offers: name and role as the university lists
@@ -779,7 +799,7 @@ function timetable_attendance_classes(string $label, array $rows): array {
     $want = null;   // [school, year, [branches], division or null]
     if (preg_match('/^B\.Tech First Year Div (\w+)$/', $label, $m)) {
         $want = ['eng', '1st Year', ['Core', 'CS'], $m[1]];
-    } elseif (preg_match('/^B\.Tech (AIDS|CSE) Sem ([IVX]+) Div (\w+)$/', $label, $m)) {
+    } elseif (preg_match('/^B\.Tech (AIDS|CSE|CS) Sem ([IVX]+) Div (\w+)$/', $label, $m)) {
         $year = $yearOf($m[2]);
         $want = ['eng', $year, [$m[1] === 'CSE' && $year !== '2nd Year' ? 'SE' : $m[1]], $m[3]];
     } elseif (preg_match('/^B\.Tech BT(?:-(MBT|FT|BI))? Sem ([IVX]+)$/', $label, $m)) {

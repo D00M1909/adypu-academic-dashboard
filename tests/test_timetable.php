@@ -219,6 +219,14 @@ foreach ([['eng', '1st Year', 'Core', 'F'], ['eng', '1st Year', 'CS', 'AA'], ['e
 $which = fn($label) => array_map(fn($r) => "{$r['year']}/{$r['branch']}/{$r['division']}", timetable_attendance_classes($label, $rows));
 assert($which('B.Tech First Year Div F') === ['1st Year/Core/F'] && $which('B.Tech First Year Div AA') === ['1st Year/CS/AA']);
 assert($which('B.Tech CSE Sem III Div A') === ['2nd Year/CSE/A'] && $which('B.Tech CSE Sem V Div A') === ['3rd Year/SE/A']);
+// CS is Cyber Security: its own branch, never CSE's or SE's.
+assert($which('B.Tech CS Sem V Div A') === ['3rd Year/CS/A']);
+
+// Hours no timetable places (an MDMC course's): matched by any spelling,
+// and a nameless or hourless one is dropped.
+$extra = timetable_parse_extra([['name' => 'Ms. Asha Rao', 'hours' => 5, 'what' => 'MDMC'], ['name' => '', 'hours' => 2], ['name' => 'B', 'hours' => 0]]);
+assert($extra === [['person' => 'asha rao', 'hours' => 5.0, 'what' => 'MDMC']]);
+assert(timetable_extra(['extra' => $extra], ['as' => ['asha rao']]) === $extra && timetable_extra(['extra' => $extra], ['as' => ['ravi rao']]) === []);
 assert($which('B.Tech BT-FT Sem V') === ['3rd Year/Biotechnology/Food Technology'] && $which('B.Tech BT Sem III') === ['2nd Year/Biotechnology/A']);
 assert($which('B.Tech ME-AE Sem III') === ['2nd Year/Mechanical/A'] && $which('B.Tech Civil Sem III (SE-A)') === ['2nd Year/Civil Engineering/A']);
 assert($which('M.Tech BT Sem I') === ['1st Year/M. Tech/Biotechnology']);

@@ -48,6 +48,7 @@ $sources = array_slice($argv, 1) ?: [
     "$data/aids-2026-08-03.json",
     "$data/mechanical-2026-09-30.json",
     "$data/mdmc-cyber-2026-10-14.json",
+    "$data/cyber-2026-08-01.json",
     "$data/science-sem1-2026-09-28.json",
     "$data/science-sem3-2026-09-28.json",
     "$data/design-foundation-2026-10-14.json",
@@ -707,6 +708,8 @@ $export = [
     'docs' => array_map(fn($d) => array_intersect_key($d, array_flip(['name', 'file', 'kind', 'how'])), $docs),
     // The Dean picker's people, kept with the data rather than in the repo.
     'deans' => json_decode((string) @file_get_contents("$data/deans.json"), true)['deans'] ?? [],
+    // Hours no timetable places at a time and room, added to a person's workload.
+    'extra' => json_decode((string) @file_get_contents("$data/workload-extra.json"), true)['extra'] ?? [],
 ];
 
 $t = timetable_parse(json_encode($export));

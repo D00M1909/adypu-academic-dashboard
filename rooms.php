@@ -215,7 +215,9 @@ page_head('Room timetable', 'page-wide', 'timetable');
     $classesShown = count(array_filter($teaching, fn($x) => in_array($x['day'], $days, true)));
     // A dean's workload is always the whole week's teaching hours, even on
     // the one-day view: it is a weekly figure, and a day's would read as one.
-    $load = timetable_hours($teaching, $person['count_each_group'] ?? false);
+    // Plus any hours no timetable places at a time and room (timetable_extra()).
+    $extra = $person ? timetable_extra($t, $person) : [];
+    $load = timetable_hours($teaching, $person['count_each_group'] ?? false) + array_sum(array_column($extra, 'hours'));
     $hours = $load == round($load) ? (string) (int) $load : number_format($load, 1);
     $hasClash = false;
     $hasBlocked = false;
@@ -486,7 +488,8 @@ page_head('Room timetable', 'page-wide', 'timetable');
     // hours: every school they teach in, the same figure their own page shows.
     $workloads = [];
     foreach ($shownFaculty as $id => $p) {
-        $load = timetable_hours(timetable_teaching($fullWeek, $p), $p['count_each_group'] ?? false);
+        $load = timetable_hours(timetable_teaching($fullWeek, $p), $p['count_each_group'] ?? false)
+            + array_sum(array_column(timetable_extra($t, $p), 'hours'));
         $workloads[$id] = $load == round($load) ? (string) (int) $load : number_format($load, 1);
     }
     $schoolName = $school === '' ? 'All schools' : ($schools[$school]['name'] ?? $school); ?>
@@ -679,6 +682,9 @@ page_head('Room timetable', 'page-wide', 'timetable');
       <div><dt>Classes a week</dt><dd><?= count($teaching) ?></dd></div>
       <div><dt>Rooms</dt><dd><?= count(array_unique(array_column($teaching, 'room'))) ?></dd></div>
     </dl>
+    <?php foreach ($extra as $x): ?>
+    <p class="field-help tt-extra">Workload includes <?= $e((string) $x['hours']) ?> hour<?= $x['hours'] == 1 ? '' : 's' ?> a week not on the timetable<?= $x['what'] !== '' ? ': ' . $e($x['what']) : '' ?>.</p>
+    <?php endforeach; ?>
     <?php endif; ?>
 
 <?php if (!$days): ?>
