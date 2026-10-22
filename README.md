@@ -1,6 +1,6 @@
 # ADYPU Academic Dashboard
 
-Daily attendance and room timetables for Ajeenkya D Y Patil University.
+Daily attendance, room timetables and teaching workload for Ajeenkya D Y Patil University.
 
 **Live:** <https://adypu-daybook.fast-page.org/>
 
@@ -13,26 +13,34 @@ Daily attendance and room timetables for Ajeenkya D Y Patil University.
 - **Drill down.** School, year, branch, division. The summary and charts follow.
 - **Export PDF.** A dated report of whatever is on screen.
 - **Knowledge partners** have their own tab and never count toward a school.
+- **Works on a phone.** Every page fits the screen; wide grids scroll inside themselves.
 
 ![Drilling into a school](docs/screenshots/drilldown.png)
+
+<img src="docs/screenshots/phone.png" alt="The dashboard on a phone" width="260">
 
 ## Room timetable
 
 - **Rooms.** Any room's week, picked by school and building.
 - **Free slots.** The same timetable with free time in green, for finding a room for an extra class.
 - **All rooms.** One switch shows every room's day on a single screen.
-- **Dean workload.** One person's week across every room.
+- **Overlapping slots.** Rooms booked twice at once, and teachers down for two rooms at once.
+- **Dean and Faculty workload.** One person's week across every room, with their weekly hours.
+- **Workload list.** Every teacher in a school with their weekly hours, ready to export as PDF.
 - **Attendance in the cell.** Tap a class to see its attendance by division.
 
 ![All rooms at once](docs/screenshots/all-rooms.png)
 
 ![Free slots](docs/screenshots/free-slots.png)
 
+![Overlapping slots](docs/screenshots/overlaps.png)
+
 ## Faculty accounts
 
 - **Sign up** with the school's join code, or wait for an admin to approve.
 - **Mark attendance** from a phone: tick the absentees, or type a count.
 - **Admins** approve accounts, rotate join codes, reset passwords and see usage.
+- **Activity log** (admins): who signed in, marked or failed, plus a leaderboard of Form and app entries.
 
 The dashboard and timetable are open to everyone. Only marking needs an account.
 
@@ -63,6 +71,7 @@ Tests are plain assert scripts:
 php -d zend.assertions=1 tests/test_attendance_parser.php
 php -d zend.assertions=1 tests/test_marking.php
 php -d zend.assertions=1 tests/test_timetable.php
+php -d zend.assertions=1 tests/test_activity.php
 node tests/test_charts.js
 ```
 
@@ -77,9 +86,9 @@ node tests/test_charts.js
 | Path | What it is |
 | --- | --- |
 | `index.php` | Attendance dashboard |
-| `rooms.php` | Room timetable, Free slots, All rooms, Dean workload |
-| `mark.php`, `login.php`, `admin.php` | Faculty marking and accounts |
-| `stats.php` | Usage, admins only |
+| `rooms.php` | Room timetable, Free slots, Overlapping slots, Dean and Faculty workload |
+| `mark.php`, `login.php`, `account.php`, `admin.php` | Faculty marking and accounts |
+| `stats.php`, `activity.php` | Usage and the activity log, admins only |
 | `api/` | Push endpoint and the division breakdown |
 | `includes/` | Parsing, structure, timetable, accounts, storage |
 | `js/`, `css/` | Front end, no libraries |
