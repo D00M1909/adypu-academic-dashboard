@@ -215,9 +215,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
     $classesShown = count(array_filter($teaching, fn($x) => in_array($x['day'], $days, true)));
     // A dean's workload is always the whole week's teaching hours, even on
     // the one-day view: it is a weekly figure, and a day's would read as one.
-    // Plus any hours no timetable places at a time and room (timetable_extra()).
-    $extra = $person ? timetable_extra($t, $person) : [];
-    $load = timetable_hours($teaching, $person['count_each_group'] ?? false) + array_sum(array_column($extra, 'hours'));
+    $load = timetable_hours($teaching, $person['count_each_group'] ?? false);
     $hours = $load == round($load) ? (string) (int) $load : number_format($load, 1);
     $hasClash = false;
     $hasBlocked = false;
@@ -357,7 +355,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
             'title' => $x['blocked'] !== '' ? $x['blocked'] . ' (booked)' : $x['code'],
             'class' => $x['class'],
             'faculty' => $x['faculty'],
-            'when' => "$d, {$x['time']}" . ($x['span'] > 1 ? " ({$x['span']} hours)" : '') . ' in ' . timetable_room_label($x['room'] ?? $room) . ', ' . ($x['ulc'] ?? $ulc),
+            'when' => "$d, {$x['time']}" . ($x['span'] > 1 ? " ({$x['span']} hours)" : '') . (($x['room'] ?? $room) === '' ? ', no room on any timetable' : ' in ' . timetable_room_label($x['room'] ?? $room) . ', ' . ($x['ulc'] ?? $ulc)),
             'att' => $att,
             'src' => $src,
         ];
@@ -488,8 +486,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
     // hours: every school they teach in, the same figure their own page shows.
     $workloads = [];
     foreach ($shownFaculty as $id => $p) {
-        $load = timetable_hours(timetable_teaching($fullWeek, $p), $p['count_each_group'] ?? false)
-            + array_sum(array_column(timetable_extra($t, $p), 'hours'));
+        $load = timetable_hours(timetable_teaching($fullWeek, $p), $p['count_each_group'] ?? false);
         $workloads[$id] = $load == round($load) ? (string) (int) $load : number_format($load, 1);
     }
     $schoolName = $school === '' ? 'All schools' : ($schools[$school]['name'] ?? $school); ?>
@@ -680,11 +677,8 @@ page_head('Room timetable', 'page-wide', 'timetable');
     <dl class="tt-stats">
       <div title="Every class they teach in the week, by its length: a two-hour lab counts as two"><dt>Weekly workload</dt><dd><?= $hours ?> <small>hour<?= $load == 1 ? '' : 's' ?></small></dd></div>
       <div><dt>Classes a week</dt><dd><?= count($teaching) ?></dd></div>
-      <div><dt>Rooms</dt><dd><?= count(array_unique(array_column($teaching, 'room'))) ?></dd></div>
+      <div><dt>Rooms</dt><dd><?= count(array_filter(array_unique(array_column($teaching, 'room')), 'strlen')) ?></dd></div>
     </dl>
-    <?php foreach ($extra as $x): ?>
-    <p class="field-help tt-extra">Workload includes <?= $e((string) $x['hours']) ?> hour<?= $x['hours'] == 1 ? '' : 's' ?> a week not on the timetable<?= $x['what'] !== '' ? ': ' . $e($x['what']) : '' ?>.</p>
-    <?php endforeach; ?>
     <?php endif; ?>
 
 <?php if (!$days): ?>
@@ -761,7 +755,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
                       <strong><?= $e($x['code']) ?><?php if ($x['lab']): ?> <span class="tt-tag tt-tag-lab">Lab</span><?php endif; ?></strong>
                       <?php if ($cell['rows'] > 1): ?><span class="tt-span"><?= $e(timetable_span_label($x)) ?></span><?php endif; ?>
                       <span class="tt-class"><?= $e($x['class']) ?></span>
-                      <?php if ($person): ?><span class="tt-faculty">Room <?= $e(timetable_room_label($x['room'])) ?>, <?= $e($x['ulc']) ?></span><?php elseif ($x['faculty'] !== ''): ?><span class="tt-faculty"><?= $e($x['faculty']) ?></span><?php endif; ?>
+                      <?php if ($person): ?><span class="tt-faculty"><?= $x['room'] === '' ? 'No room on any timetable' : 'Room ' . $e(timetable_room_label($x['room'])) . ', ' . $e($x['ulc']) ?></span><?php elseif ($x['faculty'] !== ''): ?><span class="tt-faculty"><?= $e($x['faculty']) ?></span><?php endif; ?>
                       <?php if ($att): ?>
                         <span class="tt-att<?= $att['marked'] ? '' : ' tt-att-none' ?>"><?= $att['marked'] ? $att['present'] . '/' . $att['strength'] . ' present' . ($att['marked'] < count($att['classes']) ? " &middot; {$att['marked']} of " . count($att['classes']) . ' marked' : '') : 'Not marked' ?></span>
                       <?php endif; ?>

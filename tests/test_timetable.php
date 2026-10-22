@@ -222,11 +222,17 @@ assert($which('B.Tech CSE Sem III Div A') === ['2nd Year/CSE/A'] && $which('B.Te
 // CS is Cyber Security: its own branch, never CSE's or SE's.
 assert($which('B.Tech CS Sem V Div A') === ['3rd Year/CS/A']);
 
-// Hours no timetable places (an MDMC course's): matched by any spelling,
-// and a nameless or hourless one is dropped.
-$extra = timetable_parse_extra([['name' => 'Ms. Asha Rao', 'hours' => 5, 'what' => 'MDMC'], ['name' => '', 'hours' => 2], ['name' => 'B', 'hours' => 0]]);
-assert($extra === [['person' => 'asha rao', 'hours' => 5.0, 'what' => 'MDMC']]);
-assert(timetable_extra(['extra' => $extra], ['as' => ['asha rao']]) === $extra && timetable_extra(['extra' => $extra], ['as' => ['ravi rao']]) === []);
+// Classes no timetable puts in a room (an MDMC course): on the person's own
+// week with no room, never in a room's grid. A period on a slot the grid does
+// not draw is dropped.
+$slotsX = ['9.30 to 10.30' => ['time' => '9.30 to 10.30', 'break' => ''], '4.30 to 5.30' => ['time' => '4.30 to 5.30', 'break' => '']];
+$extra = timetable_parse_extra([['name' => 'Ms. Asha Rao', 'what' => 'Ethical Hacking', 'class' => 'MDMC III Year',
+    'slots' => [['Wednesday', '9.30 to 10.30', 2, true], ['Friday', '4.30 to 5.30', 1, false], ['Friday', '7.00 to 8.00', 1, false]]], ['name' => '']],
+    ['Monday', 'Wednesday', 'Friday'], $slotsX);
+assert(count($extra) === 2 && $extra[0]['person'] === 'asha rao' && $extra[0]['span'] === 2 && $extra[0]['lab'] === true);
+$mine = timetable_teaching(['rooms' => ['101' => []], 'buildings' => ['ULC 1' => ['101']], 'extra' => $extra], ['as' => ['asha rao']]);
+assert(count($mine) === 2 && $mine[0]['room'] === '' && !isset($mine[0]['person']) && timetable_hours($mine) == 3);
+assert(timetable_teaching(['rooms' => [], 'buildings' => [], 'extra' => $extra], ['as' => ['ravi rao']]) === []);
 assert($which('B.Tech BT-FT Sem V') === ['3rd Year/Biotechnology/Food Technology'] && $which('B.Tech BT Sem III') === ['2nd Year/Biotechnology/A']);
 assert($which('B.Tech ME-AE Sem III') === ['2nd Year/Mechanical/A'] && $which('B.Tech Civil Sem III (SE-A)') === ['2nd Year/Civil Engineering/A']);
 assert($which('M.Tech BT Sem I') === ['1st Year/M. Tech/Biotechnology']);

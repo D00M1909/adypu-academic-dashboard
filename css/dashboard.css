@@ -1481,7 +1481,6 @@ input:focus-visible, select:focus-visible {
 /* A dean's week in figures, under their name: label over number, like the
    Usage page's stats, each separated by a hairline. */
 .tt-stats { display: flex; flex-wrap: wrap; gap: 10px 0; margin: -4px 0 14px; padding: 0; }
-.tt-extra { margin: -6px 0 14px; }
 .tt-stats div { display: flex; flex-direction: column; gap: 2px; padding: 0 24px; border-left: 1px solid var(--hairline); }
 .tt-stats div:first-child { padding-left: 0; border-left: 0; }
 .tt-stats dt { margin: 0; font-size: 12px; font-weight: 600; color: var(--ink-muted); }

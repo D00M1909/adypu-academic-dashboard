@@ -192,27 +192,32 @@ function timetable_parse(string $json): array|string {
         'calendars' => $calendars,
         'docs' => $docs,
         'deans' => timetable_parse_deans($raw['deans'] ?? []),
-        'extra' => timetable_parse_extra($raw['extra'] ?? []),
+        'extra' => timetable_parse_extra($raw['extra'] ?? [], $days, $slots),
     ];
 }
 
-// Teaching a person has that no timetable places at a time and room (an MDMC
-// course whose hours the sheet leaves to the minor's teachers): name as the
-// timetable spells it, hours a week, and what for. Added to their workload.
-function timetable_parse_extra(mixed $list): array {
+// Classes a person teaches that no school's timetable puts in a room (an MDMC
+// course run across programmes): bookings with no room, which go on that
+// person's own week and workload only. A room's grid, Free slots and the
+// overlaps never see them, so they can never sit where a real class is.
+// [day, slot label, hours, lab] per period; one on a day or slot the grid
+// does not draw is dropped, like any other booking.
+function timetable_parse_extra(mixed $list, array $days, array $slots): array {
+    $str = fn($v): string => is_scalar($v) ? trim((string) $v) : '';
     $out = [];
     foreach ((array) $list as $x) {
-        $name = is_array($x) && is_scalar($x['name'] ?? null) ? trim((string) $x['name']) : '';
-        $hours = is_numeric($x['hours'] ?? null) ? (float) $x['hours'] : 0.0;
-        if ($name === '' || $hours <= 0) continue;
-        $out[] = ['person' => timetable_person($name), 'hours' => $hours, 'what' => is_scalar($x['what'] ?? null) ? trim((string) $x['what']) : ''];
+        $name = is_array($x) ? $str($x['name'] ?? '') : '';
+        if ($name === '') continue;
+        foreach ((array) ($x['slots'] ?? []) as $s) {
+            $day = $str($s[0] ?? '');
+            $time = $str($s[1] ?? '');
+            if (!in_array($day, $days, true) || !isset($slots[$time])) continue;
+            $out[] = ['person' => timetable_person($name), 'day' => $day, 'time' => $time,
+                'span' => max(1, min(4, (int) ($s[2] ?? 1))), 'code' => $str($x['what'] ?? ''), 'class' => $str($x['class'] ?? ''),
+                'classes' => [], 'faculty' => $name, 'lab' => !empty($s[3]), 'blocked' => '', 'src' => []];
+        }
     }
     return $out;
-}
-
-// A person's extra hours (timetable_parse_extra()), matched by any of their spellings.
-function timetable_extra(array $t, array $person): array {
-    return array_values(array_filter($t['extra'] ?? [], fn($x) => in_array($x['person'], $person['as'] ?? [], true)));
 }
 
 // The people the Dean picker offers: name and role as the university lists
@@ -293,6 +298,10 @@ function timetable_teaching(array $t, array $person): array {
                 }
             }
         }
+    }
+    // Plus their classes that no timetable puts in a room (timetable_parse_extra()).
+    foreach ($t['extra'] ?? [] as $x) {
+        if (in_array($x['person'], $person['as'] ?? [], true)) $mine[] = ['room' => '', 'ulc' => ''] + array_diff_key($x, ['person' => 1]);
     }
     return $mine;
 }
