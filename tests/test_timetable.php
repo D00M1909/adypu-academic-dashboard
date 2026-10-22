@@ -233,6 +233,22 @@ assert(count($extra) === 2 && $extra[0]['person'] === 'asha rao' && $extra[0]['s
 $mine = timetable_teaching(['rooms' => ['101' => []], 'buildings' => ['ULC 1' => ['101']], 'extra' => $extra], ['as' => ['asha rao']]);
 assert(count($mine) === 2 && $mine[0]['room'] === '' && !isset($mine[0]['person']) && timetable_hours($mine) == 3);
 assert(timetable_teaching(['rooms' => [], 'buildings' => [], 'extra' => $extra], ['as' => ['ravi rao']]) === []);
+// A group ('names') credits each member with the same periods, and a period
+// overlapping one the person already has (another minor at 4.45 against
+// 4.30, or a room booking) counts once.
+$slotsX['4.45 to 5.45'] = ['time' => '4.45 to 5.45', 'break' => ''];
+$group = timetable_parse_extra([
+    ['names' => ['Dr. A One', 'Dr. B Two'], 'what' => 'MDMC Minor', 'class' => 'B.Tech CSE Sem III (MDMC)', 'slots' => [['Monday', '4.30 to 5.30', 1, false]]],
+    ['names' => ['Dr. A One'], 'what' => 'MDMC Minor', 'class' => 'B.Tech AIDS Sem III (MDMC)', 'slots' => [['Monday', '4.45 to 5.45', 1, false], ['Wednesday', '4.45 to 5.45', 1, false]]],
+], ['Monday', 'Wednesday'], $slotsX);
+assert(count($group) === 4);
+$tg = ['rooms' => ['101' => [['day' => 'Wednesday', 'time' => '4.30 to 5.30', 'span' => 1, 'code' => 'X', 'class' => 'B.Tech CSE Sem V Div A', 'classes' => [], 'faculty' => 'Dr. A One', 'lab' => false, 'blocked' => '', 'src' => []]]],
+    'buildings' => ['ULC 1' => ['101']], 'extra' => $group];
+$one = timetable_teaching($tg, ['as' => ['a one']]);
+assert(count($one) === 2 && timetable_hours($one) == 2 && $one[1]['time'] === '4.30 to 5.30' && $one[1]['day'] === 'Monday');
+assert(timetable_hours(timetable_teaching($tg, ['as' => ['b two']])) == 1);
+// Someone with only roomless classes is still in the Faculty picker.
+assert(isset(timetable_faculty($tg + ['calendars' => []])['b-two']));
 assert($which('B.Tech BT-FT Sem V') === ['3rd Year/Biotechnology/Food Technology'] && $which('B.Tech BT Sem III') === ['2nd Year/Biotechnology/A']);
 assert($which('B.Tech ME-AE Sem III') === ['2nd Year/Mechanical/A'] && $which('B.Tech Civil Sem III (SE-A)') === ['2nd Year/Civil Engineering/A']);
 assert($which('M.Tech BT Sem I') === ['1st Year/M. Tech/Biotechnology']);

@@ -355,7 +355,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
             'title' => $x['blocked'] !== '' ? $x['blocked'] . ' (booked)' : $x['code'],
             'class' => $x['class'],
             'faculty' => $x['faculty'],
-            'when' => "$d, {$x['time']}" . ($x['span'] > 1 ? " ({$x['span']} hours)" : '') . (($x['room'] ?? $room) === '' ? ', no room on any timetable' : ' in ' . timetable_room_label($x['room'] ?? $room) . ', ' . ($x['ulc'] ?? $ulc)),
+            'when' => "$d, {$x['time']}" . ($x['span'] > 1 ? " ({$x['span']} hours)" : '') . (($x['room'] ?? $room) === '' ? '' : ' in ' . timetable_room_label($x['room'] ?? $room) . ', ' . ($x['ulc'] ?? $ulc)),
             'att' => $att,
             'src' => $src,
         ];
@@ -755,7 +755,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
                       <strong><?= $e($x['code']) ?><?php if ($x['lab']): ?> <span class="tt-tag tt-tag-lab">Lab</span><?php endif; ?></strong>
                       <?php if ($cell['rows'] > 1): ?><span class="tt-span"><?= $e(timetable_span_label($x)) ?></span><?php endif; ?>
                       <span class="tt-class"><?= $e($x['class']) ?></span>
-                      <?php if ($person): ?><span class="tt-faculty"><?= $x['room'] === '' ? 'No room on any timetable' : 'Room ' . $e(timetable_room_label($x['room'])) . ', ' . $e($x['ulc']) ?></span><?php elseif ($x['faculty'] !== ''): ?><span class="tt-faculty"><?= $e($x['faculty']) ?></span><?php endif; ?>
+                      <?php if ($person): ?><?php if ($x['room'] !== ''): ?><span class="tt-faculty">Room <?= $e(timetable_room_label($x['room'])) ?>, <?= $e($x['ulc']) ?></span><?php endif; ?><?php elseif ($x['faculty'] !== ''): ?><span class="tt-faculty"><?= $e($x['faculty']) ?></span><?php endif; ?>
                       <?php if ($att): ?>
                         <span class="tt-att<?= $att['marked'] ? '' : ' tt-att-none' ?>"><?= $att['marked'] ? $att['present'] . '/' . $att['strength'] . ' present' . ($att['marked'] < count($att['classes']) ? " &middot; {$att['marked']} of " . count($att['classes']) . ' marked' : '') : 'Not marked' ?></span>
                       <?php endif; ?>

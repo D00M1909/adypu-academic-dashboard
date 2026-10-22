@@ -201,13 +201,15 @@ function timetable_parse(string $json): array|string {
 // person's own week and workload only. A room's grid, Free slots and the
 // overlaps never see them, so they can never sit where a real class is.
 // [day, slot label, hours, lab] per period; one on a day or slot the grid
-// does not draw is dropped, like any other booking.
+// does not draw is dropped, like any other booking. 'names' credits a group
+// (an MDMC minor's teachers, none of whom the sheet gives the hour to) with
+// the same periods, one booking each.
 function timetable_parse_extra(mixed $list, array $days, array $slots): array {
     $str = fn($v): string => is_scalar($v) ? trim((string) $v) : '';
     $out = [];
     foreach ((array) $list as $x) {
-        $name = is_array($x) ? $str($x['name'] ?? '') : '';
-        if ($name === '') continue;
+        if (!is_array($x)) continue;
+        foreach (array_filter(array_map($str, (array) ($x['names'] ?? $x['name'] ?? [])), 'strlen') as $name)
         foreach ((array) ($x['slots'] ?? []) as $s) {
             $day = $str($s[0] ?? '');
             $time = $str($s[1] ?? '');
@@ -299,9 +301,17 @@ function timetable_teaching(array $t, array $person): array {
             }
         }
     }
-    // Plus their classes that no timetable puts in a room (timetable_parse_extra()).
+    // Plus their classes that no timetable puts in a room (timetable_parse_extra()),
+    // each only where it overlaps nothing they already have: one person cannot
+    // take two minors at once, so a group's credit never counts an hour twice.
     foreach ($t['extra'] ?? [] as $x) {
-        if (in_array($x['person'], $person['as'] ?? [], true)) $mine[] = ['room' => '', 'ulc' => ''] + array_diff_key($x, ['person' => 1]);
+        if (!in_array($x['person'], $person['as'] ?? [], true) || !($m = timetable_minutes($x['time']))) continue;
+        $end = timetable_end($x);
+        foreach ($mine as $b) {
+            $bm = timetable_minutes($b['time']);
+            if ($b['day'] === $x['day'] && $bm && $bm[0] < $end && $m[0] < timetable_end($b)) continue 2;
+        }
+        $mine[] = ['room' => '', 'ulc' => ''] + array_diff_key($x, ['person' => 1]);
     }
     return $mine;
 }
@@ -331,6 +341,8 @@ function timetable_faculty(array $t): array {
     foreach ($t['calendars'] ?? [] as $c) {
         foreach ($c['subjects'] as [, $f]) $add($f, timetable_schools(['blocked' => '', 'class' => $c['class']]));
     }
+    // Someone whose only classes have no room (an MDMC group's) still teaches.
+    foreach ($t['extra'] ?? [] as $x) $add($x['faculty'], timetable_schools(['blocked' => '', 'class' => $x['class']]));
     $deanOf = [];
     foreach ($t['deans'] ?? [] as $id => $d) foreach ($d['as'] as $a) $deanOf[$a] = $id;
     $out = [];
