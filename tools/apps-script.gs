@@ -28,6 +28,11 @@
  *      only about a third of runs get past the host's bot check, so the gap
  *      between successes is several times the trigger interval.
  *   6. Run pushStatus() any time to see when the last push actually landed.
+ *   7. Deploy -> New deployment -> Web app, Execute as: Me, Who has access:
+ *      Anyone. Its /exec url is what the hub's project card reads its usage
+ *      numbers from (see doGet()). After pasting a new version of this file,
+ *      Deploy -> Manage deployments -> edit -> Version: New version, or the
+ *      url keeps running the old code.
  *
  * The Form needs a Date question in its first section, shared by every school,
  * so faculty can report a class they held yesterday. Its column is what the
@@ -101,6 +106,7 @@ function pushNow() {
     try {
       const extra = attemptPush(payload, target);
       Logger.log(target.name + ': ' + (extra.ok ? 'pushed ' + extra.result.rows + ' rows' : extra.problem));
+      if (extra.ok) keepUsage(extra.result);
     } catch (e) {
       Logger.log(target.name + ': ' + e.message);
     }
@@ -163,6 +169,7 @@ function recordSuccess(result) {
   const props = PropertiesService.getScriptProperties();
   props.setProperty('lastSuccess', new Date().toISOString());
   props.setProperty('consecutiveFailures', '0');
+  keepUsage(result);
   Logger.log(
     'pushed ' + result.rows + ' rows across ' + result.days + ' days. ' +
     'On ' + result.latest + ' (the day the dashboard opens on): ' +
@@ -196,6 +203,16 @@ function recordFailure(problem) {
   Logger.log('giving up this run, next run will retry. ' + summary);
 }
 
+// The 30-day totals for doGet(), from whichever site sent them: only a site on
+// the current code answers with `usage` (the old site, on the old-site tag,
+// never does), so the first target need not be the one that has them. A push
+// that could not total them leaves the last good copy in place.
+function keepUsage(result) {
+  if (result.usage) {
+    PropertiesService.getScriptProperties().setProperty('usage', JSON.stringify(result.usage));
+  }
+}
+
 /** Run by hand to see whether pushes are actually landing. */
 function pushStatus() {
   const props = PropertiesService.getScriptProperties();
@@ -204,6 +221,21 @@ function pushStatus() {
     '\nconsecutive failures: ' + (props.getProperty('consecutiveFailures') || '0') +
     '\nlast problem: ' + (props.getProperty('lastProblem') || 'none')
   );
+}
+
+/**
+ * The hub's Academic Dashboard card fetches this (the web app url, setup step
+ * 7) for its "attendance updates and page views in 30 days" line. The numbers
+ * ride back on each push (api/ingest.php) rather than the hub asking the
+ * dashboard itself, because the host's bot check would answer most visitors'
+ * browsers with HTML. Totals only. Until the first push lands it answers
+ * {"ok":false} and the hub keeps the figures typed into its page.
+ */
+function doGet() {
+  const usage = PropertiesService.getScriptProperties().getProperty('usage');
+  const body = usage ? Object.assign({ ok: true }, JSON.parse(usage)) : { ok: false };
+  return ContentService.createTextOutput(JSON.stringify(body))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 /**

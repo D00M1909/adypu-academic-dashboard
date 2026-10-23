@@ -13,6 +13,7 @@ require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/page.php';
 require_once __DIR__ . '/includes/structure.php';
 require_once __DIR__ . '/includes/traffic.php';
+require_once __DIR__ . '/includes/usage.php';
 
 header('Cache-Control: no-store');
 auth_boot();
@@ -37,28 +38,12 @@ $traffic = traffic_days();
 $schoolKeys = array_flip(array_map('class_key', class_rows()));
 $partnerKeys = array_flip(array_map('class_key', partner_rows()));
 
-$readings = fn(array $classes): int => array_sum(array_map(fn($r) => count((array) $r), $classes));
-
 $today = date('Y-m-d');
 $dates = [];
 for ($i = 0; $i < $span; $i++) $dates[] = date('Y-m-d', strtotime("-$i day"));
 
-// Every entry, not every lecture: a Form row re-submitted or filed today for
-// yesterday's class counts today, once per submission (the user's call, 21
-// Oct 2026: the bigger number, the same one Activity shows). Form rows by the
-// day the sheet's Timestamp says, from the log each push writes (form_log());
-// app saves by the day they were made, from the activity log. Before that log
-// began, a day's app entries are its app readings, the closest there is.
-$formEntries = [];
-foreach ((array) (store_read('formlog')['rows'] ?? []) as $r) {
-    $on = substr((string) ($r['at'] ?? ''), 0, 10);
-    if ($on !== '') $formEntries[$on] = ($formEntries[$on] ?? 0) + 1;
-}
-$logFrom = activity_first_day();
-$appEntries = [];
-foreach ($logFrom === null ? [] : activity_range(max($logFrom, end($dates)), $today) as $x) {
-    if ($x['type'] === 'mark') $appEntries[$x['day']] = ($appEntries[$x['day']] ?? 0) + 1;
-}
+// Entries filed per day (includes/usage.php).
+$entries = usage_entries($dates);
 
 $rows = [];
 foreach ($dates as $d) {
@@ -73,13 +58,12 @@ foreach ($dates as $d) {
         unset($names['']);
         return count($names);
     };
-    $inApp = $readings($app[$d] ?? []);
     $rows[$d] = [
         'visitors' => (int) ($t['visitors'] ?? 0),
-        'views'    => array_sum($views) - (int) ($views['push'] ?? 0),
+        'views'    => usage_views($t),
         'pushes'   => (int) ($views['push'] ?? 0),
-        'form'     => $formEntries[$d] ?? 0,
-        'app'      => $logFrom !== null && $d >= $logFrom ? ($appEntries[$d] ?? 0) : $inApp,
+        'form'     => $entries[$d]['form'],
+        'app'      => $entries[$d]['app'],
         'schools'  => count(array_intersect_key($classes, $schoolKeys)),
         'partners' => count(array_intersect_key($classes, $partnerKeys)),
         'faculty'  => $people($faculty[$d] ?? []),

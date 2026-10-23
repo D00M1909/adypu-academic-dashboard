@@ -13,6 +13,7 @@
 require_once __DIR__ . '/../includes/attendance.php';
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../includes/traffic.php';
+require_once __DIR__ . '/../includes/usage.php';
 
 header('Content-Type: application/json');
 
@@ -88,6 +89,14 @@ traffic_hit('push');
 // what the dashboard will actually show, so the push log and the site agree.
 [$from, $to] = resolve_range($days);
 $totals = attendance_totals(aggregate_days($days, $from, $to));
+// The hub's project card quotes these. The Apps Script keeps the last copy and
+// serves it, because the hub's visitors would mostly meet the host's bot check
+// if they asked here. Totals only, nothing that names anyone.
+try {
+    $usage = usage_brag();
+} catch (Throwable $e) {
+    $usage = null;
+}
 echo json_encode([
     'ok'       => true,
     'rows'     => count($rows),
@@ -100,4 +109,5 @@ echo json_encode([
     // Rows the Form holds but the structure doesn't recognise. Echoed back so
     // the Apps Script log names them instead of them just not being counted.
     'skipped'  => array_values(array_unique($skipped)),
+    'usage'    => $usage,
 ]);
