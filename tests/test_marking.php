@@ -235,7 +235,12 @@ if (auth_login('teacher@adypu.edu.in', 'old-password') === '') \$fail('a faculty
 if (auth_login('teacher@adypu.edu.in', 'new-password') !== '') \$fail('a faculty new password does not work');
 if (!empty(auth_find('teacher@adypu.edu.in')['admin'])) \$fail('a faculty change granted admin');
 
-foreach (glob(STORE_DIR . '/*.php') ?: [] as \$f) unlink(\$f);
+// Signing in writes activity/<date>.php too, so clear subfolders as well, or
+// rmdir fails and a folder is left beside the repo on every run.
+\$files = new RecursiveIteratorIterator(
+    new RecursiveDirectoryIterator(STORE_DIR, FilesystemIterator::SKIP_DOTS),
+    RecursiveIteratorIterator::CHILD_FIRST);
+foreach (\$files as \$f) \$f->isDir() ? rmdir(\$f->getPathname()) : unlink(\$f->getPathname());
 @rmdir(STORE_DIR);
 echo 'bootstrap-ok';
 PHP);
