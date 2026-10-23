@@ -1,33 +1,37 @@
 # ADYPU Academic Dashboard — Project Spec
 
-Single source of truth for this project. Written 26 Aug 2026, before implementation
-started. Read this first.
+How the project works as built. First written 26 Aug 2026 as a plan; rewritten
+23 Oct 2026 to match what ships. Read this first.
 
 ---
 
 ## 1. What this is
 
-A live academic dashboard for Ajeenkya D Y Patil University: drill down from
-**School → Year → Division → individual student attendance**.
+Daily attendance, room timetables and teaching workload for Ajeenkya D Y Patil
+University, live at <https://adypu-daybook.fast-page.org/>.
 
-It is a **separate project** from `adypuacademicreport` (the sibling folder). That
-one is a monthly chairman's report site — admissions, placements, research,
-events, rankings, rendered from monthly Excel workbooks. This one is the live
-day-to-day academic/attendance view. They share branding and should feel like one
-product, but they are separate repos with separate data.
+It is a separate project from `adypuacademicreport` (the monthly chairman's
+report site). The two share branding and should feel like one product, but they
+are separate repos with separate data.
 
-## 2. Status
+## 2. Pages
 
-| | |
-|---|---|
-| Layout decision | **Option B** (see §5) — decided 26 Aug 2026 |
-| Code written | initial implementation in progress |
-| Data source for attendance | **resolved — see §8.1**: Google Form → Sheet, PHP reads it server-side |
-| Visual mockups | `design/adypu-drilldown-design-options.html`, untracked, open in a browser |
+| Page | Who | What |
+|---|---|---|
+| `index.php` | everyone | Attendance dashboard. `?view=partners` is the Knowledge Partner tab |
+| `rooms.php` | everyone | Room timetable: Rooms, Free slots, All rooms, Overlapping slots, Dean and Faculty workload |
+| `login.php` | faculty | Sign in, sign up with a school join code |
+| `mark.php` | faculty | Mark attendance from a phone: tick absentees, or type a count |
+| `account.php` | faculty | Name and password |
+| `admin.php` | admin | Faculty accounts, the signup queue, join codes, temporary passwords |
+| `stats.php` | admin | Usage: visitors, page views, pushes received, classes reported |
+| `activity.php` | admin | Per-account log, a leaderboard of who files, the accounts list |
+| `source.php` | local only | A timetable cell in its source document (off on the live site) |
 
-## 3. Brand tokens
+Header: Attendance and Timetable tabs, Mark attendance (signed in), a theme
+switch, the account menu. No emoji anywhere: icons are the inline SVG sprite.
 
-Inherited from the existing report site so the two match.
+## 3. Brand
 
 | Token | Value |
 |---|---|
@@ -35,179 +39,136 @@ Inherited from the existing report site so the two match.
 | Secondary red | `#99151F` |
 | Tint / active background | `#fef2f2` |
 | Total-row background / text | `#fde3e6` / `#7a1017` |
-| Surface | `#f8fafc` |
-| Hairline border | `#f1f5f9` |
-| Radius | 14px tiles, 18px cards |
-| Modal shadow | `0 20px 50px rgba(0,0,0,.2)` |
+| Fonts | IBM Plex Sans (text), IBM Plex Mono (numbers), Playfair Display (titles) |
 
-Gradient header, rounded cards, layered shadows — same visual language as the
-sibling site's `css/dashboard.css`.
+Light and dark themes; the choice is remembered. Tab bars are grey pills with
+red text on the selected tab. Every page fits a phone; wide grids scroll
+inside themselves.
 
-## 4. Navigation shell
+## 4. Schools and partners
 
-Two top-level tabs:
+Nine schools, ids shared with the sibling project:
+`eng` `mgmt` `law` `design` `science` `arch` `hosp` `lib` `film`.
 
-- **ADYPU** (default) — all nine schools.
-- **Knowledge Partner** — MoU partner institutions with metadata tags. Sample
-  names from the mockup: Partner Institute of Technology, Global Skills Academy,
-  Horizon Career Institute, Sunrise Polytechnic.
+**Knowledge partners are their own tree** (partner → year → program →
+division), ids `kp-<name>`. They never count toward a school tile, the
+university percentage or the classes-reported pill, and show only on the
+Partners tab with their own totals.
 
-The nine schools, with the ids the sibling project already uses (reuse these so
-data can be cross-referenced later):
+## 5. Data model
 
-| id | School |
-|---|---|
-| `eng` | School of Engineering |
-| `mgmt` | School of Management |
-| `law` | School of Law |
-| `design` | School of Design |
-| `science` | School of Science |
-| `arch` | School of Architecture |
-| `hosp` | School of Hospitality |
-| `lib` | School of Liberal Arts |
-| `film` | School of Film & Media |
+**`includes/structure.php` is canonical**: every School → Year → Branch →
+Division that exists, and its strength. Faculty submit only a present count;
+the denominator never comes from a submission. A school with no branches uses
+an empty branch and the UI skips that step. Years vary per school, never
+hardcoded. Schools whose headcounts have not arrived stay in
+`placeholder_schools()` rather than show a percentage over invented numbers.
 
-The sibling project also carries legacy aliases (`SOD`, `SOHM`, `SOS`, `SOFM`)
-mapping onto design/hospitality/science/film. Don't reproduce those here; they are
-a data-cleanliness wart, not a feature.
+**A reading is one present count per class per lecture**:
+`days[date][classKey][HH:MM] = present`, with a parallel `faculty` map for who
+filed it. A whole-day answer files under the slot `day`.
 
-## 5. Layout — Option B (decided)
+- A day's number for a class is its **latest** reading; earlier ones are kept
+  and listed under the class.
+- A date range **averages** each class's days, never sums, so a week reads like
+  a day; a class that reported once says so.
+- Percentages divide by the **classes that reported**, and are always shown
+  beside the `R/N classes reported` pill.
+- With no dates in the URL the page opens on the newest day that has data.
 
-One scrolling dashboard page, detail in a modal. Chosen over Option A because it
-matches the reference screenshots from the stakeholder meeting.
+**Rosters** (`data/roster/<school>.php`) are per school, keyed by class. A class
+with a roster gets a tick list in `mark.php` and `present` is computed on the
+server; one without gets a number box, clamped to its strength.
 
-**Top: four gradient-red stat cards**, each with an icon —
-Total Schools (9) · Total Strength (3000+) · Present Today (50/60) ·
-Attendance Date (25 Aug 2026).
-
-**Schools section** — 3-column tile grid, all nine schools, centered icon above
-label. Section title with right-aligned metadata (`9 schools`).
-
-**Years section** — appears for the selected school, titled
-`School of Engineering — Years`, 4-column tile grid, metadata reads
-`4 years · 2nd Year selected`. Active year filled red.
-
-**Tile styling** — background `#f8fafc`, border `#f1f5f9`, radius 14px.
-Active: background `#fef2f2`, text and border `#C21B27`.
-
-### Division-wise attendance modal
-
-Opens from the **Present Today** stat card.
-
-- Header: title "Present Students Today" in `#C21B27`, circular red refresh
-  button, close X.
-- Subtitle carries the context: `School of Engineering — Division-wise Present
-  Count (2nd Year)`.
-- 2-column grid, one row per division, label/value flex pair separated by
-  `border-bottom: #f1f5f9`. Mockup values: Div A 25/30, Div B 50/60,
-  Div C 18/30, Div D 7/30.
-- Total row: background `#fde3e6`, text `#7a1017`, aggregate `100/150` plus the
-  date.
-- Red **Report** button at the bottom with a drop shadow.
-
-### Option A — rejected, kept for reference
-
-A focused drill-down: school header with a "Live Sync Active" pulse badge, three
-KPI cards (Total Strength 312 · Present Today 50/60 · Divisions Shown 4), year
-pills, then division chips revealed **only after** a year is picked, then a
-student table (Roll No. | Name | Division | Attendance) with green/red status
-badges and a totals row.
-
-Not being built, but two ideas from it are worth keeping: the progressive
-disclosure of divisions, and the student-level table — Option B's modal stops at
-division counts and gives no per-student view. Decide whether that table appears
-later as a second modal or a sub-page.
-
-## 6. Data model
-
-**Year count varies per school.** Engineering has 4 years, Law has 5. Never
-hardcode 4 — derive the year tiles from the school's own record. This was the one
-constraint called out explicitly during the design session.
-
-**Branch is a real fourth level, confirmed for Engineering only (26 Aug 2026).**
-Cross-checked against `automatic-timetable-generator`'s live `timetable_db.classes`
-table (same machine, same MySQL server): Engineering's years don't just contain
-bare divisions — 2nd Year alone has AIDS (A–D), CSE (A–E), and ECE (A), where the
-same letter means different divisions depending on branch. A school with no
-confirmed branch data uses a single implicit branch (empty string), and the UI
-skips that step entirely — Year tile click goes straight to the division modal,
-same as before this layer existed. See `includes/attendance.php` for the
-confirmed Engineering structure and its source note. No other school has
-confirmed branch data yet.
-
-Rough shape:
+## 6. Data pipeline
 
 ```
-School   { id, name, years[] }
-Year     { label, branches[] }              // branches[] is [''] when unconfirmed
-Branch   { label, divisions[] }
-Division { label, strength, presentToday }
-Student  { rollNo, name, division, present }   // if per-student view is built
+Google Form -> response Sheet -> Apps Script (tools/apps-script.gs)
+                                    | POSTs the whole sheet as CSV,
+                                    | secret in X-Ingest-Secret
+                                    v
+                               api/ingest.php -> cache/attendance.json (replaced every push)
+
+Faculty phone -> mark.php -> data/submissions.php
+
+cache/attendance.json + data/submissions.php -> merge_readings() -> index.php, api/division.php
 ```
 
-## 7. Tech stack
+- **Push, not pull.** The host blocks outbound HTTP from PHP, so Google sends
+  the sheet to us. The cache file is the database; losing it costs nothing,
+  since the next push rebuilds it in full.
+- **Two writers, two files.** Ingest replaces its file on every push, so the app
+  writes its own; the two are merged on read, the app winning on the same class,
+  day and lecture.
+- **The Form** asks School (which jumps to that school's section), Class (one
+  dropdown per section, options from `php tools/form-options.php`), Present,
+  Date of class, Faculty name and Time slot. Question titles are not
+  load-bearing: a cell that parses as a real class label is the class.
+- **Rows naming no known class are dropped** and named in the Apps Script log
+  and the cache's `push` block.
+- **MySQL (`db/schema.sql`) is not read from.** `get_db()` is lazy and the app
+  runs without a database.
+- A fresh checkout with nothing pushed shows bundled sample rows.
 
-**PHP, no framework** — matching `automatic-timetable-generator`, the sibling
-project's own project (plain PHP, `includes/config.php` pattern, deployed by
-copying files onto XAMPP locally and InfinityFree for a shared link). Concretely:
+## 7. Accounts
 
-- `index.php` server-renders the shell (stat cards, school/year tile grids) from
-  data provided by `includes/attendance.php`.
-- `api/division.php` — a small JSON endpoint the modal's JS calls for a given
-  school + year's division breakdown; also used by the modal's refresh button to
-  force a fresh pull past the cache.
-- `css/dashboard.css` + `js/dashboard.js` — plain non-module JS (`<script src>`,
-  functions on `window` for inline handlers), no CDN libraries needed for v1.
-- `includes/config.php` — MySQL connection (mysqli), lazy (`get_db()` only
-  connects when called) so the app doesn't require a DB to run — see §7.1.
-- No Composer dependencies for v1; add one only if a real need shows up (e.g.
-  parsing a non-CSV export format).
+The dashboard and timetable are open to everyone; only writing attendance needs
+a login. There is no email on the host, so:
 
-### 7.1 Data pipeline (resolves §8.1)
+- Signup takes a per-school **join code** (instant); a wrong code queues the
+  request for an admin instead of refusing it.
+- Recovery is an admin generating a temporary password, shown once.
+- The first admin is set in `includes/config.local.php` (server only).
+- Sessions carry only the email and re-read the account each request, so
+  disabling an account takes effect on its next click. A 30-day remember token
+  sits beside the session.
 
-- **Collection:** one Google Form, filled once a day per division by faculty —
-  Date, School, Year, Division, Strength, Present.
-- **Storage of record:** the Google Sheet the Form feeds *is* the source of
-  truth. `includes/attendance.php` fetches its published-to-web CSV export
-  server-side (`file_get_contents`), parses it (`str_getcsv`, no library), and
-  aggregates rows into School → Year → Division, keeping only the latest
-  submission per school/year/division/date (a resubmission overwrites same-day
-  data). Result is cached to `cache/attendance.json` with a 5-minute TTL so the
-  dashboard isn't hitting Google on every request.
-- **Sample data fallback:** until `SHEET_CSV_URL` is configured (the Form/Sheet
-  don't exist yet) or a fetch fails, `includes/attendance.php` serves bundled
-  sample rows shaped like real submissions, so the UI is buildable and testable
-  right now. Swapping to the real Sheet is a one-line env var, no code change.
-- **MySQL — nice to have, not read from yet.** `db/schema.sql` defines `schools`
-  (seeded with the nine ids from §4) and `attendance_records` (same shape as a
-  Sheet row: school, year, division, date, strength, present). The app never
-  queries these tables in v1 — they exist so a daily sync job can start writing
-  attendance history into them later (for trends over time) without a schema
-  change or an app-flow rewrite. `includes/config.php` connects lazily so
-  running the app doesn't require the DB to exist.
-- **Error handling:** if the Sheet is unreachable or a row is malformed, fall
-  back to the last good cached data rather than breaking the page — a
-  transient Google outage shouldn't take down a once-a-day dashboard.
+Everything the live site writes for itself lives in `data/`: JSON behind a
+`<?php exit; ?>` first line, so requesting one over the web returns a blank page.
+It is gitignored and never uploaded.
 
-## 8. Open questions — resolve before or during implementation
+## 8. Room timetable
 
-1. ~~**Where does attendance data come from?**~~ Resolved — see §7.1.
-2. **"Live Sync Active" and the modal's refresh button** imply polling a live
-   source. Decorative for now, or real? Depends on (1).
-3. **The Report button** — removed from the modal for now (26 Aug 2026); it was
-   a stub with no defined output. Re-add only once its report format is decided
-   (PDF? printable view? CSV export?).
-4. **Per-student table** — Option B has no per-student view. Needed for v1?
-5. **Knowledge Partner tab** — the mockup shows a partner list with tags, but no
-   drill-down was designed. What happens when a partner is clicked?
-6. **Total Strength "3000+"** — is the real number known, or is the rounded
-   figure intentional?
+Built offline from each school's timetable workbooks and PDFs by
+`tools/timetable/build.php` into `timetable/rooms.php`. The source documents and
+transcriptions carry faculty names, so they stay out of the repo
+(`tools/timetable/data/`, gitignored) and so does the built file.
 
-## 9. Suggested build order
+- **Rooms**: one room's week, picked by school, building and room. Opens on the
+  whole week.
+- **Free slots**: the same grid with free time in green, worked out by the clock
+  across the schools' different period times, 8.00 to 5.45.
+- **All rooms**: every room in a building as rows, one day at a time.
+- **Overlapping slots**: a room booked twice at once, or a teacher down for two
+  rooms at once.
+- **Dean / Faculty workload**: one person's week across every room and their
+  weekly hours, plus a per-school list of every teacher's hours.
+- **Classes with no room** (minors, sheets that name no room) count toward a
+  teacher's week and hours but never appear on a room grid.
+- Tapping a class shows its attendance for that lecture.
 
-1. Static shell: header, two tabs, four stat cards with hardcoded numbers.
-2. School tile grid, selection state.
-3. Year tile grid, driven by the selected school's record (variable year counts).
-4. Division modal off the Present Today card.
-5. Swap hardcoded data for whatever §8.1 resolves to.
-6. Report button, once §8.3 is answered.
+Design's timetables are dated calendars rather than weekly grids, so the week
+shown follows the date.
+
+## 9. Tech and deploy
+
+- PHP 8, no framework, no Composer. Plain `<script src>` JavaScript, no build
+  step. Charts are hand-drawn SVG (`js/charts.js`).
+- Hosted on InfinityFree: FTP only. `tools/stage-upload.sh [ref|--all]` copies
+  exactly the files to upload into `upload/`, paths intact. Never uploaded:
+  `tools/`, `tests/`, `data/`, `includes/config.local.php`.
+- Server-only config (`includes/config.local.php`): `INGEST_SECRET`, which must
+  match the Apps Script, and the first admin.
+- Pages send `Cache-Control: no-store`, because the host's edge caches pages.
+- Export PDF is the browser's print dialog over a print stylesheet.
+- Tests are assert scripts in `tests/`, no framework. Run PHP ones with
+  `php -d zend.assertions=1 -d assert.exception=1 tests/<file>.php`.
+
+## 10. Open items
+
+1. Real headcounts for Engineering 1st Year and the placeholder schools: the
+   one thing left that makes every percentage true.
+2. Student lists for the schools that have not sent one; each class moves from
+   the number box to a tick list as its list lands.
+3. Timetables for the schools not yet transcribed, and the abbreviations no
+   sheet explains.

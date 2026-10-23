@@ -1,6 +1,6 @@
 <?php
 // Attendance data pipeline: Google Form -> Apps Script push -> file cache ->
-// School -> Year -> Branch -> Division tree. See SPEC.md §7.1.
+// School -> Year -> Branch -> Division tree. See SPEC.md §5.
 // MySQL (db/schema.sql) is not read from here yet — this is the live path.
 // A school with no branch structure uses the single branch key '' (schools
 // other than eng — no confirmed branch data exists for them yet).
@@ -53,7 +53,7 @@ const KNOWLEDGE_PARTNERS = [
     ['name' => 'Noval',     'schools' => ['science']],
 ];
 
-// Used until real submissions arrive (SPEC.md §8.1). Shape matches a real row;
+// Used until real submissions arrive (SPEC.md §6). Shape matches a real row;
 // the present counts are synthetic. Strength comes from the canonical
 // structure, same as a real submission. Deliberately never written to the
 // cache file — in push mode that file IS the record, and seeding it with
@@ -175,7 +175,7 @@ function row_slot(array $header, array $fields): string {
 // Resolves one CSV row to a real class. Two row shapes are accepted: a "class"
 // column holding a full label ("School of Engineering / 2nd Year / CSE / A"),
 // and the four separate columns a hand-maintained sheet or the DB export uses. Either
-// way strength comes from structure.php, never from the row — see SPEC.md §7.1.
+// way strength comes from structure.php, never from the row — see SPEC.md §5.
 // A row naming a class that doesn't exist returns null and is dropped.
 function class_from_row(array $r): ?array {
     require_once __DIR__ . '/structure.php';
@@ -562,7 +562,7 @@ function read_attendance_cache(): ?array {
     return is_array($cached) && $cached ? $cached : null;
 }
 
-// Push mode (SPEC.md §7.1): InfinityFree blocks outbound HTTP from PHP, so
+// Push mode (SPEC.md §6): InfinityFree blocks outbound HTTP from PHP, so
 // Google pushes to api/ingest.php and this file IS the record. Nothing here
 // expires or refetches — there is nothing to refetch from.
 // What mark.php wrote, in exactly the shape day_map() produces, so nothing

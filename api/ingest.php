@@ -2,7 +2,7 @@
 // Receives the Form's response sheet, pushed by the Apps Script in
 // tools/apps-script.gs. Google pushes to us rather than us pulling from Google
 // because InfinityFree's free plan blocks outbound HTTP from PHP — inbound is
-// fine (SPEC.md §7.1).
+// fine (SPEC.md §6).
 //
 // Contract: POST, body is the whole sheet as CSV text, secret in the
 // X-Ingest-Secret header. Responds 200 with the row/class counts it stored.

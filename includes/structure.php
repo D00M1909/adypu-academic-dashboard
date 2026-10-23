@@ -1,6 +1,6 @@
 <?php
 // The canonical class list: every School -> Year -> Branch -> Division that
-// exists, and its strength. Two things depend on it (SPEC.md §7.1):
+// exists, and its strength. Two things depend on it (SPEC.md §5):
 //
 //   1. Strength. Faculty submit only a present count, so the denominator lives
 //      here and can't drift from a daily typo on the Form.

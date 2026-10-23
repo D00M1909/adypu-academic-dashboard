@@ -1,4 +1,4 @@
--- Nice-to-have for later (SPEC.md §7.1): not read from by the app yet.
+-- Nice-to-have for later (SPEC.md §6): not read from by the app yet.
 -- The live path is the Google Sheet -> includes/attendance.php -> file cache.
 -- These tables exist so a daily sync job can start writing attendance
 -- history here later, for trends over time, without a schema change.

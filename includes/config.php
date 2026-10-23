@@ -3,7 +3,7 @@
 // project. XAMPP default: host=localhost, user=root, password='', db=adypu_dashboard
 //
 // The DB (db/schema.sql) is a nice-to-have, not read from by the app yet
-// (see SPEC.md §7.1), so the connection is lazy: get_db() only connects when
+// (see SPEC.md §6), so the connection is lazy: get_db() only connects when
 // something actually calls it, and the rest of the app runs fine without a
 // DB configured at all.
 
