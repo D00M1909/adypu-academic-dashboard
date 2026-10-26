@@ -39,7 +39,7 @@ $sources = array_slice($argv, 1) ?: [
     "$data/biotech-ft-2026-10-06.json",
     "$data/civil-2026-07-15.json",
     "$data/biomedical-2026-09-30.json",
-    "$data/firstyear-2026-10-12.json",
+    "$data/firstyear-2026-10-26.json",
     "$data/ece-2026-10-12.json",
     "$data/management-2026-10-12.json",
     "$data/sy-cse-2026-09-28.json",
