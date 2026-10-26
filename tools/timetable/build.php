@@ -38,7 +38,7 @@ $sources = array_slice($argv, 1) ?: [
     "$data/biotech-2026-09-29.json",
     "$data/biotech-ft-2026-10-06.json",
     "$data/civil-2026-07-15.json",
-    "$data/biomedical-2026-09-30.json",
+    "$data/biomedical-2026-10-26.json",
     "$data/firstyear-2026-10-26.json",
     "$data/ece-2026-10-12.json",
     "$data/management-2026-10-12.json",
@@ -51,6 +51,7 @@ $sources = array_slice($argv, 1) ?: [
     "$data/cyber-2026-08-01.json",
     "$data/science-sem1-2026-09-28.json",
     "$data/science-sem3-2026-09-28.json",
+    "$data/hospitality-2026-10-26.json",
     "$data/design-foundation-2026-10-14.json",
     "$data/design-td-2026-10-14.json",
     "$data/design-uiux-2026-10-14.json",
@@ -388,7 +389,7 @@ function lecture_key(string $subj): string {
 
 // The ULCs the page offers. A booking in any other is written into the data
 // files anyway (AIDS and CSE use ULC 5), so adding one is a change here only.
-const SHOW = ['ULC 1', 'ULC 5', 'ULC 6', 'ULC 7', 'School of Design', 'Dental Building'];
+const SHOW = ['ULC 1', 'ULC 5', 'ULC 6', 'ULC 7', 'School of Design', 'Dental Building', 'School of Hospitality'];
 $hidden = [];
 $bookings = array_values(array_filter($bookings, function ($b) use (&$hidden) {
     $bld = $b['building'] ?? 'ULC 1';
