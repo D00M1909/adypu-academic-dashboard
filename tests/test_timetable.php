@@ -223,6 +223,17 @@ assert($which('B.Tech First Year Div F') === ['1st Year/Core/F'] && $which('B.Te
 assert($which('B.Tech CSE Sem III Div A') === ['2nd Year/CSE/A'] && $which('B.Tech CSE Sem V Div A') === ['3rd Year/SE/A']);
 // CS is Cyber Security: its own branch, never CSE's or SE's.
 assert($which('B.Tech CS Sem V Div A') === ['3rd Year/CS/A']);
+// A Management specialisation is its year's programme; Law's and Liberal
+// Arts' programmes are their whole year (placeholder A/B). Postgraduate
+// classes with no semester name no year, so they match nothing.
+assert($which('BBA Sem V Finance') === ['3rd Year/BBA/A'] && $which('BBA Sem I') === ['1st Year/BBA/A', '1st Year/BBA/B']);
+$lawRows = [...$rows, ['school' => 'law', 'year' => '1st Year', 'branch' => '', 'division' => 'B', 'strength' => 60],
+    ['school' => 'law', 'year' => '2nd Year', 'branch' => '', 'division' => 'A', 'strength' => 60],
+    ['school' => 'lib', 'year' => '4th Year', 'branch' => '', 'division' => 'B', 'strength' => 60]];
+$whichLaw = fn($label) => array_map(fn($r) => "{$r['school']}/{$r['year']}/{$r['division']}", timetable_attendance_classes($label, $lawRows));
+assert($whichLaw('BA LLB Sem I') === ['law/1st Year/A', 'law/1st Year/B'] && $whichLaw('BBA LLB Sem III') === ['law/2nd Year/A'] && $whichLaw('LLB Sem III') === ['law/2nd Year/A']);
+assert($whichLaw('BA Psychology Sem VII') === ['lib/4th Year/B'] && $whichLaw('BA Sem VII: Psychology, Politics & IR') === ['lib/4th Year/B']);
+assert($whichLaw('LLM Corporate') === [] && $whichLaw('MA Politics & IR') === []);
 
 // Classes no timetable puts in a room (an MDMC course): on the person's own
 // week with no room, never in a room's grid. A period on a slot the grid does
@@ -255,8 +266,8 @@ assert($which('B.Tech BT-FT Sem V') === ['3rd Year/Biotechnology/Food Technology
 assert($which('B.Tech ME-AE Sem III') === ['2nd Year/Mechanical/A'] && $which('B.Tech Civil Sem III (SE-A)') === ['2nd Year/Civil Engineering/A']);
 assert($which('M.Tech BT Sem I') === ['1st Year/M. Tech/Biotechnology']);
 assert($which('BBA Sem I') === ['1st Year/BBA/A', '1st Year/BBA/B']);
-// A specialisation, Law, Liberal Arts and ECE match nothing rather than a guess.
-assert($which('BBA Sem V Marketing') === [] && $which('BA LLB Sem I') === [] && $which('BA Psychology Sem I') === [] && $which('B.Tech ECE') === []);
+// ECE has no structure class to match, so nothing rather than a guess.
+assert($which('B.Tech ECE') === []);
 
 // The reading for a lecture is the latest filed between its start and end.
 $days = ['2026-10-12' => ['k' => ['09:30' => 50, '10:15' => 52, '10:30' => 40], 'old' => 30]];

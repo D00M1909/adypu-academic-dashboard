@@ -320,16 +320,37 @@ page_head('Room timetable', 'page-wide', 'timetable');
                     'name' => trim("{$r['year']} {$r['branch']} {$r['division']}"),
                     'present' => timetable_reading($attDays, $on->format('Y-m-d'), $key, $x, $lectures[$label][$d] ?? []),
                     'strength' => (int) $r['strength'],
+                    'estimated' => class_estimated($r),
                 ];
             }
         }
         if (!$list) return null;
+        // A placeholder school's divisions are an A/B nobody defined, so the
+        // one that did not file is no class missing its mark: it is left out
+        // while another one filed. Its invented strength is never shown.
+        $whole = count($list) > 1;
+        $real = array_filter($list, fn($c) => $c['present'] !== null || !$c['estimated']);
+        if ($real) $list = $real;
         $in = array_filter($list, fn($c) => $c['present'] !== null);
+        $guess = (bool) array_filter($in, fn($c) => $c['estimated']);
+        // Nor are its divisions added up: Law runs BA LLB, BBA LLB and LLB
+        // first years at once in three rooms, against a Form that offers that
+        // year an A and a B, so a sum would put the same total in every room.
+        // Each division that filed is shown on its own instead, named, so a
+        // lone "A 30" still says it is the year's A and not this room's.
+        $each = $guess && $whole
+            ? implode(' · ', array_map(fn($c) => preg_replace('/^.*\s/', '', $c['name']) . ' ' . $c['present'], $in)) : null;
+        foreach ($list as &$c) {
+            if ($c['estimated']) $c['strength'] = null;
+            unset($c['estimated']);
+        }
+        unset($c);
         return [
             'date' => $on->format('l j M Y'),
             'classes' => array_values($list),
             'present' => array_sum(array_column($in, 'present')),
-            'strength' => array_sum(array_column($in, 'strength')),
+            'strength' => $guess ? null : array_sum(array_column($in, 'strength')),
+            'each' => $each,
             'marked' => count($in),
         ];
     };
@@ -764,7 +785,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
                       <span class="tt-class"><?= $e($x['class']) ?></span>
                       <?php if ($person): ?><?php if ($x['room'] !== ''): ?><span class="tt-faculty">Room <?= $e(timetable_room_label($x['room'])) ?>, <?= $e($x['ulc']) ?></span><?php endif; ?><?php elseif ($x['faculty'] !== ''): ?><span class="tt-faculty"><?= $e($x['faculty']) ?></span><?php endif; ?>
                       <?php if ($att): ?>
-                        <span class="tt-att<?= $att['marked'] ? '' : ' tt-att-none' ?>"><?= $att['marked'] ? $att['present'] . '/' . $att['strength'] . ' present' . ($att['marked'] < count($att['classes']) ? " &middot; {$att['marked']} of " . count($att['classes']) . ' marked' : '') : 'Not marked' ?></span>
+                        <span class="tt-att<?= $att['marked'] ? '' : ' tt-att-none' ?>"><?= $att['marked'] ? ($att['each'] ?? $att['present'] . ($att['strength'] === null ? '' : '/' . $att['strength'])) . ' present' . ($att['marked'] < count($att['classes']) ? " &middot; {$att['marked']} of " . count($att['classes']) . ' marked' : '') : 'Not marked' ?></span>
                       <?php endif; ?>
                     <?php endif; ?>
                   </<?= $tag ?>>

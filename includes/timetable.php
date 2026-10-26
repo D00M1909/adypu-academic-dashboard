@@ -834,8 +834,17 @@ function timetable_attendance_classes(string $label, array $rows): array {
         $want = ['eng', $yearOf($m[2]), [['ME-AE' => 'Mechanical'][$m[1]] ?? $m[1]], null];
     } elseif (preg_match('/^B\.Tech Civil Sem ([IVX]+) \(\w+-(\w)\)$/', $label, $m)) {
         $want = ['eng', $yearOf($m[1]), ['Civil Engineering'], $m[2]];
-    } elseif (preg_match('/^(BBA|MBA) Sem ([IVX]+)$/', $label, $m)) {
+    } elseif (preg_match('/^(BBA|MBA) Sem ([IVX]+)(?: .+)?$/', $label, $m)) {
+        // A specialisation (BBA Sem V Finance, MBA Sem III Marketing) is a
+        // group of its year, which the Form only knows by year and division.
         $want = ['mgmt', $yearOf($m[2]), [$m[1]], null];
+    } elseif (preg_match('/^(?:BA LLB|BBA LLB|LLB) Sem ([IVX]+)$/', $label, $m)) {
+        // Law and Liberal Arts are still placeholder structures: a year and
+        // an A/B the school never defined, so a programme's class is its whole
+        // year and the cell lists whichever division filed.
+        $want = ['law', $yearOf($m[1]), [''], null];
+    } elseif (preg_match('/^BA(?: [^:]+?)? Sem ([IVX]+)(?::.*)?$/', $label, $m)) {
+        $want = ['lib', $yearOf($m[1]), [''], null];
     } elseif (preg_match('/^B\.Sc Sem ([IVX]+)$/', $label, $m)) {
         // Science's lab divisions (Div A to C) are batches of one B.Sc. year,
         // which the structure keeps as a single division.

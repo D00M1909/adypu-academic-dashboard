@@ -42,7 +42,8 @@
         li.appendChild(el('span', null, c.name));
         li.appendChild(c.present === null
           ? el('span', 'tt-att-none', 'Not marked')
-          : el('strong', null, c.present + ' of ' + c.strength + ' present'));
+          // No strength when the school's numbers are still placeholders.
+          : el('strong', null, c.present + (c.strength === null ? '' : ' of ' + c.strength) + ' present'));
         ul.appendChild(li);
       });
       att.appendChild(ul);
