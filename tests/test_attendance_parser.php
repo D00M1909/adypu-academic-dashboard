@@ -462,6 +462,7 @@ assert(class_readings(
 assert(row_time('26/08/2026 14:05:02') === '14:05', 'd/m/Y timestamp time wrong: ' . row_time('26/08/2026 14:05:02'));
 assert(row_time('1899-12-30 09:30:00') === '09:30', 'a Form time cell wrong: ' . row_time('1899-12-30 09:30:00'));
 assert(row_time('2:15 PM') === '14:15', '12-hour time wrong: ' . row_time('2:15 PM'));
+assert(row_time('1:30:00 PM') === '13:30' && row_time('12:30:00 PM') === '12:30', 'a Form Time answer as the sheet shows it');
 assert(row_time('12:05 AM') === '00:05', 'midnight wrong: ' . row_time('12:05 AM'));
 assert(row_time('2026-08-26') === '' && row_time('99:99') === '', 'a bare date or junk must have no time');
 

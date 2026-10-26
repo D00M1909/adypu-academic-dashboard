@@ -92,7 +92,7 @@ function pushNow() {
   });
 
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
-  const values = sheet.getDataRange().getValues();
+  const values = timeAsShown(sheet.getDataRange());
   if (values.length < 2) {
     Logger.log('nothing to push: sheet has no data rows');
     return;
@@ -245,6 +245,22 @@ function doGet() {
  * they keep their clock because that is what separates one lecture's reading
  * from the next one's. row_date() reads the date and ignores the rest.
  */
+// The range's values, with every Time column (a header starting with "Time",
+// not "Timestamp") as the sheet shows it: "1:30:00 PM". A Form Time answer
+// comes back from getValues() as a Date on 30 Dec 1899, and formatting that
+// with an Indian time zone applies the 1899 offset (+5:21:10, not +5:30), so
+// 1:30 PM reads 1:21. The text the sheet shows is the answer as given.
+function timeAsShown(range) {
+  const values = range.getValues();
+  const shown = range.getDisplayValues();
+  values[0].forEach(function (name, c) {
+    const h = String(name).trim().toLowerCase();
+    if (h.indexOf('time') !== 0 || h.indexOf('timestamp') === 0) return;
+    for (let r = 1; r < values.length; r++) values[r][c] = shown[r][c];
+  });
+  return values;
+}
+
 function toCsv(values) {
   return values
     .map((row, i) =>
