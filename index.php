@@ -325,6 +325,15 @@ try {
         <span class="range-summary-coverage"><span id="stat-reported"><?= $totals['reported'] ?></span> of <span id="stat-classes"><?= $totals['classes'] ?></span> reported</span>
         <svg class="range-summary-icon" aria-hidden="true"><use href="#icon-chevron"/></svg>
       </span>
+      <?php /* Enrolment, from the structure rather than any form. Only the
+               classes a school gave a real count for, so the class count
+               rides along whenever that is not all of them, the same way
+               attendance says how many reported. Rescoped by updateStats(). */ ?>
+      <span class="range-summary-enrolled" id="stat-enrolled">
+        <span id="stat-enrolled-figure"<?= $totals['enrolled_classes'] ? '' : ' hidden' ?>><span class="range-summary-enrolled-count" id="stat-enrolled-count"><?= $totals['enrolled'] ?></span> students enrolled</span>
+        <span id="stat-enrolled-cover"<?= $totals['enrolled_classes'] && $totals['enrolled_classes'] < $totals['classes'] ? '' : ' hidden' ?>>&middot; <span id="stat-enrolled-classes"><?= $totals['enrolled_classes'] ?></span> of <span id="stat-enrolled-of"><?= $totals['classes'] ?></span> classes</span>
+        <span id="stat-enrolled-none"<?= $totals['enrolled_classes'] ? ' hidden' : '' ?>>Enrolment not known yet</span>
+      </span>
     </button>
     <div class="range-dates" id="range-dates">
       <label for="range-from">From</label>

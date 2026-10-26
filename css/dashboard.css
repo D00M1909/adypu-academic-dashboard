@@ -374,6 +374,11 @@ button {
 .range-summary-empty { font-size: 14px; font-weight: 600; color: var(--ink-muted); }
 .division-empty { margin: 0; font-size: 13px; color: var(--ink-muted); }
 .range-summary-coverage { font-size: 12px; font-weight: 500; color: var(--ink-muted); }
+/* A quiet third line: enrolment is context for the present count above it,
+   never a figure that competes with it. */
+.range-summary-enrolled { font-size: 12px; font-weight: 500; color: var(--ink-muted); }
+.range-summary-enrolled [hidden] { display: none; }
+.range-summary-enrolled-count { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); }
 .range-summary-icon {
   width: 14px;
   height: 14px;

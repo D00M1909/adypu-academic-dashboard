@@ -11,6 +11,7 @@ Live site: <https://adypu-daybook.fast-page.org/>
 ## Attendance
 
 - Present counts are measured against the classes that reported, and the page always says how many did.
+- Students enrolled sits under the present count for the same scope: real headcounts only, with how many classes they cover.
 - Pick a preset or any dates. A range averages each class's days, so a week reads like a day.
 - Drill down by school, year, branch and division; the summary and charts follow.
 - Export PDF gives a dated report of whatever is on screen.

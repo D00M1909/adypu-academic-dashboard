@@ -476,6 +476,7 @@ function aggregate_days(array $days, ?string $from = null, ?string $to = null, ?
             'present'  => $n ? (int) round($sum[$key] / $n) : 0,
             'reported' => $n > 0,
             'days'     => $n,
+            'estimated' => class_estimated($c),
         ];
     }
     return $tree;
@@ -523,6 +524,8 @@ function attendance_totals(array $tree): array {
     $present = 0;
     $classes = 0;
     $reported = 0;
+    $enrolled = 0;
+    $enrolledClasses = 0;
     foreach ($tree as $years) {
         foreach ($years as $branches) {
             foreach ($branches as $divisions) {
@@ -534,6 +537,14 @@ function attendance_totals(array $tree): array {
                         $reported++;
                         $strengthReported += $d['strength'];
                     }
+                    // Students enrolled: the structure's strength, never a
+                    // submission, so a class counts once however many days it
+                    // reported. Invented strengths stay out, and the class
+                    // count says how much of the scope the figure covers.
+                    if (empty($d['estimated'])) {
+                        $enrolled += $d['strength'];
+                        $enrolledClasses++;
+                    }
                 }
             }
         }
@@ -544,6 +555,8 @@ function attendance_totals(array $tree): array {
         'present'           => $present,
         'classes'           => $classes,
         'reported'          => $reported,
+        'enrolled'          => $enrolled,
+        'enrolled_classes'  => $enrolledClasses,
     ];
 }
 

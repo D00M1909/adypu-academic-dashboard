@@ -66,6 +66,7 @@
   function scopeTotals() {
     var data = window.ATTENDANCE_DATA;
     var present = 0, classes = 0, reported = 0, strengthReported = 0;
+    var enrolled = 0, enrolledClasses = 0;
 
     var schools = state.school ? [state.school] : Object.keys(data);
 
@@ -87,6 +88,9 @@
             // percentage divides by the classes that actually reported, or a
             // morning with six forms in reads as an empty university.
             if (d.reported) { reported++; strengthReported += d.strength; }
+            // Mirrors the enrolled total in attendance_totals(): invented
+            // strengths never count as students.
+            if (!d.estimated) { enrolled += d.strength; enrolledClasses++; }
           });
         });
       });
@@ -94,7 +98,8 @@
 
     return {
       present: present, strengthReported: strengthReported,
-      classes: classes, reported: reported
+      classes: classes, reported: reported,
+      enrolled: enrolled, enrolledClasses: enrolledClasses
     };
   }
 
@@ -115,6 +120,13 @@
     var pctEl = document.getElementById('stat-pct');
     pctEl.textContent = t.reported ? p + '%' : 'No reports yet';
     pctEl.className = t.reported ? 'att-pct ' + attClass(p) : 'range-summary-empty';
+
+    document.getElementById('stat-enrolled-count').textContent = t.enrolled;
+    document.getElementById('stat-enrolled-classes').textContent = t.enrolledClasses;
+    document.getElementById('stat-enrolled-of').textContent = t.classes;
+    document.getElementById('stat-enrolled-figure').hidden = !t.enrolledClasses;
+    document.getElementById('stat-enrolled-cover').hidden = !t.enrolledClasses || t.enrolledClasses === t.classes;
+    document.getElementById('stat-enrolled-none').hidden = !!t.enrolledClasses;
 
     var parts = [];
     // "School of " on the front of a four-part path is what pushed the

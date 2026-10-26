@@ -74,6 +74,11 @@ filed it. A whole-day answer files under the slot `day`.
   a day; a class that reported once says so.
 - Percentages divide by the **classes that reported**, and are always shown
   beside the `R/N classes reported` pill.
+- **Students enrolled** (the summary card's third line) is the sum of the
+  structure's strengths in scope, so a class counts once however often it
+  reported. Invented strengths stay out (`class_estimated()`: the placeholder
+  schools, plus `ESTIMATED_STRENGTHS` inside real ones), and `E of N classes`
+  follows whenever that leaves any out. Partners count on their own tab only.
 - With no dates in the URL the page opens on the newest day that has data.
 
 **Rosters** (`data/roster/<school>.php`) are per school, keyed by class. A class

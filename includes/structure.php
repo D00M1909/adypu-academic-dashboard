@@ -227,6 +227,24 @@ function is_placeholder_school(string $school): bool {
     return isset(placeholder_schools()[$school]);
 }
 
+// Classes inside a real school whose strength is still our default rather than
+// a number the school gave: Engineering 1st Year's Core and CS groups (the
+// timetable DB's 60) and the one Biotechnology count the sheet left blank.
+// Class key prefixes, each ending in '|' so 'CS' never matches 'CSE'. Take an
+// entry out once its school sends the real count.
+const ESTIMATED_STRENGTHS = ['eng|1st Year|Core|', 'eng|1st Year|CS|', 'eng|2nd Year|Biotechnology|A|'];
+
+// Whether a class's strength is invented. The enrolled total leaves these out,
+// so it only ever states counts a school actually gave.
+function class_estimated(array $c): bool {
+    if (is_placeholder_school($c['school'])) return true;
+    $key = class_key($c) . '|';
+    foreach (ESTIMATED_STRENGTHS as $prefix) {
+        if (str_starts_with($key, $prefix)) return true;
+    }
+    return false;
+}
+
 // Flattens a structure to one row per division: the schools' by default, the
 // partners' when partner_rows() passes theirs.
 function class_rows(?array $structure = null): array {

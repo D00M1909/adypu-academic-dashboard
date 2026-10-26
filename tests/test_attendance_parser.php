@@ -537,6 +537,30 @@ assert(count($bad) === 1 && $bad[0]['present'] === 45, 'only "45 students" is a 
 assert(count($badSkipped) === 3, 'each bad count must be reported: ' . json_encode($badSkipped));
 assert(str_contains($badSkipped[1], 'forty'), 'the report should show what was typed');
 
+// --- Students enrolled ------------------------------------------------------
+// From the structure, never a submission: a class that reported on two days is
+// still one class of 70, and a class that never reported still has its 70.
+// Invented strengths (a placeholder school, Engineering 1st Year's default 60)
+// stay out, and enrolled_classes says how much of the scope is counted.
+$enrolRows = [
+    ['school' => 'eng', 'year' => '2nd Year', 'branch' => 'CSE', 'division' => 'A', 'strength' => 70],
+    ['school' => 'eng', 'year' => '2nd Year', 'branch' => 'CSE', 'division' => 'B', 'strength' => 68],
+    ['school' => 'eng', 'year' => '1st Year', 'branch' => 'CS', 'division' => 'M', 'strength' => 60],
+    ['school' => 'law', 'year' => '1st Year', 'branch' => '', 'division' => 'A', 'strength' => 30],
+];
+$enrolDays = [
+    '2026-10-22' => ['eng|2nd Year|CSE|A' => ['09:30' => 50]],
+    '2026-10-23' => ['eng|2nd Year|CSE|A' => ['09:30' => 55, '10:30' => 52]],
+];
+$enrol = attendance_totals(aggregate_days($enrolDays, '2026-10-22', '2026-10-23', $enrolRows));
+assert($enrol['enrolled'] === 138, 'CSE A counted once, B unreported still counted: ' . $enrol['enrolled']);
+assert($enrol['enrolled_classes'] === 2 && $enrol['classes'] === 4, 'placeholder and estimated classes left out: ' . json_encode($enrol));
+assert(!class_estimated(['school' => 'eng', 'year' => '2nd Year', 'branch' => 'CSE', 'division' => 'A']), "'CS' must not match 'CSE'");
+assert(class_estimated(['school' => 'eng', 'year' => '1st Year', 'branch' => 'Core', 'division' => 'A']), 'First Year Core is the default 60');
+// A partner tree never touches a school's count, and has no invented strengths.
+$kp = attendance_totals(aggregate_days([], '2026-10-22', '2026-10-22', partner_rows()));
+assert($kp['enrolled'] === array_sum(array_column(partner_rows(), 'strength')) && $kp['enrolled_classes'] === $kp['classes'], 'partners count whole');
+
 // --- Range labels -----------------------------------------------------------
 assert(range_label('2026-08-26', '2026-08-26') === '26 Aug 2026', range_label('2026-08-26', '2026-08-26'));
 assert(range_label('2026-08-24', '2026-08-26') === '24 Aug to 26 Aug 2026', range_label('2026-08-24', '2026-08-26'));
