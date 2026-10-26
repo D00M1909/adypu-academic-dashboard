@@ -121,7 +121,7 @@ $lag = function (int $m): string {
 $link = fn(array $over): string => 'activity.php?' . http_build_query(array_filter($over + ['tab' => $tab === 'log' ? '' : $tab, 'who' => $who, 'day' => $day === $today ? '' : $day, 'span' => $span === 7 ? '' : $span, 'kind' => $kind === 'work' ? '' : $kind], fn($v) => $v !== '' && $v !== null));
 
 // One event's details as a line of plain text.
-$when = fn(string $time): string => $time === WHOLE_DAY ? 'whole day' : $time;
+$when = fn(string $time): string => $time === WHOLE_DAY ? 'whole day' : str_replace('-', ' to ', $time);
 $describe = function (array $x) use ($short, $lag, $nameOf, $when): string {
     $d = $x['d'] ?? [];
     return match ($x['type']) {

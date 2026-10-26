@@ -1136,8 +1136,11 @@ input:focus-visible, select:focus-visible {
 /* ---------- Picking a class ---------- */
 
 .picker { margin-top: 8px; }
-.picker-when { display: flex; gap: 12px; }
-.picker-when > span { flex: 1; min-width: 0; }
+/* Date on its own row, the lecture's start and end side by side under it:
+   three time fields in one row leave a phone a few digits each. */
+.picker-when { display: flex; flex-wrap: wrap; gap: 0 12px; }
+.picker-when > span { flex: 1 1 calc(50% - 6px); min-width: 0; }
+.picker-when > span:first-child { flex-basis: 100%; }
 .picker #picker-go { width: 100%; margin-top: 16px; }
 
 /* ---------- Marking ----------

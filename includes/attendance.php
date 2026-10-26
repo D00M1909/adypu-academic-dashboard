@@ -162,11 +162,20 @@ function lecture_slot(string $value): string {
 // next lecture, an hour or more later, gets its own.
 // ponytail: hourly buckets, so two lectures inside one hour merge. Add the
 // Time question to the Form if that ever matters.
+//
+// A class longer than an hour (a two-hour lab) gives its end in a question
+// whose title starts with "Till", "Until" or "End", and the slot becomes
+// "09:30-11:30", so timetable_reading() can count it for every lecture it
+// covers. An end that is not after the start is ignored, not guessed at.
 function row_slot(array $header, array $fields): string {
+    $end = '';
+    foreach ($header as $i => $name) {
+        if (preg_match('/^(till|until|end)\b/', $name) && $end === '') $end = row_time((string) ($fields[$i] ?? ''));
+    }
     foreach ($header as $i => $name) {
         if (!str_starts_with($name, 'time') || str_starts_with($name, 'timestamp')) continue;
         $time = lecture_slot((string) ($fields[$i] ?? ''));
-        if ($time !== '') return $time;
+        if ($time !== '') return $time !== WHOLE_DAY && $end > $time ? "$time-$end" : $time;
     }
     $stamp = row_time(first_value($header, $fields, 'timestamp'));
     return $stamp === '' ? '' : substr($stamp, 0, 2) . ':00';

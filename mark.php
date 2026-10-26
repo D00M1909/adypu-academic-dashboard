@@ -35,6 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $class = parse_class_label((string) ($_POST['class'] ?? ''));
     $date  = row_date((string) ($_POST['date'] ?? ''));
     $time  = row_time((string) ($_POST['time'] ?? ''));
+    $till  = row_time((string) ($_POST['till'] ?? ''));
 
     if (($me['status'] ?? '') !== 'active') {
         $error = 'Your account is still waiting for approval.';
@@ -65,6 +66,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $at = $time ?: date('H:00');
+        // A class longer than an hour says when it ended, the same "09:30-11:30"
+        // slot the Form's Till question gives (row_slot()).
+        if ($till > $at) $at = "$at-$till";
         if (record_attendance($class, $date, $at, $present, (string) $me['name'], $absent, $before)) {
             // Everything about the save, for the Activity page: what was
             // filed, for when, how long after the lecture, and whose reading
@@ -77,13 +81,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'strength' => (int) $class['strength'],
                 'absent' => count($absent),
                 'how' => $roster ? 'roster' : 'count',
-                'lag' => (int) round((time() - strtotime("$date $at")) / 60),
+                'lag' => (int) round((time() - strtotime("$date " . substr($at, 0, 5))) / 60),
             ] + ($before ? ['replaced' => $before] : []));
             setcookie(LAST_CLASS_COOKIE, (string) $_POST['class'], [
                 'expires' => time() + 180 * 86400, 'path' => '/', 'samesite' => 'Lax',
             ]);
             header('Location: mark.php?' . http_build_query([
-                'class' => $_POST['class'], 'date' => $date, 'time' => $time,
+                'class' => $_POST['class'], 'date' => $date, 'time' => $time, 'till' => $till,
                 'saved' => $present,
             ]));
             exit;
@@ -110,6 +114,8 @@ $date = row_date((string) ($_GET['date'] ?? '')) ?? date('Y-m-d');
 // later lands on the same lecture and replaces it rather than inventing a
 // second one — the same rule the Form's own fallback follows.
 $time = row_time((string) ($_GET['time'] ?? '')) ?: date('H:00');
+// Blank for an ordinary one-hour lecture; a two-hour lab fills it in.
+$till = row_time((string) ($_GET['till'] ?? ''));
 
 $roster = $class ? roster_for($class) : [];
 // The sticky bar repeats the selection, because the picker card scrolls away
@@ -175,7 +181,10 @@ if (($me['status'] ?? '') !== 'active') {
       <input id="p-date" name="date" type="date" value="<?= htmlspecialchars($date) ?>" max="<?= date('Y-m-d') ?>"></span>
     <span><label for="p-time">Lecture</label>
       <input id="p-time" name="time" type="time" value="<?= htmlspecialchars($time) ?>"></span>
+    <span><label for="p-till">Till</label>
+      <input id="p-till" name="till" type="time" value="<?= htmlspecialchars($till) ?>" aria-describedby="p-till-help"></span>
   </div>
+  <p class="field-help" id="p-till-help">Fill in Till only for a class longer than an hour, like a two-hour lab.</p>
 
   <button class="btn-quiet" type="submit" id="picker-go">Load class list</button>
 </form>
@@ -188,6 +197,7 @@ if (($me['status'] ?? '') !== 'active') {
   <input type="hidden" name="class" value="<?= htmlspecialchars($label) ?>">
   <input type="hidden" name="date" value="<?= htmlspecialchars($date) ?>">
   <input type="hidden" name="time" value="<?= htmlspecialchars($time) ?>">
+  <input type="hidden" name="till" value="<?= htmlspecialchars($till) ?>">
 
   <?php if (!$roster): ?>
     <div class="card">
@@ -253,7 +263,7 @@ if (($me['status'] ?? '') !== 'active') {
   <div class="mark-bar" id="mark-bar">
     <p class="mark-context">
       <span class="mark-context-class"><?= htmlspecialchars($shortLabel) ?></span>
-      <span class="mark-context-when"><?= htmlspecialchars(date('j M', strtotime($date)) . ' at ' . date('g:i a', strtotime($time))) ?></span>
+      <span class="mark-context-when"><?= htmlspecialchars(date('j M', strtotime($date)) . ' at ' . date('g:i a', strtotime($time)) . ($till > $time ? ' to ' . date('g:i a', strtotime($till)) : '')) ?></span>
     </p>
     <div class="mark-bar-row">
       <?php /* No count without a roster: there is nothing to count, and the

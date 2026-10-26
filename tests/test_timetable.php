@@ -283,6 +283,12 @@ assert(timetable_reading($days, '2026-10-13', 'k', $lec) === null && timetable_r
 // A second person's reading for the same hour ("10:15~2") is still that lecture's.
 assert(timetable_reading(['d' => ['k' => ['10:15' => 33, '10:15~2' => 30]]], 'd', 'k', $lec) === 30);
 assert(timetable_reading(['d' => ['k' => ['day' => 12, 'day~2' => 14]]], 'd', 'k', $lec) === 14);
+// A reading that says it ran 9:30 to 11:30 counts for both lectures it covers,
+// and for a two-hour lab, but not for a lecture it only grazes.
+$labDays = ['d' => ['k' => ['09:30-11:30' => 41]]];
+assert(timetable_reading($labDays, 'd', 'k', $lec) === 41 && timetable_reading($labDays, 'd', 'k', ['time' => '10.30 to 11.30', 'span' => 1]) === 41);
+assert(timetable_reading($labDays, 'd', 'k', ['time' => '9.30 to 11.30', 'span' => 2]) === 41);
+assert(timetable_reading($labDays, 'd', 'k', ['time' => '11.15 to 12.15', 'span' => 1]) === null);
 // Up to 30 minutes early counts (the Form's 13:15 for First Year's 1.30)...
 $days = ['d' => ['k' => ['13:15' => 37]]];
 $at130 = ['time' => '1.30 to 2.30', 'span' => 1];

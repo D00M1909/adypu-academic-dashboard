@@ -899,8 +899,16 @@ function timetable_reading(array $days, string $date, string $key, array $entry,
         $time = preg_replace('/~\d+$/', '', (string) $time);
         // WHOLE_DAY in includes/attendance.php, which this file does not load.
         if ($time === 'day') $allDay = (int) $present;
-        if (!preg_match('/^(\d{2}):(\d{2})$/', $time, $t)) continue;
+        if (!preg_match('/^(\d{2}):(\d{2})(?:-(\d{2}):(\d{2}))?$/', $time, $t)) continue;
         $at = (int) $t[1] * 60 + (int) $t[2];
+        // A reading that says when it ended ("09:30-11:30", a two-hour lab)
+        // stands for every lecture it covers half of, with no other lecture
+        // to compete with: the faculty said how long it ran.
+        if (isset($t[3])) {
+            $to = (int) $t[3] * 60 + (int) $t[4];
+            if (2 * (min($to, $end) - max($at, $m[0])) >= $end - $m[0]) $during = (int) $present;
+            continue;
+        }
         if ($at < $m[0] - TIMETABLE_EARLY || $at >= $end) continue;
         $in = $at >= $m[0];
         $mine = $overlap($at, $m[0], $end);

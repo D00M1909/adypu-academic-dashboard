@@ -445,6 +445,21 @@ assert($sameDays === ['14:15' => 34, '14:15~2' => 30], 'a second faculty overwro
 assert(faculty_map($sameSlot)['2026-10-26']['eng|2nd Year|AIDS|B'] === ['14:15' => 'atul kathole', '14:15~2' => 'Dr. A. Gaigol']);
 assert(day_present($sameDays) === 30, 'the suffixed reading must still sort as that lecture');
 
+// A class longer than an hour gives its end in a Till question, and its slot
+// carries it: "09:30-11:30". An end not after the start is ignored.
+$lab = day_map(parse_attendance_csv(
+    "timestamp,time of lecture,till,class,present,date
+" .
+    '"2026-10-23 12:01","9:30:00 AM","11:30:00 AM","School of Engineering / 2nd Year / CSE / B","40","2026-10-23"' . "
+" .
+    '"2026-10-23 15:01","2:30:00 PM","","School of Engineering / 2nd Year / CSE / B","38","2026-10-23"' . "
+" .
+    '"2026-10-23 15:02","3:30:00 PM","3:00:00 PM","School of Engineering / 2nd Year / AIDS / B","20","2026-10-23"' . "
+"
+))['2026-10-23'];
+assert($lab['eng|2nd Year|CSE|B'] === ['09:30-11:30' => 40, '14:30' => 38], 'lab slot wrong: ' . json_encode($lab['eng|2nd Year|CSE|B']));
+assert($lab['eng|2nd Year|AIDS|B'] === ['15:30' => 20], 'an end before the start must be ignored');
+
 // A cache written before lecture times holds a bare int for the whole day. The
 // next push replaces it; until then it must still read, not fatal.
 assert(day_present(21) === 21, 'a pre-times cache entry must still read');

@@ -49,6 +49,10 @@
  * every reading instead of the last one replacing the rest. Also optional: with
  * no such question the submission time stands in, rounded to the hour. It must
  * not be titled "Timestamp", which is the sheet's own submission column.
+ *
+ * A Time question whose title starts with "Till" is when a class longer than
+ * an hour ended (a two-hour lab), so its reading counts for every lecture it
+ * covered. Optional, and left blank for an ordinary lecture.
  */
 
 // Every site to push the sheet to. The FIRST one is production and is the only
@@ -238,15 +242,9 @@ function doGet() {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-/**
- * The header row is what the PHP parser matches on, so it is lowercased here
- * and nowhere else. Dates become yyyy-mm-dd because that is the format the
- * parser compares when deciding which of a class's readings is the latest, and
- * they keep their clock because that is what separates one lecture's reading
- * from the next one's. row_date() reads the date and ignores the rest.
- */
 // The range's values, with every Time column (a header starting with "Time",
-// not "Timestamp") as the sheet shows it: "1:30:00 PM". A Form Time answer
+// not "Timestamp", or with "Till", "Until" or "End", a long class's end) as
+// the sheet shows it: "1:30:00 PM". A Form Time answer
 // comes back from getValues() as a Date on 30 Dec 1899, and formatting that
 // with an Indian time zone applies the 1899 offset (+5:21:10, not +5:30), so
 // 1:30 PM reads 1:21. The text the sheet shows is the answer as given.
@@ -255,12 +253,20 @@ function timeAsShown(range) {
   const shown = range.getDisplayValues();
   values[0].forEach(function (name, c) {
     const h = String(name).trim().toLowerCase();
-    if (h.indexOf('time') !== 0 || h.indexOf('timestamp') === 0) return;
+    const clock = (h.indexOf('time') === 0 && h.indexOf('timestamp') !== 0) || /^(till|until|end)\b/.test(h);
+    if (!clock) return;
     for (let r = 1; r < values.length; r++) values[r][c] = shown[r][c];
   });
   return values;
 }
 
+/**
+ * The header row is what the PHP parser matches on, so it is lowercased here
+ * and nowhere else. Dates become yyyy-mm-dd because that is the format the
+ * parser compares when deciding which of a class's readings is the latest, and
+ * they keep their clock because that is what separates one lecture's reading
+ * from the next one's. row_date() reads the date and ignores the rest.
+ */
 function toCsv(values) {
   return values
     .map((row, i) =>

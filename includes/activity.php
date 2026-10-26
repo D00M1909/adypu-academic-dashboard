@@ -211,7 +211,8 @@ function activity_form_day(array $log, string $day, array $users, array $account
         if (!str_starts_with((string) ($r['at'] ?? ''), $day)) continue;
         $who = isset($users[$r['email'] ?? '']) ? $r['email'] : ($accountOf[activity_person((string) ($r['name'] ?? ''))] ?? '');
         $at = strlen($r['at']) > 10 ? substr($r['at'], 11, 5) . ':00' : '';
-        $lecture = $r['time'] !== '' ? strtotime("{$r['date']} {$r['time']}") : false;
+        // A lab's slot is "09:30-11:30"; the lag counts from its start.
+        $lecture = $r['time'] !== '' ? strtotime("{$r['date']} " . substr($r['time'], 0, 5)) : false;
         $out[] = ['day' => $day, 't' => $at, 'who' => $who, 'name' => (string) ($r['name'] ?? ''), 'type' => 'form',
             'ip' => '', 'device' => 'Google Form', 'ua' => '', 'd' => [
                 'class' => $r['class'], 'date' => $r['date'], 'time' => $r['time'], 'present' => $r['present'], 'strength' => $r['strength'],

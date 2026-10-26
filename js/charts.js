@@ -94,26 +94,25 @@ window.Charts = (function () {
   // "16:00" -> "4:00 to 5:00 PM". The cache keys a reading by the lecture's
   // START, in 24-hour time, because that is what sorts; this is the only place
   // it turns into something to read. Every teaching slot in the timetable is
-  // exactly one hour, in the 1st Year grid and the 2nd/3rd/4th Year one alike,
-  // so the end is derived instead of stored.
+  // one hour unless the reading says when it ended ("09:30-11:30", from the
+  // Form's Till question or the app's), so the end is derived otherwise.
   //
   // The meridiem is printed once when both ends share it ("9:30 to 10:30 AM")
   // and twice when they don't, or the 11:30 lecture would read as 11:30 PM.
-  //
-  // ponytail: one-hour slots assumed. Store the end beside the start in
-  // day_map() if a two-hour lab ever has to read correctly.
   function slotLabel(time) {
     // "14:15~2" is a second person's reading for the same slot (reading_slots()).
     time = String(time).replace(/~\d+$/, '');
     // WHOLE_DAY in includes/attendance.php: one reading for a class that met all day.
     if (time === 'day') return 'Whole day';
-    var bits = /^(\d{1,2}):(\d{2})$/.exec(time);
+    // "09:30-11:30" is a reading that said when it ended (a two-hour lab).
+    var bits = /^(\d{1,2}):(\d{2})(?:-(\d{1,2}):(\d{2}))?$/.exec(time);
     if (!bits) return time;
-    var start = Number(bits[1]), end = (start + 1) % 24;
-    function clock(h) { return (h % 12 || 12) + ':' + bits[2]; }
+    var start = Number(bits[1]), end = bits[3] ? Number(bits[3]) : (start + 1) % 24;
+    var endMin = bits[3] ? bits[4] : bits[2];
+    function clock(h, m) { return (h % 12 || 12) + ':' + m; }
     function half(h) { return h < 12 ? 'AM' : 'PM'; }
-    return clock(start) + (half(start) === half(end) ? '' : ' ' + half(start)) +
-      ' to ' + clock(end) + ' ' + half(end);
+    return clock(start, bits[2]) + (half(start) === half(end) ? '' : ' ' + half(start)) +
+      ' to ' + clock(end, endMin) + ' ' + half(end);
   }
 
   function shortDate(iso) {

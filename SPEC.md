@@ -69,7 +69,9 @@ BA LLB (`LEGACY_BRANCH`).
 
 **A reading is one present count per class per lecture**:
 `days[date][classKey][HH:MM] = present`, with a parallel `faculty` map for who
-filed it. A whole-day answer files under the slot `day`. A second person filing
+filed it. A whole-day answer files under the slot `day`. A class longer than an
+hour gives its end (the Form's Till question, the app's Till field) and files
+as `09:30-11:30`, counting for every lecture it covers. A second person filing
 the same class and slot is kept as `HH:MM~2`; the same person filing again
 replaces their own reading.
 
