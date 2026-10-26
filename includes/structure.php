@@ -148,7 +148,8 @@ function class_structure(): array {
 }
 
 // The five schools that returned nothing usable, until one of them confirms its
-// real year / branch / division structure. Two divisions per year, no branches.
+// real year / branch / division structure. Two divisions per year, no branches,
+// except where a school named its programmes (Management, Law).
 // Management did send a structure (MBA 1-2, BBA 1-3) but no student numbers, so
 // it stays here rather than draw a percentage over an invented denominator; its
 // programs are real, so they are its branches, and only the strengths invented.
@@ -162,7 +163,18 @@ function placeholder_schools(): array {
             if ($y < $length) $out['mgmt'][$ordinals[$y] . ' Year'][$program] = ['A' => 30, 'B' => 60];
         }
     }
-    foreach (['law' => 5, 'arch' => 4, 'lib' => 4, 'film' => 4] as $school => $count) {
+    // Law's courses, from the school's own list (26 Oct 2026); still no numbers.
+    // BA LLB keeps the A and B every Law year had before, so the readings filed
+    // under those labels land on it (LEGACY_BRANCH). Each LLM is one year.
+    $law = ['BA LLB' => [5, ['A' => 30, 'B' => 60]], 'BBA LLB' => [2, ['A' => 60]], 'LLB' => [3, ['A' => 60]],
+        'LLM Corporate & Commercial Law' => [1, ['A' => 60]], 'LLM Constitutional Law' => [1, ['A' => 60]],
+        'LLM Criminal Law' => [1, ['A' => 60]]];
+    for ($y = 0; $y < 5; $y++) {
+        foreach ($law as $program => [$length, $divisions]) {
+            if ($y < $length) $out['law'][$ordinals[$y] . ' Year'][$program] = $divisions;
+        }
+    }
+    foreach (['arch' => 4, 'lib' => 4, 'film' => 4] as $school => $count) {
         for ($y = 0; $y < $count; $y++) {
             $out[$school][$ordinals[$y] . ' Year'][''] = ['A' => 30, 'B' => 60];
         }
@@ -175,7 +187,7 @@ function placeholder_schools(): array {
 // BBA are different lengths, and "2nd Year" means nothing until you know which.
 // The data keeps its one shape (the program is the branch); only the order of
 // the drill-down changes, in js/dashboard.js.
-const PROGRAM_FIRST_SCHOOLS = ['mgmt'];
+const PROGRAM_FIRST_SCHOOLS = ['mgmt', 'law'];
 
 // Years whose branches are scheduling groups rather than anything a student is
 // in (Engineering 1st Year's Core and CS are the timetable's two halves), so
@@ -187,7 +199,8 @@ const FLAT_YEARS = ['eng' => ['1st Year']];
 // Management / 2nd Year / A"), and the Form and the app both filed rows under
 // those labels. They count as BBA, which runs all three years, so every old
 // label has somewhere to land and nothing already reported stops counting.
-const LEGACY_BRANCH = ['mgmt' => 'BBA'];
+// Law's the same way since 26 Oct 2026, onto BA LLB, its five-year course.
+const LEGACY_BRANCH = ['mgmt' => 'BBA', 'law' => 'BA LLB'];
 
 // The branch an old, branchless label for $school now means.
 function legacy_branch(string $school, string $branch): string {

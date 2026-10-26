@@ -9,6 +9,8 @@
 $dir = sys_get_temp_dir() . '/adypu-test-tt-' . getmypid();
 define('TIMETABLE_FILE', $dir . '/timetable/rooms.php');
 require_once __DIR__ . '/../includes/timetable.php';
+require_once __DIR__ . '/../includes/attendance.php';
+require_once __DIR__ . '/../includes/structure.php';
 
 register_shutdown_function(function () use ($dir) {
     @unlink(TIMETABLE_FILE);
@@ -223,17 +225,19 @@ assert($which('B.Tech First Year Div F') === ['1st Year/Core/F'] && $which('B.Te
 assert($which('B.Tech CSE Sem III Div A') === ['2nd Year/CSE/A'] && $which('B.Tech CSE Sem V Div A') === ['3rd Year/SE/A']);
 // CS is Cyber Security: its own branch, never CSE's or SE's.
 assert($which('B.Tech CS Sem V Div A') === ['3rd Year/CS/A']);
-// A Management specialisation is its year's programme; Law's and Liberal
-// Arts' programmes are their whole year (placeholder A/B). Postgraduate
-// classes with no semester name no year, so they match nothing.
+// A Management specialisation is its year's programme; Law's programmes are
+// its branches, an LLM its one class; Liberal Arts' are the whole year
+// (placeholder A/B). Postgraduate classes with no semester name no year, so
+// they match nothing.
 assert($which('BBA Sem V Finance') === ['3rd Year/BBA/A'] && $which('BBA Sem I') === ['1st Year/BBA/A', '1st Year/BBA/B']);
-$lawRows = [...$rows, ['school' => 'law', 'year' => '1st Year', 'branch' => '', 'division' => 'B', 'strength' => 60],
-    ['school' => 'law', 'year' => '2nd Year', 'branch' => '', 'division' => 'A', 'strength' => 60],
-    ['school' => 'lib', 'year' => '4th Year', 'branch' => '', 'division' => 'B', 'strength' => 60]];
+$lawRows = [...$rows, ['school' => 'lib', 'year' => '4th Year', 'branch' => '', 'division' => 'B', 'strength' => 60]];
 $whichLaw = fn($label) => array_map(fn($r) => "{$r['school']}/{$r['year']}/{$r['division']}", timetable_attendance_classes($label, $lawRows));
-assert($whichLaw('BA LLB Sem I') === ['law/1st Year/A', 'law/1st Year/B'] && $whichLaw('BBA LLB Sem III') === ['law/2nd Year/A'] && $whichLaw('LLB Sem III') === ['law/2nd Year/A']);
+$whichCourse = fn($label) => array_map(fn($r) => "{$r['year']}/{$r['branch']}/{$r['division']}", timetable_attendance_classes($label, class_rows()));
+assert($whichCourse('BA LLB Sem I') === ['1st Year/BA LLB/A', '1st Year/BA LLB/B'] && $whichCourse('BBA LLB Sem III') === ['2nd Year/BBA LLB/A']);
+assert($whichCourse('LLB Sem V') === ['3rd Year/LLB/A'] && $whichCourse('LLM Constitution A') === ['1st Year/LLM Constitutional Law/A']);
+assert($whichCourse('LLM Corporate') === ['1st Year/LLM Corporate & Commercial Law/A'] && $whichCourse('LLM Criminal') === ['1st Year/LLM Criminal Law/A']);
 assert($whichLaw('BA Psychology Sem VII') === ['lib/4th Year/B'] && $whichLaw('BA Sem VII: Psychology, Politics & IR') === ['lib/4th Year/B']);
-assert($whichLaw('LLM Corporate') === [] && $whichLaw('MA Politics & IR') === []);
+assert($whichLaw('MA Politics & IR') === []);
 
 // Classes no timetable puts in a room (an MDMC course): on the person's own
 // week with no room, never in a room's grid. A period on a slot the grid does

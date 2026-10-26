@@ -838,11 +838,14 @@ function timetable_attendance_classes(string $label, array $rows): array {
         // A specialisation (BBA Sem V Finance, MBA Sem III Marketing) is a
         // group of its year, which the Form only knows by year and division.
         $want = ['mgmt', $yearOf($m[2]), [$m[1]], null];
-    } elseif (preg_match('/^(?:BA LLB|BBA LLB|LLB) Sem ([IVX]+)$/', $label, $m)) {
-        // Law and Liberal Arts are still placeholder structures: a year and
-        // an A/B the school never defined, so a programme's class is its whole
-        // year and the cell lists whichever division filed.
-        $want = ['law', $yearOf($m[1]), [''], null];
+    } elseif (preg_match('/^(BA LLB|BBA LLB|LLB) Sem ([IVX]+)$/', $label, $m)) {
+        // Law's programmes are its branches. Their divisions are still the
+        // placeholder A/B, so a cell lists whichever division filed.
+        $want = ['law', $yearOf($m[2]), [$m[1]], null];
+    } elseif (preg_match('/^LLM (Corporate|Constitution|Criminal)/', $label, $m)) {
+        // "LLM Constitution A" is that LLM's only class, not a division.
+        $want = ['law', '1st Year', [['Corporate' => 'LLM Corporate & Commercial Law',
+            'Constitution' => 'LLM Constitutional Law', 'Criminal' => 'LLM Criminal Law'][$m[1]]], null];
     } elseif (preg_match('/^BA(?: [^:]+?)? Sem ([IVX]+)(?::.*)?$/', $label, $m)) {
         $want = ['lib', $yearOf($m[1]), [''], null];
     } elseif (preg_match('/^B\.Sc Sem ([IVX]+)$/', $label, $m)) {
