@@ -892,9 +892,11 @@ function timetable_reading(array $days, string $date, string $key, array $entry,
     $during = null;
     $allDay = null;
     foreach ((array) ($days[$date][$key] ?? []) as $time => $present) {
+        // A second person's reading for the same slot is "HH:MM~2" (reading_slots()).
+        $time = preg_replace('/~\d+$/', '', (string) $time);
         // WHOLE_DAY in includes/attendance.php, which this file does not load.
-        if ((string) $time === 'day') $allDay = (int) $present;
-        if (!preg_match('/^(\d{2}):(\d{2})$/', (string) $time, $t)) continue;
+        if ($time === 'day') $allDay = (int) $present;
+        if (!preg_match('/^(\d{2}):(\d{2})$/', $time, $t)) continue;
         $at = (int) $t[1] * 60 + (int) $t[2];
         if ($at < $m[0] - TIMETABLE_EARLY || $at >= $end) continue;
         $in = $at >= $m[0];

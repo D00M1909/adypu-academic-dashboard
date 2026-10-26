@@ -323,13 +323,46 @@ function class_key(array $c): string {
     return $c['school'] . '|' . $c['year'] . '|' . $c['branch'] . '|' . $c['division'];
 }
 
+// Each row's slot within its class and day, in sheet order. A row whose class,
+// day and time someone else already filed gets the next free "HH:MM~2", "~3":
+// two faculty reporting the same class at the same hour are two groups (a Law
+// year whose programmes share one Form option) or one of them picked the wrong
+// class, and either way overwriting dropped a reading without a trace (26 Oct
+// 2026: 117 rows since September, 62 of them in one week, a dean's among
+// them). The same person filing again is a correction and replaces their own,
+// wherever it sits. Rows with no name all count as one person, which is how
+// every row behaved before.
+//
+// The suffix sorts right after its clock and before the next one, so
+// day_present() still takes the day's latest lecture, and readers that want the
+// clock take the first five characters.
+function reading_slots(array $rows): array {
+    $out = [];
+    $at = [];
+    foreach ($rows as $r) {
+        $date = $r['date'];
+        $key = class_key($r);
+        $time = (string) ($r['time'] ?? '');
+        $name = trim((string) ($r['faculty'] ?? ''));
+        $who = strtolower(preg_replace('/[^a-z]/i', '', $name));
+        $slot = $time;
+        for ($n = 2; isset($at["$date|$key|$slot"]) && $out[$at["$date|$key|$slot"]]['who'] !== $who; $n++) {
+            $slot = "$time~$n";
+        }
+        $x = ['date' => $date, 'key' => $key, 'slot' => $slot, 'present' => (int) $r['present'], 'faculty' => $name, 'who' => $who];
+        if (isset($at["$date|$key|$slot"])) $out[$at["$date|$key|$slot"]] = $x;
+        else $at["$date|$key|$slot"] = array_push($out, $x) - 1;
+    }
+    return $out;
+}
+
 // date => class key => time => present. This is what the cache stores: one
 // number per class per LECTURE, so any range can be rebuilt and a class whose
 // faculty each file after their own lecture keeps every reading. Still small
 // enough to json_decode on every request where the raw rows would not be.
 //
-// Two rows for the same class, day and slot overwrite, so the later wins — rows
-// arrive in sheet order, and a resubmission at the same slot is a correction.
+// Slots come from reading_slots(): a resubmission by the same person is a
+// correction and replaces their reading, a second person's is kept beside it.
 // A row with no time keys under '', which is exactly how the whole history
 // behaved before the sheet carried a clock: one reading a day, the last wins.
 //
@@ -337,8 +370,8 @@ function class_key(array $c): string {
 // rolling window, or move to db/schema.sql, when the decode starts to hurt.
 function day_map(array $rows): array {
     $days = [];
-    foreach ($rows as $r) {
-        $days[$r['date']][class_key($r)][$r['time'] ?? ''] = (int) $r['present'];
+    foreach (reading_slots($rows) as $x) {
+        $days[$x['date']][$x['key']][$x['slot']] = $x['present'];
     }
     ksort($days);
     // Chronological within the day, so "the first reading" means something and
@@ -382,9 +415,8 @@ function day_present(array|int $readings): int {
 // the question in Aug 2026, so most of the history has none.
 function faculty_map(array $rows): array {
     $names = [];
-    foreach ($rows as $r) {
-        $name = trim((string) ($r['faculty'] ?? ''));
-        if ($name !== '') $names[$r['date']][class_key($r)][$r['time'] ?? ''] = $name;
+    foreach (reading_slots($rows) as $x) {
+        if ($x['faculty'] !== '') $names[$x['date']][$x['key']][$x['slot']] = $x['faculty'];
     }
     ksort($names);
     return $names;

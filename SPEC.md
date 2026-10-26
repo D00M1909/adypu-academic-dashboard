@@ -66,7 +66,9 @@ hardcoded. Schools whose headcounts have not arrived stay in
 
 **A reading is one present count per class per lecture**:
 `days[date][classKey][HH:MM] = present`, with a parallel `faculty` map for who
-filed it. A whole-day answer files under the slot `day`.
+filed it. A whole-day answer files under the slot `day`. A second person filing
+the same class and slot is kept as `HH:MM~2`; the same person filing again
+replaces their own reading.
 
 - A day's number for a class is its **latest** reading; earlier ones are kept
   and listed under the class.

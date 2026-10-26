@@ -276,6 +276,9 @@ assert(timetable_reading($days, '2026-10-12', 'k', $lec) === 52);
 assert(timetable_reading($days, '2026-10-12', 'k', ['time' => '10.30 to 11.30', 'span' => 1]) === 40);
 assert(timetable_reading($days, '2026-10-12', 'k', ['time' => '8.30 to 9.30', 'span' => 1]) === null);
 assert(timetable_reading($days, '2026-10-13', 'k', $lec) === null && timetable_reading($days, '2026-10-12', 'old', $lec) === null);
+// A second person's reading for the same hour ("10:15~2") is still that lecture's.
+assert(timetable_reading(['d' => ['k' => ['10:15' => 33, '10:15~2' => 30]]], 'd', 'k', $lec) === 30);
+assert(timetable_reading(['d' => ['k' => ['day' => 12, 'day~2' => 14]]], 'd', 'k', $lec) === 14);
 // Up to 30 minutes early counts (the Form's 13:15 for First Year's 1.30)...
 $days = ['d' => ['k' => ['13:15' => 37]]];
 $at130 = ['time' => '1.30 to 2.30', 'span' => 1];

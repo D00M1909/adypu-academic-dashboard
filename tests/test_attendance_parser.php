@@ -413,6 +413,27 @@ $twoNames = faculty_map(parse_attendance_csv(
 assert($twoNames['2026-08-26']['law|2nd Year||A'] === ['09:00' => 'Dr. Meera Rao', '14:00' => 'Prof. S. Iyer'],
     'one lecture overwrote the other faculty: ' . json_encode($twoNames['2026-08-26']['law|2nd Year||A']));
 
+// Two faculty filing the same class for the same lecture both keep their
+// reading (26 Oct 2026: a dean's AIDS B at 14:15 vanished under a colleague's
+// row for the same slot). The same person filing again, however they spell
+// their name, still replaces their own reading.
+$sameSlot = parse_attendance_csv(
+    "timestamp,faculty name,time,class,present,date
+" .
+    '"2026-10-26 15:07","Atul Kathole","14:15","School of Engineering / 2nd Year / AIDS / B","33","2026-10-26"' . "
+" .
+    '"2026-10-26 15:30","Dr. A. Gaigol","14:15","School of Engineering / 2nd Year / AIDS / B","28","2026-10-26"' . "
+" .
+    '"2026-10-26 15:36","Dr. A. Gaigol","14:15","School of Engineering / 2nd Year / AIDS / B","30","2026-10-26"' . "
+" .
+    '"2026-10-26 15:40","atul kathole","14:15","School of Engineering / 2nd Year / AIDS / B","34","2026-10-26"' . "
+"
+);
+$sameDays = day_map($sameSlot)['2026-10-26']['eng|2nd Year|AIDS|B'];
+assert($sameDays === ['14:15' => 34, '14:15~2' => 30], 'a second faculty overwrote the first: ' . json_encode($sameDays));
+assert(faculty_map($sameSlot)['2026-10-26']['eng|2nd Year|AIDS|B'] === ['14:15' => 'atul kathole', '14:15~2' => 'Dr. A. Gaigol']);
+assert(day_present($sameDays) === 30, 'the suffixed reading must still sort as that lecture');
+
 // A cache written before lecture times holds a bare int for the whole day. The
 // next push replaces it; until then it must still read, not fatal.
 assert(day_present(21) === 21, 'a pre-times cache entry must still read');
