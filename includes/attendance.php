@@ -98,6 +98,8 @@ function sample_attendance_rows(): array {
 // they are resolved here off the raw header/field arrays instead.
 function first_value(array $header, array $fields, string $prefix): string {
     foreach ($header as $i => $name) {
+        // "Class started at" is the lecture's time, not a class.
+        if ($prefix === 'class' && (start_header($name) || end_header($name))) continue;
         if (str_starts_with($name, $prefix) && trim((string) ($fields[$i] ?? '')) !== '') {
             return trim($fields[$i]);
         }
@@ -164,16 +166,29 @@ function lecture_slot(string $value): string {
 // Time question to the Form if that ever matters.
 //
 // A class longer than an hour (a two-hour lab) gives its end in a question
-// whose title starts with "Till", "Until" or "End", and the slot becomes
+// whose title starts with "Till", "Until" or "End" (end_header()), and the slot becomes
 // "09:30-11:30", so timetable_reading() can count it for every lecture it
 // covers. An end that is not after the start is ignored, not guessed at.
+// Which columns hold a lecture's start and end. Read off the title, and
+// generously: renaming the start question to "Class started at" (26 Oct 2026)
+// renamed its sheet column too, and a time column read as a class dropped
+// every row whose class sat to its right. Never also a class column.
+function start_header(string $name): bool {
+    return (str_starts_with($name, 'time') && !str_starts_with($name, 'timestamp'))
+        || (bool) preg_match('/\b(start|started|starts|began|begins)\b/', $name);
+}
+
+function end_header(string $name): bool {
+    return (bool) preg_match('/^(till|until|end)\b|\b(ended|ends|finished)\b/', $name);
+}
+
 function row_slot(array $header, array $fields): string {
     $end = '';
     foreach ($header as $i => $name) {
-        if (preg_match('/^(till|until|end)\b/', $name) && $end === '') $end = row_time((string) ($fields[$i] ?? ''));
+        if (end_header($name) && $end === '') $end = row_time((string) ($fields[$i] ?? ''));
     }
     foreach ($header as $i => $name) {
-        if (!str_starts_with($name, 'time') || str_starts_with($name, 'timestamp')) continue;
+        if (!start_header($name)) continue;
         $time = lecture_slot((string) ($fields[$i] ?? ''));
         if ($time !== '') return $time !== WHOLE_DAY && $end > $time ? "$time-$end" : $time;
     }

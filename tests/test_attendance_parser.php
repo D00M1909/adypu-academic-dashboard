@@ -460,6 +460,21 @@ $lab = day_map(parse_attendance_csv(
 assert($lab['eng|2nd Year|CSE|B'] === ['09:30-11:30' => 40, '14:30' => 38], 'lab slot wrong: ' . json_encode($lab['eng|2nd Year|CSE|B']));
 assert($lab['eng|2nd Year|AIDS|B'] === ['15:30' => 20], 'an end before the start must be ignored');
 
+// Renaming the time questions renames their sheet columns, and "Class started
+// at" once read as a class: every row whose class column came after it was
+// dropped (26 Oct 2026, 587 rows). Both are times, never a class.
+$renamed = parse_attendance_csv(
+    "timestamp,class (school of law),class started at,class (aero),class ended at (only if it ran longer than an hour),present,date
+" .
+    '"2026-10-23 17:00","","2:30:00 PM","Aero / 1st Year / B.Tech Aeronautical / R","4:30:00 PM","20","2026-10-23"' . "
+" .
+    '"2026-10-23 17:01","School of Law / 2nd Year / BA LLB / A","9:30:00 AM","","","30","2026-10-23"' . "
+",
+    $renamedSkipped
+);
+assert(count($renamed) === 2 && $renamedSkipped === [], 'a renamed time column ate rows: ' . json_encode($renamedSkipped));
+assert($renamed[0]['time'] === '14:30-16:30' && $renamed[1]['time'] === '09:30', 'renamed time columns not read: ' . $renamed[0]['time'] . ' ' . $renamed[1]['time']);
+
 // A cache written before lecture times holds a bare int for the whole day. The
 // next push replaces it; until then it must still read, not fatal.
 assert(day_present(21) === 21, 'a pre-times cache entry must still read');

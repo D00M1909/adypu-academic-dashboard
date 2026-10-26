@@ -253,7 +253,9 @@ function timeAsShown(range) {
   const shown = range.getDisplayValues();
   values[0].forEach(function (name, c) {
     const h = String(name).trim().toLowerCase();
-    const clock = (h.indexOf('time') === 0 && h.indexOf('timestamp') !== 0) || /^(till|until|end)\b/.test(h);
+    // The same columns start_header() and end_header() read in includes/attendance.php.
+    const clock = (h.indexOf('time') === 0 && h.indexOf('timestamp') !== 0) ||
+      /\b(start|started|starts|began|begins)\b/.test(h) || /^(till|until|end)\b|\b(ended|ends|finished)\b/.test(h);
     if (!clock) return;
     for (let r = 1; r < values.length; r++) values[r][c] = shown[r][c];
   });
