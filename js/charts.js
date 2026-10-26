@@ -9,6 +9,7 @@
 //                    which the two daily charts draw whatever the range is
 //   CLASS_STRENGTH   class key -> strength, the denominator for those days
 // so a drill-down rescopes every chart without another request.
+
 // A division is normally a letter, and reads best as "Division A". Some schools
 // name theirs after the stream instead ("Medical Biotechnology"), where the
 // prefix is noise. Global on purpose: dashboard.js loads after this and labels
@@ -17,20 +18,10 @@ function divisionLabel(name) {
   return String(name).length > 2 ? String(name) : 'Division ' + name;
 }
 
-// Whether a school's strengths are invented rather than counted. Such a school
-// may not state an enrolment as fact, so its unreported tiles and rows say only
-// that nobody reported. Mirrors is_placeholder_school() in structure.php, whose
-// answer index.php ships on window.SCHOOLS. Global on purpose: dashboard.js
-// draws the division tiles and modal rows the same way.
-function placeholderSchool(id) {
-  var s = window.SCHOOLS && window.SCHOOLS[id];
-  return !!(s && s.placeholder);
-}
-
 // A school the drill-down walks program first (school > program > year), and a
 // year it lists every division of at once, as structure.php declares them
-// (PROGRAM_FIRST_SCHOOLS, FLAT_YEARS). Global for the same reason as the two
-// above: dashboard.js draws the drill-down, this file ranks it.
+// (PROGRAM_FIRST_SCHOOLS, FLAT_YEARS). Global for the same reason as
+// divisionLabel(): dashboard.js draws the drill-down, this file ranks it.
 function programFirstSchool(id) {
   return ((window.DASHBOARD_VIEW || {}).programFirst || []).indexOf(id) !== -1;
 }
@@ -333,6 +324,7 @@ window.Charts = (function () {
             strength: d.strength,
             present: d.present,
             reported: d.reported,
+            estimated: !!d.estimated,
             days: d.days,
           });
         });
@@ -380,7 +372,7 @@ window.Charts = (function () {
         ? '<td>' + r.days + '</td>' +
           '<td>' + r.present + '<span class="report-table-sep">/</span>' + r.strength + '</td>' +
           '<td><span class="att-pct ' + attClass(p) + '">' + p + '%</span></td>'
-        : placeholderSchool(state.school)
+        : r.estimated
           ? '<td>0</td><td colspan="2"><span class="tile-unreported">Not reported</span></td>'
           : '<td>0</td><td><span class="tile-unreported">' + r.strength + '</span></td>' +
             '<td><span class="tile-unreported">Not reported</span></td>';

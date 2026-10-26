@@ -279,7 +279,7 @@
             d.strength + ' \u00b7 <span class="att-pct ' + attClass(divPct) + '">' + divPct + '%</span></span>' +
             '<span class="division-bar"><span class="division-bar-fill ' + attClass(divPct) +
               '" style="width:' + divPct + '%"></span></span>'
-          : placeholderSchool(state.school)
+          : d.estimated
             ? '<span class="tile-stat tile-unreported">Not reported</span>' +
               '<span class="division-bar"><span class="division-bar-fill" style="width:0"></span></span>'
             : '<span class="tile-stat tile-unreported">' + d.strength + ' students</span>' +
@@ -649,7 +649,7 @@
         var readout = d.reported
           ? d.present + '<span class="division-count-sep">/</span>' + d.strength +
             ' <span class="att-pct ' + attClass(divPct) + '">' + divPct + '%</span>'
-          : '<span class="tile-unreported">' + (placeholderSchool(data.school)
+          : '<span class="tile-unreported">' + (d.estimated
               ? 'Not reported' : d.strength + ' students, not reported') + '</span>';
         // Every chip below is derived from the one readings list, so nothing on
         // the row can disagree with the entries listed under it.

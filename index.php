@@ -384,11 +384,13 @@ try {
           <?php if ($st['classes'] === 0): ?>
           <span class="tile-stat tile-unreported">No programs yet</span>
           <span class="division-bar"><span class="division-bar-fill" style="width:0"></span></span>
-          <?php elseif ($st['reported'] === 0 && ($school['placeholder'] ?? is_placeholder_school($id))): ?>
+          <?php /* "Students" is real headcounts only, as in the summary card:
+                   a school with none says just "Not reported". */ ?>
+          <?php elseif ($st['reported'] === 0 && $st['enrolled_classes'] === 0): ?>
           <span class="tile-stat tile-unreported">Not reported</span>
           <span class="division-bar"><span class="division-bar-fill" style="width:0"></span></span>
           <?php elseif ($st['reported'] === 0): ?>
-          <span class="tile-stat tile-unreported"><?= $st['strength'] ?> students</span>
+          <span class="tile-stat tile-unreported"><?= $st['enrolled'] ?> students</span>
           <span class="division-bar"><span class="division-bar-fill" style="width:0"></span></span>
           <span class="tile-meta">Not reported</span>
           <?php else: ?>
@@ -517,13 +519,11 @@ try {
 <script>
   window.ATTENDANCE_DATA = <?= json_encode($tree) ?>;
   <?php
-  // The placeholder flag rides along with the name so every tile, bar and table
-  // in JS can tell an invented strength from a counted one off one lookup.
   // On the partner view these are the partners, which is all the scripts need.
-  $schoolsJs = [];
-  foreach ($groups as $sid => $s) $schoolsJs[$sid] = $s + ['placeholder' => is_placeholder_school($sid)];
+  // Whether a strength is invented rides on each division ('estimated'), so
+  // every tile, row and table can tell it from a counted one without a lookup.
   ?>
-  window.SCHOOLS = <?= json_encode($schoolsJs) ?>;
+  window.SCHOOLS = <?= json_encode($groups) ?>;
   window.DASHBOARD_VIEW = <?= json_encode([
       'partners' => $isPartners, 'noun' => $groupNoun,
       // How the drill-down walks the schools that are not year > branch
