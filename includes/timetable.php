@@ -756,6 +756,8 @@ function timetable_schools(array $e): array {
         $s = match (true) {
             (bool) preg_match('/^[BM]\.\s?Tech\b/i', $c) => 'eng',
             (bool) preg_match('/^[BM]\.\s?Des\b/i', $c) => 'design',
+            // Hospitality's B.Sc/M.Sc HHA, before Science claims every B.Sc.
+            (bool) preg_match('/^[BM]\.\s?Sc HHA\b/i', $c) => 'hosp',
             (bool) preg_match('/^[BM]\.\s?Sc\b/i', $c) => 'science',
             (bool) preg_match('/^(BA LLB|BBA LLB|LLB|LLM)\b/i', $c) => 'law',
             (bool) preg_match('/^(BBA|MBA)\b/i', $c) => 'mgmt',

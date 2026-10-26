@@ -168,6 +168,8 @@ assert(timetable_schools($x('BBA Sem I Div A')) === ['mgmt'] && timetable_school
 assert(timetable_schools($x('BA Economics Sem V')) === ['lib'] && timetable_schools($x('LLM Corporate')) === ['law']);
 assert(timetable_schools($x('B.Tech First Year Div F')) === ['eng'] && timetable_schools($x('M.Tech BT Sem I')) === ['eng']);
 assert(timetable_schools($x('MA Industrial Psychology; BBA Sem I')) === ['lib', 'mgmt']);
+// Hospitality's B.Sc is not Science's.
+assert(timetable_schools($x('B.Sc HHA Sem V Culinary; M.Sc HHA Sem III')) === ['hosp'] && timetable_schools($x('B.Sc Sem III')) === ['science']);
 assert(timetable_schools($x('', 'SOE CSE/AIDS')) === ['eng'] && timetable_schools($x('', 'BBA Seminar')) === [] && timetable_schools($x('Guest')) === []);
 
 // One school's view keeps only the rooms it teaches in, and shows another

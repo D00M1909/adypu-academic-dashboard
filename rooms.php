@@ -26,6 +26,11 @@ foreach ($t['rooms'] ?? [] as $entries) {
     foreach ($entries as $x) foreach (timetable_schools($x) as $k) $schools[$k] = true;
 }
 foreach ($t['calendars'] ?? [] as $c) foreach (timetable_schools(['blocked' => '', 'class' => $c['class']]) as $k) $schools[$k] = true;
+// A school whose classes have no rooms yet (Hospitality's) has teachers but no
+// room to pick, so it is offered on the Faculty tab only.
+if (($_GET['view'] ?? '') === 'faculty') {
+    foreach ($t['extra'] ?? [] as $x) foreach (timetable_schools(['blocked' => '', 'class' => $x['class']]) as $k) $schools[$k] = true;
+}
 $schools = array_filter(SCHOOLS, fn($k) => isset($schools[$k]), ARRAY_FILTER_USE_KEY);
 $school = (string) ($_GET['school'] ?? '');
 if (!isset($schools[$school])) $school = '';
@@ -80,7 +85,9 @@ $overlap = !$person && $view === 'overlap';
 $all = !$person && !$facultyAll && ($_GET['all'] ?? '') === '1';
 // A school's rooms are the ones it teaches in at all, so they are picked
 // before the week drops the bookings that do not run in it.
-if ($t && $school !== '' && !$person) $t = timetable_for_school($t, $school);
+// The All faculty list draws no room, so it keeps them all: a school with no
+// rooms yet would otherwise read as "No timetable yet".
+if ($t && $school !== '' && !$person && !$facultyAll) $t = timetable_for_school($t, $school);
 if ($t) $t = timetable_for_week($t, $monday);
 $teaching = $person ? timetable_teaching($t, $person) : [];
 $buildings = $t['buildings'] ?? [];
