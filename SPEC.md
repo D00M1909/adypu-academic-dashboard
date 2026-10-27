@@ -19,6 +19,7 @@ are separate repos with separate data.
 | Page | Who | What |
 |---|---|---|
 | `index.php` | everyone | Attendance dashboard. `?view=partners` is the Knowledge Partner tab |
+| `report.php` | everyone | Attendance report: schools and years ticked, filled / not filled, year by year, filled first, timetable faculty beside each class not filled; insights; Export PDF |
 | `rooms.php` | everyone | Room timetable: Rooms, Free slots, All rooms, Overlapping slots, Dean and Faculty workload |
 | `login.php` | faculty | Sign in, sign up with a school join code |
 | `mark.php` | faculty | Mark attendance from a phone: tick absentees, or type a count |
@@ -172,7 +173,10 @@ shown follows the date.
 - Server-only config (`includes/config.local.php`): `INGEST_SECRET`, which must
   match the Apps Script, and the first admin.
 - Pages send `Cache-Control: no-store`, because the host's edge caches pages.
-- Export PDF is the browser's print dialog over a print stylesheet.
+- The PDF is `report.php` printed: the browser's print dialog over a print
+  stylesheet. The page draws every class once and `js/report.js` filters it
+  in place, so the PDF is always what is on screen. The partners tab still
+  prints the dashboard itself.
 - Tests are assert scripts in `tests/`, no framework. Run PHP ones with
   `php -d zend.assertions=1 -d assert.exception=1 tests/<file>.php`.
 

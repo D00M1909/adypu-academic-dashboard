@@ -827,9 +827,32 @@
   // fires, and putting the old title back first is what leaves a PDF called
   // "ADYPU Academic Dashboard".
   window.addEventListener('beforeprint', updateStats);
-  document.getElementById('range-export').addEventListener('click', function () {
+  var exportButton = document.getElementById('range-export');
+  if (exportButton) exportButton.addEventListener('click', function () {
     updateStats();
     window.print();
+  });
+  // What a click on a chart does: a day opens that day, keeping the
+  // drill-down; a bar or a class opens it here; the donut lists every class.
+  window.Charts.bind({
+    day: function (date) {
+      rememberScroll();
+      var q = new URLSearchParams({ from: date, to: date });
+      if (window.DASHBOARD_VIEW && window.DASHBOARD_VIEW.partners) q.set('view', 'partners');
+      location.href = '?' + q.toString();
+    },
+    drill: function (to) {
+      selectSchool(to.school, to.year || null, to.branch === undefined ? null : to.branch, to.division || null);
+      breadcrumb.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    },
+    details: function () { openDivisionModal(); },
+  });
+  // The report opens on the school drilled into, or the whole university.
+  var reportLink = document.getElementById('range-report');
+  if (reportLink) reportLink.addEventListener('click', function () {
+    if (!state.school) return;
+    reportLink.href += '&scope=schools&school%5B%5D=' + encodeURIComponent(state.school) +
+      (state.year ? '&year%5B%5D=' + encodeURIComponent(state.year) : '');
   });
   document.getElementById('modal-refresh').addEventListener('click', function () { openDivisionModal(); });
   document.getElementById('modal-close').addEventListener('click', hideModal);

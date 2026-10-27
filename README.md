@@ -14,7 +14,9 @@ Live site: <https://adypu-daybook.fast-page.org/>
 - Students enrolled sits under the present count for the same scope: real headcounts only, with how many classes they cover.
 - Pick a preset or any dates. A range averages each class's days, so a week reads like a day.
 - Drill down by school, year, branch and division; the summary and charts follow.
-- Export PDF gives a dated report of whatever is on screen.
+- Insights: hover any chart for its numbers, click a day to open it, click a school, year or class to drill in.
+- Insights also compare the level below and show attendance by lecture hour and by weekday.
+- Report / PDF: tick schools and years, show filled or not-filled classes, year by year, with the timetable's faculty beside each missing class. Save it as a PDF.
 - Knowledge partners have their own tab and never count toward a school.
 - Every page fits a phone screen, and wide grids scroll inside themselves.
 
@@ -100,6 +102,7 @@ php -d zend.assertions=1 tests/test_attendance_parser.php
 php -d zend.assertions=1 tests/test_marking.php
 php -d zend.assertions=1 tests/test_timetable.php
 php -d zend.assertions=1 tests/test_activity.php
+php -d zend.assertions=1 tests/test_report.php
 node tests/test_charts.js
 ```
 
@@ -114,6 +117,7 @@ node tests/test_charts.js
 | Path | What it is |
 | --- | --- |
 | `index.php` | Attendance dashboard |
+| `report.php` | Attendance report: schools, years, filled or not, saved as PDF |
 | `rooms.php` | Room timetable, Free slots, Overlapping slots, Dean and Faculty workload |
 | `mark.php`, `login.php`, `account.php`, `admin.php` | Faculty marking and accounts |
 | `stats.php`, `activity.php` | Usage and the activity log, admins only |

@@ -18,7 +18,7 @@ OUT=upload
 rm -rf "$OUT"
 
 if [ "${1:-}" = "--all" ]; then
-  files=$(find index.php login.php mark.php admin.php account.php stats.php activity.php rooms.php source.php api includes css js img -type f)
+  files=$(find index.php login.php mark.php admin.php account.php stats.php activity.php rooms.php report.php source.php api includes css js img -type f)
   [ -f timetable/rooms.php ] && files="$files"$'\n'timetable/rooms.php
 else
   # One ref, not a range: this diffs the ref against the WORKING TREE, so a file
@@ -50,7 +50,7 @@ while IFS= read -r f; do
   # a local copy only for now (TIMETABLE_SOURCES in config.php), so the server
   # gets neither the switch nor the files.
   case "$f" in
-    index.php|login.php|mark.php|admin.php|account.php|stats.php|activity.php|rooms.php|source.php|timetable/rooms.php|api/*|includes/*|css/*|js/*|img/*) ;;
+    index.php|login.php|mark.php|admin.php|account.php|stats.php|activity.php|rooms.php|report.php|source.php|timetable/rooms.php|api/*|includes/*|css/*|js/*|img/*) ;;
     *) continue ;;
   esac
   # Server-only, and gitignored, so this should never match — but staging it

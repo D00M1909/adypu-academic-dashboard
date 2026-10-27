@@ -123,22 +123,24 @@ assert(breakdown.includes('2nd Year / ECE / Division A'), 'later years missing f
 assert(breakdown.includes('75%') && breakdown.includes('80%') && breakdown.includes('50%'),
   'per-class percentages wrong: ' + breakdown);
 // An unreported class is part of the school whether or not anyone filed for
-// it, and saying so is most of why a head of school wants this page. It states
-// its enrolment in the figures column so the columns still line up beside a
-// reported row's "48/60".
+// it, and saying so is most of why a head of school wants this page.
 assert(breakdown.includes('Not reported'), 'unreported class dropped from the breakdown');
-assert(breakdown.includes('<td>0</td><td><span class="tile-unreported">60</span></td>'),
-  'unreported row should state its strength in the figures column: ' + breakdown);
+assert(breakdown.includes('<span class="tile-unreported">60 students</span>'),
+  'unreported row should state its strength: ' + breakdown);
 assert(!breakdown.includes('>0%<'), 'unreported class drawn as a 0% reading');
+assert(breakdown.includes('Average of 2 days') && breakdown.includes('1 day filed'),
+  'each class should say how many days its number covers: ' + breakdown);
 
-// Every entry behind a class's number is printed under it, so the report states
-// the readings it was read from rather than only their headline.
-assert((breakdown.match(/report-subrow/g) || []).length === 4,
-  'a class reported twice a day over two days should list all four readings');
-assert(breakdown.includes('27 Aug · 9:30 to 10:30 AM') && breakdown.includes('28 Aug · 2:15 to 3:15 PM'),
-  'reading sub-rows should name the day and the full slot: ' + breakdown);
-// A class with a single reading would only repeat its own row.
-assert(!breakdown.includes('10:30 to 11:30'), 'a lone reading should not get a sub-row of its own');
+// Every entry behind a class's number is a chip on its row, grouped by day
+// once the range has more than one, so the report states the readings it was
+// read from rather than only their headline.
+const coreA = breakdown.slice(breakdown.indexOf('1st Year / Core / Division A'), breakdown.indexOf('1st Year / Core / Division B'));
+assert((coreA.match(/class="lec-chip/g) || []).length === 4,
+  'a class reported twice a day over two days should list all four readings: ' + coreA);
+assert(coreA.includes('27 Aug · 9:30 to 10:30 AM') && coreA.includes('28 Aug · 2:15 to 3:15 PM'),
+  'a chip should name the day and the full slot on hover: ' + coreA);
+assert((coreA.match(/class="bd-date"/g) || []).length === 2, 'two days should give two day groups');
+assert(!breakdown.includes('report-subrow'), 'lectures are chips now, not sub-rows');
 
 // --- Slot labels: the stored start, read back as the lecture it stands for ---
 const slot = window.Charts.slotLabel;
@@ -175,7 +177,7 @@ window.Charts.render({ school: 'eng', year: '1st Year', branch: 'Core' },
   { present: 45, strengthReported: 60, reported: 1, classes: 2 });
 assert(els['breakdown-section'].hidden === false,
   'a division reported twice in a day must print its lectures');
-assert((els['breakdown-rows'].innerHTML.match(/report-subrow/g) || []).length === 4,
+assert((els['breakdown-rows'].innerHTML.match(/class="lec-chip/g) || []).length === 4,
   'every lecture should be printed, not just the day');
 
 // Same for a branchless school's year: selecting it lands straight on the
@@ -253,5 +255,34 @@ assert(els['chart-trend'].innerHTML.includes('60% (1 classes)'), 'trend lost the
 assert(els['chart-compliance'].innerHTML.includes('2 of 2 classes reported'), 'reporting chart should cover the month');
 assert(els['daybyday-section'].hidden === true, 'the day-by-day table must stay on the one-day range');
 delete window.TREND_DAYS;
+
+// --- Compare, lecture hour and the two class lists --------------------------
+window.ATTENDANCE_DAYS = {
+  '2026-08-27': { 'eng|1st Year|Core|A': { '09:30': 40, '11:30': 50 }, 'law|1st Year||A': { '09:30': 90 } },
+  '2026-08-28': { 'eng|1st Year|Core|A': { '09:30': 95, '14:15': 90 }, 'eng|1st Year|Core|B': { '10:30': 60 }, 'law|1st Year||A': { '09:30': 80 } },
+};
+window.Charts.render({ school: null, year: null, branch: null },
+  { present: 215, strengthReported: 300, reported: 3, classes: 4 });
+const compare = els['chart-compare'].innerHTML;
+// Engineering 130 of 200, Law 85 of 100 (B never filed): Law ranks first.
+assert(compare.indexOf('>Law<') < compare.indexOf('>Engineering<'), 'compare should rank by attendance: ' + compare);
+assert(compare.includes('65%') && compare.includes('85%'), 'compare percentages wrong');
+assert(compare.includes('1/2 filed') && compare.includes('2/2 filed'), 'compare should say how many classes filed');
+assert(compare.includes('data-drill="{&quot;school&quot;:&quot;law&quot;}"'), 'a school bar should drill into the school');
+assert(els['chart-compare-title'].textContent === 'Compare schools', 'root compares schools');
+// 9:30 holds three readings: 40 + 95 + 90 + 80 of 400 = 76%.
+assert(els['chart-hours'].innerHTML.includes('76%'), '9:30 bucket wrong: ' + els['chart-hours'].innerHTML);
+// 27 Aug is a Thursday (140 of 200), 28 Aug a Friday (230 of 300).
+const weekdays = els['chart-weekdays'].innerHTML;
+assert(weekdays.indexOf('>Thu<') < weekdays.indexOf('>Fri<') && weekdays.includes('70%') && weekdays.includes('77%'),
+  'weekday bars wrong: ' + weekdays);
+// Inside a school the compare chart sets its years side by side; inside a
+// division there is nothing under it to compare.
+window.Charts.render({ school: 'eng', year: null, branch: null },
+  { present: 150, strengthReported: 200, reported: 2, classes: 2 });
+assert(els['chart-compare-title'].textContent === 'Compare years', 'a school compares its years');
+window.Charts.render({ school: 'eng', year: '1st Year', branch: 'Core', division: 'A' },
+  { present: 90, strengthReported: 100, reported: 1, classes: 1 });
+assert(els['chart-compare'].innerHTML === '', 'one division has nothing to compare');
 
 console.log('OK');

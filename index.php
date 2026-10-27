@@ -344,7 +344,14 @@ try {
                This invisible one keeps Enter submitting, since a form with two
                fields and no submit button ignores it. */ ?>
       <button class="sr-only" type="submit" tabindex="-1">Show this range</button>
+      <?php /* The report page is the PDF now: pick schools, years and which
+               classes, then Export PDF there. Partners have no report yet, so
+               their tab keeps printing the page as it stands. */ ?>
+      <?php if ($isPartners): ?>
       <button class="range-export no-print" id="range-export" type="button" title="In the print dialog, choose Save as PDF: the Windows Print to PDF driver ignores the page orientation and the file name."><svg aria-hidden="true"><use href="#icon-print"/></svg>Export PDF</button>
+      <?php else: ?>
+      <a class="range-export no-print" id="range-report" href="report.php?<?= htmlspecialchars(http_build_query(['from' => $from, 'to' => $to])) ?>" title="Pick schools, years and classes, then save it as a PDF"><svg aria-hidden="true"><use href="#icon-print"/></svg>Report / PDF</a>
+      <?php endif; ?>
     </div>
     <span class="print-range">Date range: <?= htmlspecialchars($rangeLabel) ?> &middot; <?= htmlspecialchars($freshness) ?></span>
   </form>
@@ -445,6 +452,22 @@ try {
           <figcaption>Classes reporting each day <span class="chart-caption-note">Last 30 days</span></figcaption>
           <div class="chart-body" id="chart-compliance"></div>
         </figure>
+        <figure class="chart-card chart-wide">
+          <figcaption><span id="chart-compare-title">Compare schools</span> <span class="chart-caption-note">Click one to open it</span></figcaption>
+          <div class="chart-body" id="chart-compare"></div>
+        </figure>
+        <?php /* A row of its own, so the two cards share the full width
+                 rather than leave a hole in the grid above. */ ?>
+        <div class="chart-row">
+          <figure class="chart-card">
+            <figcaption>Attendance by lecture hour</figcaption>
+            <div class="chart-body" id="chart-hours"></div>
+          </figure>
+          <figure class="chart-card">
+            <figcaption>Attendance by weekday <span class="chart-caption-note">Last 30 days</span></figcaption>
+            <div class="chart-body" id="chart-weekdays"></div>
+          </figure>
+        </div>
       </div>
     </section>
 
@@ -462,7 +485,7 @@ try {
         <thead>
           <tr>
             <th scope="col">Class</th>
-            <th scope="col">Days reported</th>
+            <th scope="col">Lectures</th>
             <th scope="col">Present</th>
             <th scope="col">Attendance</th>
           </tr>
