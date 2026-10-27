@@ -460,6 +460,24 @@ $lab = day_map(parse_attendance_csv(
 assert($lab['eng|2nd Year|CSE|B'] === ['09:30-11:30' => 40, '14:30' => 38], 'lab slot wrong: ' . json_encode($lab['eng|2nd Year|CSE|B']));
 assert($lab['eng|2nd Year|AIDS|B'] === ['15:30' => 20], 'an end before the start must be ignored');
 
+// A time left on AM, or typed 24-hour style as "2:00", is the afternoon: no
+// lecture runs between midnight and 8 (27 Oct 2026, 16 of 133 answers).
+$ampm = day_map(parse_attendance_csv(
+    "timestamp,time of lecture,till,class,present,date
+" .
+    '"2026-10-27 11:00","10:30:00 AM","12:30:00 AM","School of Engineering / 2nd Year / CSE / B","40","2026-10-27"' . "
+" .
+    '"2026-10-27 15:01","2:00:00 AM","3:00:00 AM","School of Engineering / 2nd Year / CSE / B","38","2026-10-27"' . "
+" .
+    '"2026-10-27 15:02","12:00:00 AM","","School of Engineering / 2nd Year / AIDS / B","20","2026-10-27"' . "
+" .
+    '"2026-10-27 15:03","9:30:00 AM","9:30:00 AM","School of Engineering / 2nd Year / AIDS / A","21","2026-10-27"' . "
+"
+))['2026-10-27'];
+assert($ampm['eng|2nd Year|CSE|B'] === ['10:30-12:30' => 40, '14:00-15:00' => 38], 'night times not read as afternoon: ' . json_encode($ampm['eng|2nd Year|CSE|B']));
+assert($ampm['eng|2nd Year|AIDS|B'] === ['12:00' => 20], '12 AM should be noon: ' . json_encode($ampm['eng|2nd Year|AIDS|B']));
+assert($ampm['eng|2nd Year|AIDS|A'] === ['09:30' => 21], 'a morning lecture must stay in the morning');
+
 // Renaming the time questions renames their sheet columns, and "Class started
 // at" once read as a class: every row whose class column came after it was
 // dropped (26 Oct 2026, 587 rows). Both are times, never a class.

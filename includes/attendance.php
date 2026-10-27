@@ -182,14 +182,24 @@ function end_header(string $name): bool {
     return (bool) preg_match('/^(till|until|end)\b|\b(ended|ends|finished)\b/', $name);
 }
 
+// A Form Time answer between midnight and 7:59 is an afternoon one. The
+// question's AM/PM dropdown starts on AM, and an account set to a 24-hour
+// region gets no dropdown at all, so "12:30" files as 00:30 and "2:00" as
+// 02:00 (27 Oct 2026: 16 of the first 133 answers, mostly end times). No
+// lecture runs at night, so the PM reading is the only one that can be meant.
+function afternoon_time(string $time): string {
+    if (!preg_match('/^(\d{2}):(\d{2})$/', $time, $m) || (int) $m[1] >= 8) return $time;
+    return sprintf('%02d:%s', (int) $m[1] + 12, $m[2]);
+}
+
 function row_slot(array $header, array $fields): string {
     $end = '';
     foreach ($header as $i => $name) {
-        if (end_header($name) && $end === '') $end = row_time((string) ($fields[$i] ?? ''));
+        if (end_header($name) && $end === '') $end = afternoon_time(row_time((string) ($fields[$i] ?? '')));
     }
     foreach ($header as $i => $name) {
         if (!start_header($name)) continue;
-        $time = lecture_slot((string) ($fields[$i] ?? ''));
+        $time = afternoon_time(lecture_slot((string) ($fields[$i] ?? '')));
         if ($time !== '') return $time !== WHOLE_DAY && $end > $time ? "$time-$end" : $time;
     }
     $stamp = row_time(first_value($header, $fields, 'timestamp'));
