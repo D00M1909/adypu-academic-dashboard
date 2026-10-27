@@ -242,10 +242,13 @@ function activity_person(string $name): string {
 // lecture filed both ways is credited once, to the app's name, the same rule
 // the dashboard's numbers follow (merge_readings()). A person's school is the
 // one they mark for most, read off the class key (class_key() leads with it).
-// Returns [rows, unnamed], where unnamed counts lectures nobody's name is on.
+// Returns [rows, unnamed, unnamed by class], where unnamed counts lectures
+// nobody's name is on. Each row's class_days (class key => date => lectures)
+// is what lets the report count a person for the schools and years it shows.
 function activity_leaderboard(array $form, array $app, string $from, string $to): array {
     $rows = [];
     $unnamed = 0;
+    $unnamedBy = [];
     $dates = array_unique([...array_keys($form), ...array_keys($app)]);
     foreach ($dates as $date) {
         $date = (string) $date;
@@ -255,15 +258,16 @@ function activity_leaderboard(array $form, array $app, string $from, string $to)
         foreach ((array) ($app[$date] ?? []) as $class => $times) foreach ((array) $times as $time => $name) $slots["$class|$time"] = [(string) $class, (string) $name, 'app'];
         foreach ($slots as [$class, $name, $via]) {
             $key = activity_person($name);
-            if ($key === '') { $unnamed++; continue; }
+            if ($key === '') { $unnamed++; $unnamedBy[$class] = ($unnamedBy[$class] ?? 0) + 1; continue; }
             $r = &$rows[$key];
-            $r ??= ['name' => [], 'lectures' => 0, 'form' => 0, 'app' => 0, 'classes' => [], 'days' => [], 'schools' => [], 'last' => '', 'per_day' => [], 'by_class' => []];
+            $r ??= ['name' => [], 'lectures' => 0, 'form' => 0, 'app' => 0, 'classes' => [], 'days' => [], 'schools' => [], 'last' => '', 'per_day' => [], 'by_class' => [], 'class_days' => []];
             $r['name'][$name] = ($r['name'][$name] ?? 0) + 1;
             $r['lectures']++;
             $r[$via]++;
             $r['classes'][$class] = true;
             $r['per_day'][$date] = ($r['per_day'][$date] ?? 0) + 1;
             $r['by_class'][$class] = ($r['by_class'][$class] ?? 0) + 1;
+            $r['class_days'][$class][$date] = ($r['class_days'][$class][$date] ?? 0) + 1;
             $r['days'][$date] = true;
             $school = explode('|', $class)[0];
             $r['schools'][$school] = ($r['schools'][$school] ?? 0) + 1;
@@ -278,5 +282,5 @@ function activity_leaderboard(array $form, array $app, string $from, string $to)
             'classes' => count($r['classes']), 'days' => count($r['days'])] + $r;
     }
     usort($rows, fn($a, $b) => [$b['lectures'], $b['days'], $a['name']] <=> [$a['lectures'], $a['days'], $b['name']]);
-    return [array_values($rows), $unnamed];
+    return [array_values($rows), $unnamed, $unnamedBy];
 }

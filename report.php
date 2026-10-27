@@ -4,6 +4,7 @@
 // js/report.js only hides rows and recounts, so changing a filter is instant
 // and the page printed is always exactly the page on screen.
 require_once __DIR__ . '/includes/report.php';
+require_once __DIR__ . '/includes/activity.php';
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/page.php';
 require_once __DIR__ . '/includes/traffic.php';
@@ -137,6 +138,7 @@ page_head('Attendance report', 'page-wide page-report', 'attendance');
     <div class="rep-stat"><span>Not filled</span><strong class="rep-miss" id="st-missing">0</strong></div>
     <div class="rep-stat"><span>Present</span><strong><b id="st-present">0</b><small> of <b id="st-strength">0</b></small></strong></div>
     <div class="rep-stat"><span>Attendance</span><strong id="st-pct">0%</strong></div>
+    <div class="rep-stat"><span>Faculty who filed</span><strong id="st-filers">0</strong></div>
   </div>
 
   <section class="rep-section rep-insights" id="rep-insights">
@@ -171,6 +173,19 @@ page_head('Attendance report', 'page-wide page-report', 'attendance');
         <?php endforeach; ?>
       </tbody>
     </table>
+  </section>
+
+  <?php // Who filed, most lectures first, counted for the schools and years
+        // ticked: js/report.js draws it from REPORT.filers. Only people who
+        // filed are named here; the classes nobody filed say who was due. ?>
+  <section class="rep-section" id="rep-filers" hidden>
+    <div class="section-title"><h2>Who filed</h2><span class="section-meta" id="rep-filers-meta"></span></div>
+    <table class="report-table rep-table rep-filers">
+      <thead><tr><th scope="col">Faculty</th><th scope="col">School</th><th scope="col">Lectures</th><th scope="col">Classes</th><th scope="col">Days</th></tr></thead>
+      <tbody id="rep-filers-rows"></tbody>
+    </table>
+    <button class="rep-more no-print" type="button" id="rep-filers-more" hidden></button>
+    <p class="rep-filers-note">Every lecture with a faculty name on it, from the Google Form and the app; a lecture filed both ways counts once. Names are matched ignoring titles and spacing, so a misspelt name counts as someone else.<span id="rep-filers-unnamed"></span></p>
   </section>
 
   <?php foreach ($years as $y): ?>
@@ -218,6 +233,20 @@ page_head('Attendance report', 'page-wide page-report', 'attendance');
 // tree, its days, and the 30 days to the range's end for the two daily charts.
 $classStrength = [];
 foreach ($classRows as $c) $classStrength[class_key($c)] = $c['strength'];
+
+// The leaderboard over the report's dates, the same count as the admin
+// Activity page's (activity_leaderboard()). Each person keeps their lectures
+// by class and day so the filters can narrow it without a reload; partner
+// classes are not in this report, so they are dropped here.
+$cache = read_attendance_cache() ?? [];
+[$board, , $unnamedBy] = activity_leaderboard(
+    remap_legacy_days(is_array($cache['faculty'] ?? null) ? $cache['faculty'] : []),
+    remap_legacy_days(submitted('faculty')), $from, $to);
+$filers = [];
+foreach ($board as $r) {
+    $mine = array_intersect_key($r['class_days'], $classStrength);
+    if ($mine) $filers[] = ['n' => $r['name'], 'c' => $mine];
+}
 $trendFrom = (new DateTimeImmutable($to))->modify('-29 days')->format('Y-m-d');
 $rangeDays = $trendDays = [];
 foreach ($days as $d => $classes) {
@@ -231,6 +260,7 @@ foreach ($days as $d => $classes) {
   window.REPORT = <?= json_encode([
       'schools' => array_map($short, array_combine($schoolIds, $schoolIds)),
       'years' => $years, 'from' => $from, 'to' => $to, 'range' => $rangeLabel,
+      'filers' => $filers, 'unnamed' => (object) array_intersect_key($unnamedBy, $classStrength),
   ]) ?>;
   window.SCHOOLS = <?= json_encode(SCHOOLS) ?>;
   window.DASHBOARD_VIEW = <?= json_encode(['partners' => false, 'noun' => 'school',

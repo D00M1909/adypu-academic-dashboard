@@ -65,7 +65,11 @@ $app = [
     // The same lecture as the Form's 9.00: counted once, for the app.
     '2026-10-21' => ['law|2nd Year||A' => ['09:00' => 'Ben Das'], 'eng|1st Year|Core|A' => ['14:00' => 'Prof. Asha Rao']],
 ];
-[$rows, $unnamed] = activity_leaderboard($form, $app, '2026-10-15', '2026-10-21');
+[$rows, $unnamed, $unnamedBy] = activity_leaderboard($form, $app, '2026-10-15', '2026-10-21');
+// The report narrows the board to the schools and years it shows, so each
+// row keeps its lectures by class and day, and the nameless ones by class.
+assert($rows[0]['class_days'] === ['law|2nd Year||A' => ['2026-10-20' => 2], 'eng|1st Year|Core|A' => ['2026-10-21' => 1]], json_encode($rows[0]['class_days']));
+assert($unnamedBy === ['law|2nd Year||A' => 1]);
 assert(array_column($rows, 'key') === ['asha rao', 'ben das'], json_encode($rows));
 assert($rows[0]['lectures'] === 3 && $rows[0]['form'] === 2 && $rows[0]['app'] === 1 && $rows[0]['days'] === 2 && $rows[0]['classes'] === 2, json_encode($rows[0]));
 assert($rows[0]['school'] === 'law' && $rows[0]['last'] === '2026-10-21');

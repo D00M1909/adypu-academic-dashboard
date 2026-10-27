@@ -19,7 +19,7 @@ are separate repos with separate data.
 | Page | Who | What |
 |---|---|---|
 | `index.php` | everyone | Attendance dashboard. `?view=partners` is the Knowledge Partner tab |
-| `report.php` | everyone | Attendance report: schools and years ticked, filled / not filled, year by year, filled first, timetable faculty beside each class not filled; insights; Export PDF |
+| `report.php` | everyone | Attendance report: schools and years ticked, filled / not filled, year by year, filled first, timetable faculty beside each class not filled; who filed, ranked by lectures; insights; Export PDF |
 | `rooms.php` | everyone | Room timetable: Rooms, Free slots, All rooms, Overlapping slots, Dean and Faculty workload |
 | `login.php` | faculty | Sign in, sign up with a school join code |
 | `mark.php` | faculty | Mark attendance from a phone: tick absentees, or type a count |

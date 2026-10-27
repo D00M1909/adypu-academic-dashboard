@@ -29,6 +29,69 @@
     return names.length < 3 ? names.join(' and ') : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
   }
 
+  function esc(v) {
+    return String(v).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; });
+  }
+
+  // Who filed, counted only for the classes the filters leave in: a person who
+  // filed for Engineering and Law is counted for whichever of the two is
+  // ticked. Lectures, then days, then name, as on the admin Activity page.
+  // The top ten show on screen with a button for the rest; the PDF lists all.
+  var FILERS_TOP = 10;
+  var filersOpen = false;
+  function renderFilers(s, any) {
+    var on = function (key) {
+      var k = key.split('|');
+      return s.schools.indexOf(k[0]) !== -1 && s.years.indexOf(k[1]) !== -1;
+    };
+    var people = [];
+    (R.filers || []).forEach(function (f) {
+      var p = { name: f.n, lectures: 0, classes: 0, days: {}, schools: {} };
+      Object.keys(f.c).forEach(function (key) {
+        if (!on(key)) return;
+        p.classes++;
+        Object.keys(f.c[key]).forEach(function (d) {
+          p.lectures += f.c[key][d];
+          p.days[d] = true;
+          var sc = key.split('|')[0];
+          p.schools[sc] = (p.schools[sc] || 0) + f.c[key][d];
+        });
+      });
+      if (!p.lectures) return;
+      p.dayCount = Object.keys(p.days).length;
+      p.school = Object.keys(p.schools).sort(function (a, b) { return p.schools[b] - p.schools[a]; })[0];
+      people.push(p);
+    });
+    people.sort(function (a, b) {
+      return b.lectures - a.lectures || b.dayCount - a.dayCount || (a.name < b.name ? -1 : 1);
+    });
+    var unnamed = 0;
+    Object.keys(R.unnamed || {}).forEach(function (key) { if (on(key)) unnamed += R.unnamed[key]; });
+
+    var section = document.getElementById('rep-filers');
+    section.hidden = !any || !people.length;
+    document.getElementById('st-filers').textContent = people.length;
+    if (section.hidden) return;
+    var total = people.reduce(function (n, p) { return n + p.lectures; }, 0);
+    document.getElementById('rep-filers-meta').textContent = people.length + ' faculty · ' + total + ' lecture' + (total === 1 ? '' : 's');
+    var top = people[0].lectures;
+    document.getElementById('rep-filers-rows').innerHTML = people.map(function (p, i) {
+      return '<tr' + (i >= FILERS_TOP ? ' class="rep-filer-extra"' : '') + '>' +
+        '<th scope="row"><span class="rep-rank">' + (i + 1) + '</span>' + esc(p.name) + '</th>' +
+        '<td>' + esc(R.schools[p.school] || '') + '</td>' +
+        '<td><span class="rep-filer-count"><span class="rep-bar" aria-hidden="true"><i style="width:' + Math.round(p.lectures / top * 100) + '%"></i></span>' + p.lectures + '</span></td>' +
+        '<td>' + p.classes + '</td>' +
+        '<td>' + p.dayCount + '</td>' +
+      '</tr>';
+    }).join('');
+    section.classList.toggle('is-open', filersOpen);
+    var more = document.getElementById('rep-filers-more');
+    more.hidden = people.length <= FILERS_TOP;
+    more.textContent = filersOpen ? 'Show the top ' + FILERS_TOP : 'Show all ' + people.length;
+    document.getElementById('rep-filers-unnamed').textContent = unnamed
+      ? ' ' + unnamed + ' lecture' + (unnamed === 1 ? ' has' : 's have') + ' no name on it and count' + (unnamed === 1 ? 's' : '') + ' for nobody.' : '';
+  }
+
   function state() {
     var scope = form.querySelector('input[name="scope"]:checked').value;
     return {
@@ -87,6 +150,8 @@
     document.getElementById('rep-empty').hidden = any;
     document.getElementById('rep-insights').hidden = !any;
     if (any) window.Charts.renderReport(s.schools, s.years);
+
+    renderFilers(s, any);
 
     // By school: whenever more than one school is in the report.
     var summary = document.getElementById('rep-summary');
@@ -148,6 +213,10 @@
     apply();
   });
   document.getElementById('rep-export').addEventListener('click', function () { window.print(); });
+  document.getElementById('rep-filers-more').addEventListener('click', function () {
+    filersOpen = !filersOpen;
+    apply();
+  });
   // A day on either daily chart opens the report for that day; a school or a
   // year in Compare narrows the report to it.
   window.Charts.bind({

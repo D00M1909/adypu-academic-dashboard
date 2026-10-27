@@ -2051,7 +2051,7 @@ button.tt-entry + button.tt-entry { margin-top: 6px; border-top-left-radius: 0; 
 .rep-sub:empty { display: none; }
 .rep-when { margin: 0; text-align: right; font-size: 15px; font-weight: 600; color: var(--ink); }
 .rep-when span { display: block; font-size: 12px; font-weight: 500; color: var(--ink-muted); }
-.rep-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 16px 0 6px; }
+.rep-stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin: 16px 0 6px; }
 .rep-stat { background: var(--lecture-tint); border: 1px solid var(--hairline); border-radius: 12px; padding: 10px 14px; }
 .rep-stat span { display: block; font-size: 12px; font-weight: 600; color: var(--ink-muted); }
 .rep-stat strong { display: block; margin-top: 2px; font-size: 22px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
@@ -2091,11 +2091,23 @@ button.tt-entry + button.tt-entry { margin-top: 6px; border-top-left-radius: 0; 
 .rep-time { display: inline-block; min-width: 3.2em; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
 .rep-group-note { float: right; text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--ink-faint); }
 .rep-empty { margin: 24px 0; text-align: center; color: var(--ink-muted); }
+/* Who filed: a ranked table, the top ten on screen until "Show all". */
+.rep-rank { display: inline-block; min-width: 1.8em; color: var(--ink-faint); font-weight: 600; font-variant-numeric: tabular-nums; }
+.rep-filer-count { display: inline-flex; align-items: center; justify-content: flex-end; gap: 10px; font-weight: 600; color: var(--ink); }
+.rep-filer-count .rep-bar { width: 110px; }
+.rep-filers .rep-filer-extra { display: none; }
+#rep-filers.is-open .rep-filer-extra { display: table-row; }
+.rep-more { display: block; margin: 8px auto 0; padding: 7px 16px; border: 1px solid var(--hairline); border-radius: 999px; background: var(--surface-raised); font: inherit; font-size: 13px; font-weight: 600; color: var(--ink-muted); cursor: pointer; }
+.rep-more:hover, .rep-more:focus-visible { color: var(--ink); background: var(--surface-control); }
+.rep-filers-note { margin: 8px 2px 0; font-size: 11.5px; color: var(--ink-faint); }
 .rep-foot { margin: 18px 0 0; padding-top: 10px; border-top: 1px solid var(--hairline); font-size: 11.5px; color: var(--ink-faint); }
 
 @media (max-width: 640px) {
   .rep-doc { padding: 16px 12px 10px; }
   .rep-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rep-stat:last-child { grid-column: 1 / -1; }
+  .rep-filer-count .rep-bar { display: none; }
+  .rep-filers th:nth-child(2), .rep-filers td:nth-child(2) { display: none; }
   .rep-when { text-align: left; }
   .rep-actions { margin-left: 0; width: 100%; }
   .rep-export { width: 100%; justify-content: center; }
@@ -2133,6 +2145,8 @@ button.tt-entry + button.tt-entry { margin-top: 6px; border-top-left-radius: 0; 
   .rep-table tr { break-inside: avoid; page-break-inside: avoid; }
   .rep-group-head { break-after: avoid; page-break-after: avoid; }
   .rep-foot { font-size: 9.5px; }
+  .rep-filers .rep-filer-extra { display: table-row; }
+  .rep-filer-count .rep-bar { width: 70px; }
   .rank-row { padding: 2px 6px; }
   .rank-label, .rank-value b { font-size: 11px; }
   .rep-insights .chart-card { padding: 10px; gap: 6px; }

@@ -117,7 +117,7 @@ node tests/test_charts.js
 | Path | What it is |
 | --- | --- |
 | `index.php` | Attendance dashboard |
-| `report.php` | Attendance report: schools, years, filled or not, saved as PDF |
+| `report.php` | Attendance report: schools, years, filled or not, who filed, saved as PDF |
 | `rooms.php` | Room timetable, Free slots, Overlapping slots, Dean and Faculty workload |
 | `mark.php`, `login.php`, `account.php`, `admin.php` | Faculty marking and accounts |
 | `stats.php`, `activity.php` | Usage and the activity log, admins only |
