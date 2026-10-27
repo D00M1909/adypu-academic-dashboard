@@ -64,9 +64,10 @@ the denominator never comes from a submission. A school with no branches uses
 an empty branch and the UI skips that step. Years vary per school, never
 hardcoded. Schools whose headcounts have not arrived stay in
 `placeholder_schools()` rather than show a percentage over invented numbers.
-Management and Law list their programmes there as branches (Law: BA LLB, BBA
-LLB, LLB and three LLMs); their labels from before that count under BBA and
-BA LLB (`LEGACY_BRANCH`).
+Management, Law and Liberal Arts list their programmes there as branches (Law:
+BA LLB, BBA LLB, LLB and three LLMs; Liberal Arts: BA and three first-year
+MAs); their labels from before that count under BBA, BA LLB and BA
+(`LEGACY_BRANCH`).
 
 **A reading is one present count per class per lecture**:
 `days[date][classKey][HH:MM] = present`, with a parallel `faculty` map for who

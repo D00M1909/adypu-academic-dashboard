@@ -174,7 +174,19 @@ function placeholder_schools(): array {
             if ($y < $length) $out['law'][$ordinals[$y] . ' Year'][$program] = $divisions;
         }
     }
-    foreach (['arch' => 4, 'lib' => 4, 'film' => 4] as $school => $count) {
+    // Liberal Arts' programmes (27 Oct 2026): its BA keeps the A and B every
+    // year had before, so readings filed under those labels land on it
+    // (LEGACY_BRANCH); the three MAs are new this year, one class each.
+    $lib = ['BA' => [4, ['A' => 30, 'B' => 60]],
+        'MA Psychology (Industrial-Organizational)' => [1, ['A' => 30]],
+        'MA Psychology (Counselling)' => [1, ['A' => 30]],
+        'MA Politics & International Relations' => [1, ['A' => 30]]];
+    for ($y = 0; $y < 4; $y++) {
+        foreach ($lib as $program => [$length, $divisions]) {
+            if ($y < $length) $out['lib'][$ordinals[$y] . ' Year'][$program] = $divisions;
+        }
+    }
+    foreach (['arch' => 4, 'film' => 4] as $school => $count) {
         for ($y = 0; $y < $count; $y++) {
             $out[$school][$ordinals[$y] . ' Year'][''] = ['A' => 30, 'B' => 60];
         }
@@ -187,7 +199,7 @@ function placeholder_schools(): array {
 // BBA are different lengths, and "2nd Year" means nothing until you know which.
 // The data keeps its one shape (the program is the branch); only the order of
 // the drill-down changes, in js/dashboard.js.
-const PROGRAM_FIRST_SCHOOLS = ['mgmt', 'law'];
+const PROGRAM_FIRST_SCHOOLS = ['mgmt', 'law', 'lib'];
 
 // Years whose branches are scheduling groups rather than anything a student is
 // in (Engineering 1st Year's Core and CS are the timetable's two halves), so
@@ -199,8 +211,9 @@ const FLAT_YEARS = ['eng' => ['1st Year']];
 // Management / 2nd Year / A"), and the Form and the app both filed rows under
 // those labels. They count as BBA, which runs all three years, so every old
 // label has somewhere to land and nothing already reported stops counting.
-// Law's the same way since 26 Oct 2026, onto BA LLB, its five-year course.
-const LEGACY_BRANCH = ['mgmt' => 'BBA', 'law' => 'BA LLB'];
+// Law's the same way since 26 Oct 2026, onto BA LLB, its five-year course,
+// and Liberal Arts since 27 Oct, onto its BA.
+const LEGACY_BRANCH = ['mgmt' => 'BBA', 'law' => 'BA LLB', 'lib' => 'BA'];
 
 // The branch an old, branchless label for $school now means.
 function legacy_branch(string $school, string $branch): string {

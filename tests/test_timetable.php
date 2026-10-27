@@ -226,18 +226,22 @@ assert($which('B.Tech CSE Sem III Div A') === ['2nd Year/CSE/A'] && $which('B.Te
 // CS is Cyber Security: its own branch, never CSE's or SE's.
 assert($which('B.Tech CS Sem V Div A') === ['3rd Year/CS/A']);
 // A Management specialisation is its year's programme; Law's programmes are
-// its branches, an LLM its one class; Liberal Arts' are the whole year
-// (placeholder A/B). Postgraduate classes with no semester name no year, so
-// they match nothing.
+// its branches, an LLM its one class; Liberal Arts' BA is the whole year
+// (placeholder A/B) and each MA its one first-year class.
 assert($which('BBA Sem V Finance') === ['3rd Year/BBA/A'] && $which('BBA Sem I') === ['1st Year/BBA/A', '1st Year/BBA/B']);
-$lawRows = [...$rows, ['school' => 'lib', 'year' => '4th Year', 'branch' => '', 'division' => 'B', 'strength' => 60]];
+$lawRows = [...$rows, ['school' => 'lib', 'year' => '4th Year', 'branch' => 'BA', 'division' => 'B', 'strength' => 60],
+    ['school' => 'lib', 'year' => '1st Year', 'branch' => 'MA Politics & International Relations', 'division' => 'A', 'strength' => 30]];
 $whichLaw = fn($label) => array_map(fn($r) => "{$r['school']}/{$r['year']}/{$r['division']}", timetable_attendance_classes($label, $lawRows));
 $whichCourse = fn($label) => array_map(fn($r) => "{$r['year']}/{$r['branch']}/{$r['division']}", timetable_attendance_classes($label, class_rows()));
 assert($whichCourse('BA LLB Sem I') === ['1st Year/BA LLB/A', '1st Year/BA LLB/B'] && $whichCourse('BBA LLB Sem III') === ['2nd Year/BBA LLB/A']);
 assert($whichCourse('LLB Sem V') === ['3rd Year/LLB/A'] && $whichCourse('LLM Constitution A') === ['1st Year/LLM Constitutional Law/A']);
 assert($whichCourse('LLM Corporate') === ['1st Year/LLM Corporate & Commercial Law/A'] && $whichCourse('LLM Criminal') === ['1st Year/LLM Criminal Law/A']);
 assert($whichLaw('BA Psychology Sem VII') === ['lib/4th Year/B'] && $whichLaw('BA Sem VII: Psychology, Politics & IR') === ['lib/4th Year/B']);
-assert($whichLaw('MA Politics & IR') === []);
+assert($whichLaw('MA Politics & IR') === ['lib/1st Year/A']);
+assert($whichCourse('MA Industrial Psychology') === ['1st Year/MA Psychology (Industrial-Organizational)/A']
+    && $whichCourse('MA Counselling Psychology') === ['1st Year/MA Psychology (Counselling)/A']);
+// An old branchless Liberal Arts label lands on the BA.
+assert(parse_class_label('School of Liberal Arts / 2nd Year / A')['branch'] === 'BA');
 
 // Classes no timetable puts in a room (an MDMC course): on the person's own
 // week with no room, never in a room's grid. A period on a slot the grid does

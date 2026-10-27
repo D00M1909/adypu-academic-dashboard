@@ -806,9 +806,8 @@ function timetable_for_school(array $t, string $school): array {
 
 // The attendance classes (class_rows() entries) one timetable class is, for
 // the schools whose timetable names classes the way the structure does:
-// Engineering, Management, Design and Science. Law and Liberal Arts timetable by programme
-// ("BA LLB Sem III", "BA Psychology Sem I") while their attendance is kept by
-// division, so they match nothing rather than a guess.
+// Engineering, Management, Design and Science, and the programmes of Law and
+// Liberal Arts ("BA LLB Sem III", "BA Psychology Sem I", "MA Politics & IR").
 //
 // A semester is half a year ("Sem V" is 3rd Year). A label with no division
 // is every division of its year ("BBA Sem I" is BBA A and B). A specialisation
@@ -847,7 +846,12 @@ function timetable_attendance_classes(string $label, array $rows): array {
         $want = ['law', '1st Year', [['Corporate' => 'LLM Corporate & Commercial Law',
             'Constitution' => 'LLM Constitutional Law', 'Criminal' => 'LLM Criminal Law'][$m[1]]], null];
     } elseif (preg_match('/^BA(?: [^:]+?)? Sem ([IVX]+)(?::.*)?$/', $label, $m)) {
-        $want = ['lib', $yearOf($m[1]), [''], null];
+        $want = ['lib', $yearOf($m[1]), ['BA'], null];
+    } elseif (preg_match('/^MA (Industrial Psychology|Counselling Psychology|Politics & IR)$/', $label, $m)) {
+        // Each MA is one class, in its first year.
+        $want = ['lib', '1st Year', [['Industrial Psychology' => 'MA Psychology (Industrial-Organizational)',
+            'Counselling Psychology' => 'MA Psychology (Counselling)',
+            'Politics & IR' => 'MA Politics & International Relations'][$m[1]]], null];
     } elseif (preg_match('/^B\.Sc Sem ([IVX]+)$/', $label, $m)) {
         // Science's lab divisions (Div A to C) are batches of one B.Sc. year,
         // which the structure keeps as a single division.
