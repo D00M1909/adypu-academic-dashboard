@@ -209,7 +209,17 @@ page_head('Attendance report', 'page-wide page-report', 'attendance');
           <?php if ($filed): ?>
           <td><?php if ($r['estimated']): ?><?= $r['present'] ?> present<?php else: ?><?= $r['present'] ?><span class="report-table-sep">/</span><?= $r['strength'] ?><?php endif; ?>
             <?php if ($single && count($r['readings']) > 1): ?><span class="rep-note"><?= implode(' ', array_map(fn($x) => '<span>' . $e($clock($x['time'])) . ': ' . $x['present'] . '</span>', $r['readings'])) ?></span>
-            <?php elseif (!$single): ?><span class="rep-note">avg of <?= $r['days'] ?> day<?= $r['days'] === 1 ? '' : 's' ?></span><?php endif; ?></td>
+            <?php elseif (!$single): ?><span class="rep-note">avg of <?= $r['days'] ?> day<?= $r['days'] === 1 ? '' : 's' ?></span>
+              <?php // Every day in the range, each with its latest reading; a day
+                    // with several lectures lists them all. ?>
+              <?php $byDay = []; foreach ($r['readings'] as $x) $byDay[$x['date']][] = $x; ?>
+              <span class="rep-note rep-daily"><?= implode(' ', array_map(function ($date, $list) use ($e, $clock) {
+                  $label = date('j M', strtotime($date));
+                  $nums = count($list) > 1
+                      ? implode(', ', array_map(fn($x) => $e($clock($x['time'])) . ' ' . $x['present'], $list))
+                      : $list[0]['present'];
+                  return '<span>' . $e($label) . ': ' . $nums . '</span>';
+              }, array_keys($byDay), $byDay)) ?></span><?php endif; ?></td>
           <td><?= $r['estimated'] ? '<span class="rep-muted">Not known</span>' : '<span class="att-pct ' . $band($p) . '">' . $p . '%</span>' ?></td>
           <td class="rep-fac"><?= $r['filed_by'] ? $e(implode(', ', $r['filed_by'])) : '<span class="rep-muted">Name not recorded</span>' ?></td>
           <?php else: ?>

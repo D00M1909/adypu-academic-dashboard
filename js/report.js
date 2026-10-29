@@ -69,7 +69,8 @@
     Object.keys(R.unnamed || {}).forEach(function (key) { if (on(key)) unnamed += R.unnamed[key]; });
 
     var section = document.getElementById('rep-filers');
-    section.hidden = !any || !people.length;
+    // A list of who filed has no place in a report of the classes that did not.
+    section.hidden = !any || !people.length || s.show === 'missing';
     document.getElementById('st-filers').textContent = people.length;
     if (section.hidden) return;
     var total = people.reduce(function (n, p) { return n + p.lectures; }, 0);
