@@ -62,7 +62,9 @@ function class_structure(): array {
                 'Robotics'          => ['A' => 48],
                 'Civil Engineering' => ['A' => 69], // written "69*" with no footnote anywhere
                 'M. Tech'           => ['Biotechnology' => 5],
-                // ECE division A was here until 4 Sep 2026; the school confirmed it closed.
+                // Closed on 4 Sep 2026 and back on 29 Oct with two divisions.
+                // No count yet, so both hold the default 60 (ESTIMATED_STRENGTHS).
+                'ECE'               => ['A' => 60, 'B' => 60],
             ],
             '3rd Year' => [
                 'AIDS'              => ['A' => 60, 'B' => 57],
@@ -258,7 +260,7 @@ function is_placeholder_school(string $school): bool {
 // timetable DB's 60) and the one Biotechnology count the sheet left blank.
 // Class key prefixes, each ending in '|' so 'CS' never matches 'CSE'. Take an
 // entry out once its school sends the real count.
-const ESTIMATED_STRENGTHS = ['eng|1st Year|Core|', 'eng|1st Year|CS|', 'eng|2nd Year|Biotechnology|A|'];
+const ESTIMATED_STRENGTHS = ['eng|1st Year|Core|', 'eng|1st Year|CS|', 'eng|2nd Year|Biotechnology|A|', 'eng|2nd Year|ECE|'];
 
 // Whether a class's strength is invented. The enrolled total leaves these out,
 // so it only ever states counts a school actually gave.
