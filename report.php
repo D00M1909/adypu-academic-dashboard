@@ -223,7 +223,10 @@ page_head('Attendance report', 'page-wide page-report', 'attendance');
         // ticked: js/report.js draws it from REPORT.filers. Only people who
         // filed are named here; the classes nobody filed say who was due. ?>
   <section class="rep-section" id="rep-filers" hidden>
-    <div class="section-title"><h2>Who filed</h2><span class="section-meta" id="rep-filers-meta"></span></div>
+    <div class="section-title"><h2>Who filed</h2>
+      <span class="section-meta"><span id="rep-filers-meta"></span>
+        <label class="rep-filers-pick no-print" id="rep-filers-pick" hidden><span class="sr-only">Leaderboard for</span>
+          <select id="rep-filers-school"><option value="">All schools</option></select></label></span></div>
     <table class="report-table rep-table rep-filers">
       <thead><tr><th scope="col">Faculty</th><th scope="col">School</th><th scope="col">Lectures</th><th scope="col">Classes</th><th scope="col">Days</th></tr></thead>
       <tbody id="rep-filers-rows"></tbody>

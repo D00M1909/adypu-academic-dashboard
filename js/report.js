@@ -37,13 +37,29 @@
   // filed for Engineering and Law is counted for whichever of the two is
   // ticked. Lectures, then days, then name, as on the admin Activity page.
   // The top ten show on screen with a button for the rest; the PDF lists all.
+  // With more than one school in the report, a picker narrows the
+  // leaderboard alone to one of them; the rest of the report stays as it is.
   var FILERS_TOP = 10;
   var filersOpen = false;
+  var filerPick = document.getElementById('rep-filers-school');
+  filerPick.value = new URLSearchParams(location.search).get('filers') || '';
   function renderFilers(s, any) {
-    var on = function (key) {
+    var pickWrap = document.getElementById('rep-filers-pick');
+    pickWrap.hidden = s.schools.length < 2;
+    var keep = filerPick.value;
+    filerPick.innerHTML = '<option value="">All schools</option>' + s.schools.map(function (id) {
+      return '<option value="' + esc(id) + '">' + esc(R.schools[id]) + '</option>';
+    }).join('');
+    filerPick.value = !pickWrap.hidden && s.schools.indexOf(keep) !== -1 ? keep : '';
+    var only = filerPick.value;
+    var inReport = function (key) {
       var k = key.split('|');
       return s.schools.indexOf(k[0]) !== -1 && s.years.indexOf(k[1]) !== -1;
     };
+    var on = function (key) { return inReport(key) && (!only || key.split('|')[0] === only); };
+    // The stat counts everyone in the report, whatever the picker says.
+    var inAll = (R.filers || []).filter(function (f) { return Object.keys(f.c).some(inReport); }).length;
+    document.getElementById('st-filers').textContent = inAll;
     var people = [];
     (R.filers || []).forEach(function (f) {
       var p = { name: f.n, lectures: 0, classes: 0, days: {}, schools: {} };
@@ -70,9 +86,16 @@
 
     var section = document.getElementById('rep-filers');
     // A list of who filed has no place in a report of the classes that did not.
-    section.hidden = !any || !people.length || s.show === 'missing';
-    document.getElementById('st-filers').textContent = people.length;
+    section.hidden = !any || !inAll || s.show === 'missing';
     if (section.hidden) return;
+    if (!people.length) {
+      // Only the picker can get here: keep it on screen so it can be changed back.
+      document.getElementById('rep-filers-meta').textContent = '';
+      document.getElementById('rep-filers-rows').innerHTML = '<tr><td colspan="5" class="rep-muted">Nobody filed for ' + esc(R.schools[only]) + ' in these dates.</td></tr>';
+      document.getElementById('rep-filers-more').hidden = true;
+      document.getElementById('rep-filers-unnamed').textContent = '';
+      return;
+    }
     var total = people.reduce(function (n, p) { return n + p.lectures; }, 0);
     document.getElementById('rep-filers-meta').textContent = people.length + ' faculty · ' + total + ' lecture' + (total === 1 ? '' : 's');
     var top = people[0].lectures;
@@ -191,6 +214,7 @@
     if (!s.university) { q.set('scope', 'schools'); s.schools.forEach(function (id) { q.append('school[]', id); }); }
     if (s.years.length !== R.years.length) s.years.forEach(function (y) { q.append('year[]', y); });
     if (s.show !== 'all') q.set('show', s.show);
+    if (filerPick.value) q.set('filers', filerPick.value);
     history.replaceState(null, '', '?' + q.toString());
     form.querySelectorAll('a[data-from]').forEach(function (a) {
       q.set('from', a.dataset.from);
@@ -214,6 +238,7 @@
     apply();
   });
   document.getElementById('rep-export').addEventListener('click', function () { window.print(); });
+  filerPick.addEventListener('change', function (e) { e.stopPropagation(); apply(); });
   document.getElementById('rep-filers-more').addEventListener('click', function () {
     filersOpen = !filersOpen;
     apply();

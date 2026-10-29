@@ -2122,6 +2122,9 @@ button.tt-entry + button.tt-entry { margin-top: 6px; border-top-left-radius: 0; 
 .rep-more { display: block; margin: 8px auto 0; padding: 7px 16px; border: 1px solid var(--hairline); border-radius: 999px; background: var(--surface-raised); font: inherit; font-size: 13px; font-weight: 600; color: var(--ink-muted); cursor: pointer; }
 .rep-more:hover, .rep-more:focus-visible { color: var(--ink); background: var(--surface-control); }
 .rep-filers-note { margin: 8px 2px 0; font-size: 11.5px; color: var(--ink-faint); }
+#rep-filers .section-meta { display: inline-flex; align-items: center; gap: 12px; }
+.rep-filers-pick[hidden] { display: none; }
+.rep-filers-pick select { width: auto; height: 32px; min-height: 0; padding: 4px 28px 4px 10px; font-size: 13px; }
 .rep-foot { margin: 18px 0 0; padding-top: 10px; border-top: 1px solid var(--hairline); font-size: 11.5px; color: var(--ink-faint); }
 
 @media (max-width: 640px) {

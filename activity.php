@@ -53,6 +53,10 @@ $kind = isset($kinds[(string) ($_GET['kind'] ?? '')]) ? (string) $_GET['kind'] :
 // One section at a time, so the leaderboard is not a scroll past the log.
 $tabs = ['log' => 'Log', 'board' => 'Leaderboard', 'accounts' => 'Accounts'];
 $tab = isset($tabs[(string) ($_GET['tab'] ?? '')]) ? (string) $_GET['tab'] : 'log';
+// The leaderboard for one school: only lectures filed for that school's
+// classes count, so a person who files for two schools is ranked in each on
+// what they filed there. Checked against the schools on the board below.
+$school = (string) ($_GET['school'] ?? '');
 
 $events = activity_range(min($from, $day), $today);
 $summary = activity_summary(array_filter($events, fn($x) => $x['day'] >= $from));
@@ -77,13 +81,22 @@ $failedToday = count(array_filter($events, fn($x) => $x['day'] === $day && $x['t
 // names come straight from the cache (not get_attendance_faculty(), which
 // would hide which way a lecture came in), the app's from its own store.
 $cache = read_attendance_cache() ?? [];
-[$board, $unnamed] = activity_leaderboard(
-    remap_legacy_days(is_array($cache['faculty'] ?? null) ? $cache['faculty'] : []),
-    remap_legacy_days(submitted('faculty')), $from, $today);
+$formNames = remap_legacy_days(is_array($cache['faculty'] ?? null) ? $cache['faculty'] : []);
+$appNames = remap_legacy_days(submitted('faculty'));
+[$board, $unnamed] = activity_leaderboard($formNames, $appNames, $from, $today);
+// The schools anyone filed for in the window, in SCHOOLS order, partners last.
+$boardSchools = [];
+foreach ($board as $r) $boardSchools += $r['schools'];
+$boardSchools = array_keys(array_intersect_key(array_flip([...array_keys(SCHOOLS), ...array_keys($boardSchools)]), $boardSchools));
+if (!in_array($school, $boardSchools, true)) $school = '';
+// date => class key => lecture => name, keeping only $school's classes.
+$inSchool = fn(array $names): array => array_filter(array_map(
+    fn($classes) => array_filter((array) $classes, fn($k) => explode('|', (string) $k)[0] === $school, ARRAY_FILTER_USE_KEY), $names));
+$shown = $school === '' ? $board : activity_leaderboard($inSchool($formNames), $inSchool($appNames), $from, $today)[0];
 // A name that is also an account's links to that account's record.
 $accountOf = [];
 foreach ($users as $k => $u) $accountOf[activity_person((string) ($u['name'] ?? ''))] = $k;
-$topLectures = max([1, ...array_column($board, 'lectures')]);
+$topLectures = max([1, ...array_column($shown, 'lectures')]);
 // The leaderboard shows its top rows and folds the rest behind a button,
 // unless the account picked is further down, when it opens whole.
 const ACTIVITY_BOARD_TOP = 10;
@@ -118,7 +131,7 @@ $lag = function (int $m): string {
     if ($m < 24 * 60) return round($m / 60) . ' h after';
     return round($m / 1440) . ' days after';
 };
-$link = fn(array $over): string => 'activity.php?' . http_build_query(array_filter($over + ['tab' => $tab === 'log' ? '' : $tab, 'who' => $who, 'day' => $day === $today ? '' : $day, 'span' => $span === 7 ? '' : $span, 'kind' => $kind === 'work' ? '' : $kind], fn($v) => $v !== '' && $v !== null));
+$link = fn(array $over): string => 'activity.php?' . http_build_query(array_filter($over + ['tab' => $tab === 'log' ? '' : $tab, 'who' => $who, 'day' => $day === $today ? '' : $day, 'span' => $span === 7 ? '' : $span, 'kind' => $kind === 'work' ? '' : $kind, 'school' => $school], fn($v) => $v !== '' && $v !== null));
 
 // One event's details as a line of plain text.
 $when = fn(string $time): string => $time === WHOLE_DAY ? 'whole day' : str_replace('-', ' to ', $time);
@@ -182,6 +195,17 @@ page_head('Activity', 'page-wide');
         </select>
       </div>
       <?php elseif ($span !== 7): ?><input type="hidden" name="span" value="<?= $span ?>"><?php endif; ?>
+      <?php if ($tab === 'board'): ?>
+      <div class="tt-pick">
+        <label for="act-school">School</label>
+        <select id="act-school" name="school" onchange="this.form.submit()">
+          <option value="">All schools</option>
+          <?php foreach ($boardSchools as $id): ?>
+            <option value="<?= $e($id) ?>"<?= $id === $school ? ' selected' : '' ?>><?= $e(group_name($id)) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <?php elseif ($school !== ''): ?><input type="hidden" name="school" value="<?= $e($school) ?>"><?php endif; ?>
       <?php if ($tab === 'log'): ?>
       <div class="tt-pick">
         <label for="act-kind">Show</label>
@@ -319,13 +343,13 @@ page_head('Activity', 'page-wide');
 
 <?php if ($tab === 'board'): ?>
 <section class="card">
-  <h2>Most active faculty, <?= $span === 1 ? 'today' : 'last ' . $span . ' days' ?> <span class="count-pill"><?= count($board) ?></span></h2>
-  <?php if (!$board): ?>
-    <p class="field-help">Nobody's name is on any attendance in this window.</p>
+  <h2>Most active faculty<?= $school === '' ? '' : ', ' . $e(preg_replace('/^School of /', '', group_name($school))) ?>, <?= $span === 1 ? 'today' : 'last ' . $span . ' days' ?> <span class="count-pill"><?= count($shown) ?></span></h2>
+  <?php if (!$shown): ?>
+    <p class="field-help">Nobody's name is on any attendance<?= $school === '' ? '' : ' for ' . $e(group_name($school)) ?> in this window.</p>
   <?php else: ?>
   <div class="stat-table-wrap">
-    <?php $pickedAt = $who === '' ? false : array_search(activity_person((string) ($users[$who]['name'] ?? '')), array_column($board, 'key'), true);
-          $folded = count($board) > ACTIVITY_BOARD_TOP && ($pickedAt === false || $pickedAt < ACTIVITY_BOARD_TOP); ?>
+    <?php $pickedAt = $who === '' ? false : array_search(activity_person((string) ($users[$who]['name'] ?? '')), array_column($shown, 'key'), true);
+          $folded = count($shown) > ACTIVITY_BOARD_TOP && ($pickedAt === false || $pickedAt < ACTIVITY_BOARD_TOP); ?>
     <table class="stat-table act-board<?= $folded ? ' is-folded' : '' ?>" id="act-board">
       <thead>
         <tr>
@@ -340,7 +364,7 @@ page_head('Activity', 'page-wide');
         </tr>
       </thead>
       <tbody>
-      <?php $rank = 0; $prev = null; foreach ($board as $i => $r):
+      <?php $rank = 0; $prev = null; foreach ($shown as $i => $r):
           // Equal counts share a rank: 1, 2, 2, 4.
           if ($prev !== $r['lectures']) $rank = $i + 1;
           $prev = $r['lectures'];
@@ -361,10 +385,10 @@ page_head('Activity', 'page-wide');
     </table>
   </div>
   <?php endif; ?>
-  <?php if (count($board) > ACTIVITY_BOARD_TOP): ?>
+  <?php if (count($shown) > ACTIVITY_BOARD_TOP): ?>
   <button class="btn-quiet act-board-toggle no-print" type="button" aria-controls="act-board" aria-expanded="<?= $folded ? 'false' : 'true' ?>"
-          data-more="Show all <?= count($board) ?>" data-less="Show top <?= ACTIVITY_BOARD_TOP ?>"
-          onclick="var t = document.getElementById('act-board'), f = t.classList.toggle('is-folded'); this.setAttribute('aria-expanded', f ? 'false' : 'true'); this.textContent = f ? this.dataset.more : this.dataset.less;"><?= $folded ? 'Show all ' . count($board) : 'Show top ' . ACTIVITY_BOARD_TOP ?></button>
+          data-more="Show all <?= count($shown) ?>" data-less="Show top <?= ACTIVITY_BOARD_TOP ?>"
+          onclick="var t = document.getElementById('act-board'), f = t.classList.toggle('is-folded'); this.setAttribute('aria-expanded', f ? 'false' : 'true'); this.textContent = f ? this.dataset.more : this.dataset.less;"><?= $folded ? 'Show all ' . count($shown) : 'Show top ' . ACTIVITY_BOARD_TOP ?></button>
   <noscript><style>.act-board.is-folded tr.act-more { display: table-row; } .act-board-toggle { display: none; }</style></noscript>
   <?php endif; ?>
   <p class="field-help">Counts every lecture with a name on it, from the Google Form's Faculty name and from saves in the app. A lecture filed both ways counts once, for the app. Names are matched ignoring titles and spacing, so "Dr. A Rao" and "a rao" are one person; a misspelt name counts as someone else.<?= $unnamed ? ' ' . $unnamed . ' lecture' . ($unnamed === 1 ? ' has' : 's have') . ' no name on it and count for nobody.' : '' ?></p>
