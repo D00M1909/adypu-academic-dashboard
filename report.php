@@ -45,6 +45,50 @@ $clock = function (string $slot): string {
 $pct = fn(int $p, int $s): int => $s ? (int) round(min($p, $s) / $s * 100) : 0;
 $band = fn(int $p): string => $p >= 75 ? 'att-good' : ($p >= 70 ? 'att-warn' : 'att-low');
 
+// A range shows every day it has data for: up to ten as columns of their own,
+// beyond that as a strip of squares. Days only a partner filed are left out,
+// since partners are not in this report.
+$keys = array_flip(array_map('class_key', $classRows));
+$dates = $single ? [] : array_values(array_filter(array_keys($days),
+    fn($d) => $d >= $from && $d <= $to && array_intersect_key($days[$d], $keys)));
+$dayCols = count($dates) <= 10 ? $dates : [];
+$dayExtra = count($dayCols) + ($dates && !$dayCols ? 1 : 0);
+// The same slot as $clock, with am or pm, for a tooltip that has room for it:
+// an 8.30 sorted after a 1.30 is an evening reading, which plain 8.30 hides.
+$ampm = function (string $slot): string {
+    $slot = preg_replace('/~\d+$/', '', $slot);
+    if ($slot === WHOLE_DAY) return 'Whole day';
+    return preg_replace_callback('/(\d{2}):(\d{2})/', function ($m) {
+        $h = (int) $m[1];
+        return ($h > 12 ? $h - 12 : ($h ?: 12)) . '.' . $m[2] . ($h < 12 ? ' am' : ' pm');
+    }, str_replace('-', ' to ', $slot));
+};
+// date => the day's number (its latest reading, as on the tiles), its band and
+// a tooltip listing every lecture that day.
+$dayReadings = function (array $r) use ($ampm, $pct, $band): array {
+    $out = [];
+    foreach ($r['readings'] as $x) $out[$x['date']][] = $x;
+    foreach ($out as $date => $list) {
+        $n = end($list)['present'];
+        $of = $r['estimated'] ? '' : ' of ' . $r['strength'];
+        $tip = date('D j M', strtotime($date)) . ': ' . (count($list) > 1
+            ? implode(' · ', array_map(fn($x) => ($x['time'] === '' ? '' : $ampm($x['time']) . ' ') . $x['present'], $list)) . " (latest $n$of)"
+            : "$n present$of");
+        $out[$date] = ['n' => $n, 'tip' => $tip, 'class' => $r['estimated'] ? 'is-unknown' : $band($pct($n, $r['strength']))];
+    }
+    return $out;
+};
+// One square a day: the per-day view past ten days, and on a phone, where the
+// day columns do not fit.
+$strip = function (array $byDay, string $extra) use ($dates, $e): string {
+    $out = '';
+    foreach ($dates as $d) {
+        $c = $byDay[$d] ?? null;
+        $out .= '<i class="' . ($c ? $c['class'] : 'is-none') . '" title="' . $e($c ? $c['tip'] : date('D j M', strtotime($d)) . ': not filled') . '"></i>';
+    }
+    return '<span class="rep-strip' . $extra . '">' . $out . '</span>';
+};
+
 // The date chips: the same presets as the dashboard, as links that keep the
 // filters (js/report.js rewrites them as filters change).
 $latestDay = new DateTimeImmutable($latest);
@@ -194,36 +238,36 @@ page_head('Attendance report', 'page-wide page-report', 'attendance');
       <h2><?= $e($y) ?></h2>
       <span class="section-meta rep-year-meta"><span data-ymeta></span><span class="rep-bar" aria-hidden="true"><i data-ybar></i></span></span>
     </div>
-    <table class="report-table rep-table">
-      <thead><tr><th scope="col">Class</th><th scope="col">Present</th><th scope="col">Attendance</th><th scope="col">Faculty</th></tr></thead>
+    <table class="report-table rep-table<?= $dayCols ? ' has-days' : ($dates ? ' has-strip' : '') ?>">
+      <thead><tr><th scope="col">Class</th>
+        <?php foreach ($dayCols as $d): ?><th scope="col" class="rep-day"><span><?= $e(date('D', strtotime($d))) ?></span><?= $e(date('j M', strtotime($d))) ?></th><?php endforeach; ?>
+        <?php if ($dates && !$dayCols): ?><th scope="col" class="rep-strip-col">Each day</th><?php endif; ?>
+        <th scope="col"><?= $single ? 'Present' : 'Average' ?></th><th scope="col">Attendance</th><th scope="col">Faculty</th></tr></thead>
       <?php foreach (['filled' => true, 'missing' => false] as $status => $filed): ?>
       <tbody class="rep-group" data-group="<?= $status ?>">
-        <tr class="rep-group-head"><th scope="rowgroup" colspan="4"><?= $filed ? 'Filled' : 'Not filled' ?> <span data-gcount></span><?= $filed ? '' : '<span class="rep-group-note">Faculty from the timetable</span>' ?></th></tr>
+        <tr class="rep-group-head"><th scope="rowgroup" colspan="<?= 4 + $dayExtra ?>"><?= $filed ? 'Filled' : 'Not filled' ?> <span data-gcount></span><?= $filed ? '' : '<span class="rep-group-note">Faculty from the timetable</span>' ?></th></tr>
         <?php foreach ($rows as $r):
           if ($r['year'] !== $y || $r['reported'] !== $filed) continue;
           $label = implode(' / ', array_filter([$short($r['school']), $r['branch'], $r['division']], 'strlen'));
           $p = $pct($r['present'], $r['strength']);
+          $byDay = $single ? [] : $dayReadings($r);
         ?>
         <tr class="rep-row" data-school="<?= $e($r['school']) ?>" data-present="<?= $r['present'] ?>" data-strength="<?= $r['strength'] ?>">
           <th scope="row"><span class="rep-dot <?= $filed ? 'is-filled' : 'is-missing' ?>" aria-hidden="true"></span><?= $e($label) ?></th>
           <?php if ($filed): ?>
+          <?php foreach ($dayCols as $d): $c = $byDay[$d] ?? null; ?>
+          <td class="rep-day"<?= $c ? ' title="' . $e($c['tip']) . '"' : ' title="' . $e(date('D j M', strtotime($d))) . ': not filled"' ?>><?= $c ? '<span class="att-pct ' . $c['class'] . '">' . $c['n'] . '</span>' : '<span class="rep-muted">&ndash;</span>' ?></td>
+          <?php endforeach; ?>
+          <?php if ($dates && !$dayCols): ?><td class="rep-strip-col"><?= $strip($byDay, '') ?></td><?php endif; ?>
           <td><?php if ($r['estimated']): ?><?= $r['present'] ?> present<?php else: ?><?= $r['present'] ?><span class="report-table-sep">/</span><?= $r['strength'] ?><?php endif; ?>
             <?php if ($single && count($r['readings']) > 1): ?><span class="rep-note"><?= implode(' ', array_map(fn($x) => '<span>' . $e($clock($x['time'])) . ': ' . $x['present'] . '</span>', $r['readings'])) ?></span>
             <?php elseif (!$single): ?><span class="rep-note">avg of <?= $r['days'] ?> day<?= $r['days'] === 1 ? '' : 's' ?></span>
-              <?php // Every day in the range, each with its latest reading; a day
-                    // with several lectures lists them all. ?>
-              <?php $byDay = []; foreach ($r['readings'] as $x) $byDay[$x['date']][] = $x; ?>
-              <span class="rep-note rep-daily"><?= implode(' ', array_map(function ($date, $list) use ($e, $clock) {
-                  $label = date('j M', strtotime($date));
-                  $nums = count($list) > 1
-                      ? implode(', ', array_map(fn($x) => $e($clock($x['time'])) . ' ' . $x['present'], $list))
-                      : $list[0]['present'];
-                  return '<span>' . $e($label) . ': ' . $nums . '</span>';
-              }, array_keys($byDay), $byDay)) ?></span><?php endif; ?></td>
+            <?php if ($dayCols): ?><?= $strip($byDay, ' rep-strip-narrow') ?><?php endif; ?>
+            <?php endif; ?></td>
           <td><?= $r['estimated'] ? '<span class="rep-muted">Not known</span>' : '<span class="att-pct ' . $band($p) . '">' . $p . '%</span>' ?></td>
           <td class="rep-fac"><?= $r['filed_by'] ? $e(implode(', ', $r['filed_by'])) : '<span class="rep-muted">Name not recorded</span>' ?></td>
           <?php else: ?>
-          <td colspan="2"><span class="rep-miss">Not filled</span></td>
+          <td colspan="<?= 2 + $dayExtra ?>"><span class="rep-miss">Not filled</span></td>
           <td class="rep-fac"><?php if ($r['due']): ?><?= implode('', array_map(fn($d) => '<span class="rep-person">' . ($single && $d['time'] < 1440 ? '<span class="rep-time">' . $e(timetable_clock($d['time'])) . '</span>' : '') . $e($d['name']) . '</span>', $r['due'])) ?><?php else: ?><span class="rep-muted">Not on the timetable</span><?php endif; ?></td>
           <?php endif; ?>
         </tr>
