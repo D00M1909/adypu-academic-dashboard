@@ -389,7 +389,7 @@ function lecture_key(string $subj): string {
 
 // The ULCs the page offers. A booking in any other is written into the data
 // files anyway (AIDS and CSE use ULC 5), so adding one is a change here only.
-const SHOW = ['ULC 1', 'ULC 5', 'ULC 6', 'ULC 7', 'School of Design', 'Dental Building', 'School of Hospitality'];
+const SHOW = ['ULC 1', 'ULC 3', 'ULC 5', 'ULC 6', 'ULC 7', 'School of Design', 'Dental Building'];
 $hidden = [];
 $bookings = array_values(array_filter($bookings, function ($b) use (&$hidden) {
     $bld = $b['building'] ?? 'ULC 1';
