@@ -2149,7 +2149,8 @@ button.tt-entry + button.tt-entry { margin-top: 6px; border-top-left-radius: 0; 
   .rep-year .rep-table tr.rep-row th, .rep-year .rep-table tr.rep-row td { padding: 0; border: 0; width: auto; text-align: left; }
   .rep-year .rep-table tr.rep-row th, .rep-year .rep-table td.rep-fac { grid-column: 1 / -1; }
   .rep-year .rep-table .rep-group-head th { display: block; width: auto; }
-  .rep-year .rep-table [hidden] { display: none; }
+  /* Must outrank the grid above, or a filtered-out class comes back. */
+  .rep-year .rep-table [hidden], .rep-year .rep-table tr.rep-row[hidden] { display: none; }
   /* The day columns give way to the strip under the average. */
   .rep-year .rep-table .rep-day { display: none; }
   .rep-strip-narrow { display: flex; }
