@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/includes/attendance.php';
 require_once __DIR__ . '/includes/structure.php';
+require_once __DIR__ . '/includes/calendar.php';
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/page.php';
 require_once __DIR__ . '/includes/traffic.php';
@@ -176,6 +177,18 @@ try {
       <path d="m3.34 7 1.73 1" />
       <circle cx="12" cy="12" r="2" />
       <circle cx="12" cy="12" r="8" />
+    </symbol>
+    <symbol id="icon-holiday" viewBox="0 0 24 24">
+      <rect width="18" height="18" x="3" y="4" rx="2" />
+      <path d="M16 2v4" />
+      <path d="M8 2v4" />
+      <path d="M3 10h18" />
+      <path d="m9.5 13.5 5 5" />
+      <path d="m14.5 13.5-5 5" />
+    </symbol>
+    <symbol id="icon-event" viewBox="0 0 24 24">
+      <path d="M4 22V4" />
+      <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1" />
     </symbol>
     <symbol id="icon-mark" viewBox="0 0 24 24">
       <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
@@ -355,6 +368,10 @@ try {
     </div>
     <span class="print-range">Date range: <?= htmlspecialchars($rangeLabel) ?> &middot; <?= htmlspecialchars($freshness) ?></span>
   </form>
+
+  <?php /* Partners keep their own calendar, so a school holiday says nothing here. */ ?>
+  <?php $calendar = $isPartners ? [] : calendar_all(); ?>
+  <?= calendar_strips($calendar, $from, $to) ?>
 
   <div id="tab-adypu" class="tab-panel">
     <nav class="breadcrumb" id="breadcrumb" aria-label="Drill-down path" hidden></nav>
@@ -565,6 +582,7 @@ try {
   // The last 30 days to the range's end, for Attendance by day and Classes
   // reporting each day only.
   window.TREND_DAYS = <?= json_encode((object) $trendDays) ?>;
+  window.CALENDAR_DAYS = <?= json_encode((object) calendar_chart_days($calendar, (new DateTimeImmutable($to))->modify('-29 days')->format('Y-m-d'), $to)) ?>;
 </script>
 <script src="js/theme.js?v=<?= filemtime(__DIR__ . '/js/theme.js') ?>"></script>
 <script src="js/charts.js?v=<?= filemtime(__DIR__ . '/js/charts.js') ?>"></script>

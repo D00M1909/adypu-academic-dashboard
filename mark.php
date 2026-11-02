@@ -14,6 +14,7 @@
 
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/roster.php';
+require_once __DIR__ . '/includes/calendar.php';
 require_once __DIR__ . '/includes/page.php';
 require_once __DIR__ . '/includes/traffic.php';
 
@@ -152,6 +153,8 @@ if (($me['status'] ?? '') !== 'active') {
 <?php if ($saved !== null): ?>
   <?php page_notice('ok', "Saved. $saved present in " . ($class ? class_label($class['school'], $class['year'], $class['branch'], $class['division']) : 'that class') . " at $time."); ?>
 <?php endif; ?>
+
+<?= isset(SCHOOLS[$school]) ? calendar_strips(array_filter(calendar_all(), fn($x) => calendar_applies($x, $school, $class['year'] ?? '')), $date, $date, 'You can still file a make-up lecture.') : '' ?>
 
 <form class="card picker" method="get" id="picker">
   <label for="p-school">School</label>

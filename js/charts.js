@@ -352,6 +352,17 @@ window.Charts = (function () {
   }
 
   // How many of the scope's classes filled the form in, per day, over the last
+  // The holidays and events on a day that touch any class in scope.
+  function dayMarks(date, inScope) {
+    var keys = Object.keys(window.CLASS_STRENGTH || {}).filter(inScope);
+    return ((window.CALENDAR_DAYS || {})[date] || []).filter(function (m) {
+      return keys.some(function (k) {
+        var p = k.split('|');
+        return (!m.s.length || m.s.indexOf(p[0]) !== -1) && (!m.y.length || m.y.indexOf(p[1]) !== -1);
+      });
+    });
+  }
+
   // 30 days. While the tool is being rolled out this is the number that moves.
   // A 95% attendance figure resting on 6 of 136 classes should be visible as
   // exactly that; the count for each day is in its tooltip.
@@ -363,12 +374,19 @@ window.Charts = (function () {
     var total = classesInScope(inScope);
     var att = {};
     dailySeries(inScope, days).forEach(function (d) { att[d.date] = d; });
-    var series = Object.keys(days).sort().map(function (date) {
+    // A holiday with no filing still gets its place, or the quiet day it
+    // explains would simply vanish from the axis.
+    var dates = Object.keys(days);
+    Object.keys(window.CALENDAR_DAYS || {}).forEach(function (date) {
+      if (!days[date] && dayMarks(date, inScope).some(function (m) { return m.k === 'holiday'; })) dates.push(date);
+    });
+    var series = dates.sort().map(function (date) {
       var reported = 0;
-      Object.keys(days[date]).forEach(function (key) {
+      Object.keys(days[date] || {}).forEach(function (key) {
         if (inScope(key)) reported++;
       });
-      return { date: date, reported: reported };
+      var marks = dayMarks(date, inScope);
+      return { date: date, reported: reported, marks: marks, off: marks.some(function (m) { return m.k === 'holiday'; }) };
     });
     if (!series.length || !total) {
       empty(el, 'No submissions in the last 30 days.');
@@ -390,13 +408,18 @@ window.Charts = (function () {
     el.innerHTML =
       '<svg class="trend" viewBox="0 0 ' + w + ' ' + h + '" role="img" aria-label="Classes reporting each day, last 30 days">' +
         rangeBand(series.map(function (d, i) { return padL + i * slot + slot / 2; }), slot, padT, h - padB, series.map(function (d) { return d.date; })) +
+        series.map(function (d, i) {
+          return d.off ? '<rect class="chart-holiday" x="' + (padL + i * slot).toFixed(1) + '" y="' + padT + '" width="' + slot.toFixed(1) + '" height="' + (h - padT - padB) + '"/>' : '';
+        }).join('') +
         [0, top / 2, top].map(function (v) { return gridline(padL, w - padR, y(v), String(v)); }).join('') +
         series.map(function (d, i) {
           var now = i === n - 1, bx = padL + i * slot + (slot - bw) / 2, cx = (bx + bw / 2).toFixed(1);
           var a = att[d.date], share = Math.round(d.reported / total * 100);
           var detail = '<b>' + esc(longDate(d.date)) + '</b><span class="tip-big">' + d.reported + '</span> of ' + total + ' classes filed (' + share + '%)' +
-            (a ? '<br>Attendance ' + pct(a.present, a.strength) + '% of those' : '');
+            (a ? '<br>Attendance ' + pct(a.present, a.strength) + '% of those' : '') +
+            d.marks.map(function (m) { return '<br>' + (m.k === 'holiday' ? 'Holiday: ' : 'Event: ') + esc(m.t); }).join('');
           return '<g class="chart-day">' +
+            (!d.off && d.marks.length ? '<circle class="chart-event" cx="' + cx + '" cy="' + (padT - 12) + '" r="3"/>' : '') +
             '<rect class="compliance-bar' + (now ? ' is-now' : '') + (inRange(d.date) ? ' is-range' : '') + '" x="' + bx.toFixed(1) + '" y="' + y(d.reported).toFixed(1) +
               '" width="' + bw.toFixed(1) + '" height="' + (y(0) - y(d.reported)).toFixed(1) + '" rx="3"/>' +
             dayHit(padL + i * slot, slot, padT, h - padB, d.date, shortDate(d.date) + ': ' + d.reported + ' of ' + total + ' classes reported', detail) +
@@ -407,7 +430,9 @@ window.Charts = (function () {
               ? '<text class="chart-callout' + (now ? '' : ' is-quiet') + '" x="' + cx + '" y="' + (y(d.reported) - 6).toFixed(1) + '" text-anchor="middle">' + d.reported + '</text>' : '');
         }).join('') +
       '</svg>' +
-      '<p class="chart-foot">Out of ' + total + ' classes</p>';
+      '<p class="chart-foot">Out of ' + total + ' classes' +
+        (series.some(function (d) { return d.off; }) ? ' · Grey days are holidays' : '') +
+        (series.some(function (d) { return !d.off && d.marks.length; }) ? ' · A dot is an event' : '') + '</p>';
   }
 
   // What the compare chart sets side by side: the level under the selection.

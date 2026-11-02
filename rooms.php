@@ -13,11 +13,13 @@ require_once __DIR__ . '/includes/page.php';
 require_once __DIR__ . '/includes/traffic.php';
 require_once __DIR__ . '/includes/timetable.php';
 require_once __DIR__ . '/includes/structure.php';
+require_once __DIR__ . '/includes/calendar.php';
 
 auth_boot();
 traffic_hit('rooms');
 
 $t = timetable_read();
+$calendar = calendar_all();
 // The school picker lists only schools the timetable has classes for, in
 // SCHOOLS order. Picking one narrows the ULCs and rooms to where that school
 // teaches; no school (the default) is every room.
@@ -719,7 +721,7 @@ page_head('Room timetable', 'page-wide', 'timetable');
     <div class="tt-wrap">
       <table class="tt-grid<?= $week ? '' : ' tt-grid-day' ?>">
         <thead>
-          <tr><th class="tt-time" scope="col">Time</th><?php foreach ($days as $d): ?><th scope="col"<?= $dateOf($d) == $today ? ' class="tt-on"' : '' ?>><?= $e($d) ?><span class="tt-date"><?= $e($dateOf($d)->format('j M')) ?></span></th><?php endforeach; ?></tr>
+          <tr><th class="tt-time" scope="col">Time</th><?php foreach ($days as $d): ?><th scope="col"<?= $dateOf($d) == $today ? ' class="tt-on"' : '' ?>><?= $e($d) ?><span class="tt-date"><?= $e($dateOf($d)->format('j M')) ?></span><?= implode('', array_map('calendar_tag', calendar_between($calendar, $dateOf($d)->format('Y-m-d'), $dateOf($d)->format('Y-m-d')))) ?></th><?php endforeach; ?></tr>
         </thead>
         <tbody>
         <?php foreach ($shown['slots'] as $s):

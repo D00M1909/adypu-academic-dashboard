@@ -14,8 +14,10 @@
   function pct(p, s) { return s ? Math.round(Math.min(p, s) / s * 100) : 0; }
   function band(p) { return p >= 75 ? 'att-good' : p >= 70 ? 'att-warn' : 'att-low'; }
   function tally(rows) {
-    var t = { classes: 0, filled: 0, present: 0, strength: 0 };
+    var t = { classes: 0, filled: 0, present: 0, strength: 0, holiday: 0 };
     rows.forEach(function (r) {
+      // A class on holiday owes nothing, so it is in no count below.
+      if (r.closest('[data-group="holiday"]')) { t.holiday++; return; }
       t.classes++;
       if (r.closest('[data-group="filled"]')) {
         t.filled++;
@@ -136,7 +138,7 @@
       var inYear = s.years.indexOf(sec.dataset.year) !== -1;
       var yearRows = [];
       sec.querySelectorAll('.rep-group').forEach(function (g) {
-        var groupOn = s.show === 'all' || s.show === g.dataset.group;
+        var groupOn = s.show === 'all' || s.show === g.dataset.group || (s.show === 'missing' && g.dataset.group === 'holiday');
         var n = 0;
         g.querySelectorAll('.rep-row').forEach(function (r) {
           var inScope = inYear && s.schools.indexOf(r.dataset.school) !== -1;
@@ -153,7 +155,7 @@
       sec.hidden = !inYear || !sec.querySelector('.rep-group:not([hidden])');
       if (!sec.hidden) any = true;
       var p = pct(t.present, t.strength);
-      sec.querySelector('[data-ymeta]').textContent = t.filled + ' of ' + t.classes + ' filled' +
+      sec.querySelector('[data-ymeta]').textContent = !t.classes && t.holiday ? 'Holiday' : t.filled + ' of ' + t.classes + ' filled' +
         (t.filled ? ' · ' + p + '% present' : '');
       var bar = sec.querySelector('[data-ybar]');
       bar.style.width = (t.classes ? t.filled / t.classes * 100 : 0) + '%';
@@ -165,7 +167,9 @@
     var p = pct(t.present, t.strength);
     document.getElementById('st-filled').textContent = t.filled;
     document.getElementById('st-classes').textContent = t.classes;
-    document.getElementById('st-missing').textContent = t.classes - t.filled;
+    var missing = document.getElementById('st-missing');
+    missing.textContent = !t.classes && t.holiday ? 'Holiday' : t.classes - t.filled;
+    missing.className = !t.classes && t.holiday ? 'rep-off' : 'rep-miss';
     document.getElementById('st-present').textContent = t.present;
     document.getElementById('st-strength').textContent = t.strength;
     var pctEl = document.getElementById('st-pct');
@@ -174,6 +178,14 @@
     document.getElementById('rep-empty').hidden = any;
     document.getElementById('rep-insights').hidden = !any;
     if (any) window.Charts.renderReport(s.schools, s.years);
+
+    // A holiday for one school says nothing in a report on another.
+    doc.querySelectorAll('.cal-strip').forEach(function (st) {
+      var sc = st.dataset.schools ? st.dataset.schools.split(' ') : [];
+      var yr = st.dataset.years ? st.dataset.years.split('|') : [];
+      st.hidden = !(!sc.length || sc.some(function (x) { return s.schools.indexOf(x) !== -1; })) ||
+        !(!yr.length || yr.some(function (x) { return s.years.indexOf(x) !== -1; }));
+    });
 
     renderFilers(s, any);
 
@@ -188,7 +200,7 @@
       var st = tally(shown.filter(function (r) { return r.dataset.school === id; }));
       var sp = pct(st.present, st.strength);
       tr.querySelector('[data-f]').textContent = st.filled + ' of ' + st.classes;
-      tr.querySelector('[data-m]').textContent = st.classes - st.filled;
+      tr.querySelector('[data-m]').textContent = !st.classes && st.holiday ? 'Holiday' : st.classes - st.filled;
       tr.querySelector('[data-p]').textContent = st.filled ? st.present + ' / ' + st.strength : '';
       tr.querySelector('[data-a]').innerHTML = st.filled
         ? '<span class="att-pct ' + band(sp) + '">' + sp + '%</span>' : '<span class="rep-muted">None filed</span>';

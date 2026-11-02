@@ -149,7 +149,7 @@ $describe = function (array $x) use ($short, $lag, $nameOf, $when): string {
         'signout' => ucfirst($d['why'] ?? ''),
         'signup' => (SCHOOLS[$d['school'] ?? '']['name'] ?? '') . ', ' . ($d['status'] ?? '') . ', join code ' . ($d['code'] ?? ''),
         'password' => !empty($d['ok']) ? 'Changed' : 'Refused: ' . ($d['why'] ?? ''),
-        'admin' => ucfirst($d['action'] ?? '') . ' ' . (isset(SCHOOLS[$d['target'] ?? '']) ? SCHOOLS[$d['target']]['name'] . ' join code' : $nameOf((string) ($d['target'] ?? '')) . ' (' . ($d['target'] ?? '') . ')'),
+        'admin' => isset($d['label']) ? (string) $d['label'] : ucfirst($d['action'] ?? '') . ' ' . (isset(SCHOOLS[$d['target'] ?? '']) ? SCHOOLS[$d['target']]['name'] . ' join code' : $nameOf((string) ($d['target'] ?? '')) . ' (' . ($d['target'] ?? '') . ')'),
         'view' => ($d['url'] ?? $d['page'] ?? ''),
         'form' => $short($d['class'] ?? '') . ', ' . date('j M', strtotime($d['date'] ?? $x['day'])) . ($d['time'] !== '' ? ' ' . $when($d['time']) : '')
             . ': ' . $d['present'] . ($d['strength'] ? '/' . $d['strength'] : '') . ' present'

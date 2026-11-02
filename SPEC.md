@@ -21,6 +21,7 @@ are separate repos with separate data.
 | `index.php` | everyone | Attendance dashboard. `?view=partners` is the Knowledge Partner tab |
 | `report.php` | everyone | Attendance report: schools and years ticked, filled / not filled, year by year, filled first, timetable faculty beside each class not filled; who filed, ranked by lectures; insights; Export PDF |
 | `rooms.php` | everyone | Room timetable: Rooms, Free slots, All rooms, Overlapping slots, Dean and Faculty workload |
+| `events.php` | everyone, admin edits | Holidays and events as a month, by school and year (`data/calendar.php`). A holiday reads Holiday, not Not filled, in the report; an event is a note on a normal day |
 | `login.php` | faculty | Sign in, sign up with a school join code |
 | `mark.php` | faculty | Mark attendance from a phone: tick absentees, or type a count |
 | `account.php` | faculty | Name and password |
@@ -29,7 +30,7 @@ are separate repos with separate data.
 | `activity.php` | admin | Per-account log, a leaderboard of who files, the accounts list |
 | `source.php` | local only | A timetable cell in its source document (off on the live site) |
 
-Header: Attendance and Timetable tabs, Mark attendance (signed in), a theme
+Header: Attendance, Timetable and Events tabs, Mark attendance (signed in), a theme
 switch, the account menu. No emoji anywhere: icons are the inline SVG sprite.
 
 ## 3. Brand

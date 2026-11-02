@@ -5,6 +5,7 @@
 // and the page printed is always exactly the page on screen.
 require_once __DIR__ . '/includes/report.php';
 require_once __DIR__ . '/includes/activity.php';
+require_once __DIR__ . '/includes/calendar.php';
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/page.php';
 require_once __DIR__ . '/includes/traffic.php';
@@ -19,6 +20,11 @@ $classRows = class_rows();
 $tree = aggregate_days($days, $from, $to, $classRows);
 $rows = report_rows($classRows, $tree, $days, get_attendance_faculty(), $from, $to,
     report_due_faculty(timetable_read(), $classRows, $from, $to));
+$calendar = calendar_all();
+// Filed, due, or off: a class with nothing filed on a holiday owes nothing.
+foreach ($rows as $i => $r) {
+    $rows[$i]['status'] = $r['reported'] ? 'filled' : (calendar_off($calendar, $from, $to, $r['school'], $r['year']) ? 'holiday' : 'missing');
+}
 $single = $from === $to;
 $rangeLabel = range_label($from, $to);
 $latest = $days ? max(array_keys($days)) : date('Y-m-d');
@@ -80,11 +86,12 @@ $dayReadings = function (array $r) use ($ampm, $pct, $band): array {
 };
 // One square a day: the per-day view past ten days, and on a phone, where the
 // day columns do not fit.
-$strip = function (array $byDay, string $extra) use ($dates, $e): string {
+$strip = function (array $byDay, string $extra, array $r) use ($dates, $e, $calendar): string {
     $out = '';
     foreach ($dates as $d) {
         $c = $byDay[$d] ?? null;
-        $out .= '<i class="' . ($c ? $c['class'] : 'is-none') . '" title="' . $e($c ? $c['tip'] : date('D j M', strtotime($d)) . ': not filled') . '"></i>';
+        $off = !$c && calendar_is_off($calendar, $d, $r['school'], $r['year']);
+        $out .= '<i class="' . ($c ? $c['class'] : ($off ? 'is-off' : 'is-none')) . '" title="' . $e($c ? $c['tip'] : date('D j M', strtotime($d)) . ($off ? ': holiday' : ': not filled')) . '"></i>';
     }
     return '<span class="rep-strip' . $extra . '">' . $out . '</span>';
 };
@@ -176,6 +183,7 @@ page_head('Attendance report', 'page-wide page-report', 'attendance');
     </div>
     <p class="rep-when"><?= $e($rangeLabel) ?><?= $single ? '' : '<span>Each class is the average of the days it filed</span>' ?></p>
   </header>
+  <?= calendar_strips($calendar, $from, $to) ?>
 
   <div class="rep-stats">
     <div class="rep-stat"><span>Classes filled</span><strong><b id="st-filled">0</b><small> of <b id="st-classes">0</b></small></strong></div>
@@ -246,29 +254,33 @@ page_head('Attendance report', 'page-wide page-report', 'attendance');
         <?php foreach ($dayCols as $d): ?><th scope="col" class="rep-day"><span><?= $e(date('D', strtotime($d))) ?></span><?= $e(date('j M', strtotime($d))) ?></th><?php endforeach; ?>
         <?php if ($dates && !$dayCols): ?><th scope="col" class="rep-strip-col">Each day</th><?php endif; ?>
         <th scope="col"><?= $single ? 'Present' : 'Average' ?></th><th scope="col">Attendance</th><th scope="col">Faculty</th></tr></thead>
-      <?php foreach (['filled' => true, 'missing' => false] as $status => $filed): ?>
+      <?php foreach (['filled' => 'Filled', 'missing' => 'Not filled', 'holiday' => 'Holiday'] as $status => $heading): $filed = $status === 'filled'; ?>
       <tbody class="rep-group" data-group="<?= $status ?>">
-        <tr class="rep-group-head"><th scope="rowgroup" colspan="<?= 4 + $dayExtra ?>"><?= $filed ? 'Filled' : 'Not filled' ?> <span data-gcount></span><?= $filed ? '' : '<span class="rep-group-note">Faculty from the timetable</span>' ?></th></tr>
+        <tr class="rep-group-head"><th scope="rowgroup" colspan="<?= 4 + $dayExtra ?>"><?= $heading ?> <span data-gcount></span><?= $status === 'missing' ? '<span class="rep-group-note">Faculty from the timetable</span>' : '' ?></th></tr>
         <?php foreach ($rows as $r):
-          if ($r['year'] !== $y || $r['reported'] !== $filed) continue;
+          if ($r['year'] !== $y || $r['status'] !== $status) continue;
           $label = implode(' / ', array_filter([$short($r['school']), $r['branch'], $r['division']], 'strlen'));
           $p = $pct($r['present'], $r['strength']);
           $byDay = $single ? [] : $dayReadings($r);
         ?>
         <tr class="rep-row" data-school="<?= $e($r['school']) ?>" data-present="<?= $r['present'] ?>" data-strength="<?= $r['strength'] ?>">
-          <th scope="row"><span class="rep-dot <?= $filed ? 'is-filled' : 'is-missing' ?>" aria-hidden="true"></span><?= $e($label) ?></th>
+          <th scope="row"><span class="rep-dot is-<?= $status === 'filled' ? 'filled' : ($status === 'missing' ? 'missing' : 'off') ?>" aria-hidden="true"></span><?= $e($label) ?></th>
           <?php if ($filed): ?>
           <?php foreach ($dayCols as $d): $c = $byDay[$d] ?? null; ?>
-          <td class="rep-day"<?= $c ? ' title="' . $e($c['tip']) . '"' : ' title="' . $e(date('D j M', strtotime($d))) . ': not filled"' ?>><?= $c ? '<span class="att-pct ' . $c['class'] . '">' . $c['n'] . '</span>' : '<span class="rep-muted">&ndash;</span>' ?></td>
+          <?php $dayOff = !$c && calendar_is_off($calendar, $d, $r['school'], $r['year']); ?>
+          <td class="rep-day"<?= $c ? ' title="' . $e($c['tip']) . '"' : ' title="' . $e(date('D j M', strtotime($d))) . ($dayOff ? ': holiday' : ': not filled') . '"' ?>><?= $c ? '<span class="att-pct ' . $c['class'] . '">' . $c['n'] . '</span>' : '<span class="rep-muted">' . ($dayOff ? 'Off' : '&ndash;') . '</span>' ?></td>
           <?php endforeach; ?>
-          <?php if ($dates && !$dayCols): ?><td class="rep-strip-col"><?= $strip($byDay, '') ?></td><?php endif; ?>
+          <?php if ($dates && !$dayCols): ?><td class="rep-strip-col"><?= $strip($byDay, '', $r) ?></td><?php endif; ?>
           <td><?php if ($r['estimated']): ?><?= $r['present'] ?> present<?php else: ?><?= $r['present'] ?><span class="report-table-sep">/</span><?= $r['strength'] ?><?php endif; ?>
             <?php if ($single && count($r['readings']) > 1): ?><span class="rep-note"><?= implode(' ', array_map(fn($x) => '<span>' . $e($clock($x['time'])) . ': ' . $x['present'] . '</span>', $r['readings'])) ?></span>
             <?php elseif (!$single): ?><span class="rep-note">avg of <?= $r['days'] ?> day<?= $r['days'] === 1 ? '' : 's' ?></span>
-            <?php if ($dayCols): ?><?= $strip($byDay, ' rep-strip-narrow') ?><?php endif; ?>
+            <?php if ($dayCols): ?><?= $strip($byDay, ' rep-strip-narrow', $r) ?><?php endif; ?>
             <?php endif; ?></td>
           <td><?= $r['estimated'] ? '<span class="rep-muted">Not known</span>' : '<span class="att-pct ' . $band($p) . '">' . $p . '%</span>' ?></td>
           <td class="rep-fac"><?= $r['filed_by'] ? $e(implode(', ', $r['filed_by'])) : '<span class="rep-muted">Name not recorded</span>' ?></td>
+          <?php elseif ($status === 'holiday'): ?>
+          <td colspan="<?= 2 + $dayExtra ?>"><span class="rep-off">Holiday</span></td>
+          <td class="rep-fac"><span class="rep-muted">Not expected</span></td>
           <?php else: ?>
           <td colspan="<?= 2 + $dayExtra ?>"><span class="rep-miss">Not filled</span></td>
           <td class="rep-fac"><?php if ($r['due']): ?><?= implode('', array_map(fn($d) => '<span class="rep-person">' . ($single && $d['time'] < 1440 ? '<span class="rep-time">' . $e(timetable_clock($d['time'])) . '</span>' : '') . $e($d['name']) . '</span>', $r['due'])) ?><?php else: ?><span class="rep-muted">Not on the timetable</span><?php endif; ?></td>
@@ -326,6 +338,7 @@ foreach ($days as $d => $classes) {
   window.ATTENDANCE_DATA = <?= json_encode($tree) ?>;
   window.ATTENDANCE_DAYS = <?= json_encode((object) $rangeDays) ?>;
   window.TREND_DAYS = <?= json_encode((object) $trendDays) ?>;
+  window.CALENDAR_DAYS = <?= json_encode((object) calendar_chart_days($calendar, $trendFrom, $to)) ?>;
   window.CLASS_STRENGTH = <?= json_encode($classStrength) ?>;
 </script>
 <script src="js/charts.js?v=<?= filemtime(__DIR__ . '/js/charts.js') ?>"></script>

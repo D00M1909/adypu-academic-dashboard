@@ -285,4 +285,26 @@ window.Charts.render({ school: 'eng', year: '1st Year', branch: 'Core', division
   { present: 90, strengthReported: 100, reported: 1, classes: 1 });
 assert(els['chart-compare'].innerHTML === '', 'one division has nothing to compare');
 
+// --- Holidays and events ----------------------------------------------------
+// A law holiday on a day nobody filed gets its own place on the axis, but only
+// for a scope that has law in it; the event is a dot on a day that has a bar.
+window.CALENDAR_DAYS = {
+  '2026-08-20': [{ k: 'holiday', t: 'Law day', s: ['law'], y: [] }],
+  '2026-08-21': [{ k: 'holiday', t: 'Second years', s: [], y: ['2nd Year'] }],
+};
+const scope = (school) => window.Charts.render({ school, year: null, branch: null },
+  { present: 0, strengthReported: 0, reported: 0, classes: 0 });
+
+scope('law');
+assert(els['chart-compliance'].innerHTML.includes('chart-holiday'), 'law sees its holiday');
+assert(els['chart-compliance'].innerHTML.includes('Holiday: Law day'), 'the tip names it');
+assert(!els['chart-compliance'].innerHTML.includes('Second years'), 'no 2nd Year class here, so not its holiday');
+
+scope('eng');
+assert(!els['chart-compliance'].innerHTML.includes('chart-holiday'), 'a law holiday is not eng\'s');
+
+delete window.CALENDAR_DAYS;
+scope('eng');
+assert(!els['chart-compliance'].innerHTML.includes('Grey days'), 'no calendar, no note');
+
 console.log('OK');

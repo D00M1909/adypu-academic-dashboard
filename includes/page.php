@@ -44,11 +44,11 @@ function account_menu(): string {
 // Timetable, the two pages anyone opens), then the one action, the theme and
 // the account on the right. $current names the page so its link is marked;
 // 'mark' hides the Mark attendance button on the page it would lead to.
-// The icons it uses must be in each page's sprite: chart, rooms, mark, user,
-// caret, sun, moon.
+// The icons it uses must be in each page's sprite: chart, rooms, event, mark,
+// user, caret, sun, moon.
 function site_header(string $title, string $current = ''): void {
     $signedIn = function_exists('auth_user') && auth_user() !== null;
-    $nav = ['attendance' => ['index.php', 'chart', 'Attendance'], 'timetable' => ['rooms.php', 'rooms', 'Timetable']];
+    $nav = ['attendance' => ['index.php', 'chart', 'Attendance'], 'timetable' => ['rooms.php', 'rooms', 'Timetable'], 'events' => ['events.php', 'event', 'Events']];
     ?>
 <header class="app-header">
   <div class="header-inner">
@@ -118,6 +118,9 @@ try {
   <symbol id="icon-chart" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></symbol>
   <symbol id="icon-rooms" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/><path d="M10 10v11"/></symbol>
   <symbol id="icon-mark" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="m9 11 3 3L22 4"/></symbol>
+  <symbol id="icon-close" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+  <symbol id="icon-holiday" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/><path d="m9.5 13.5 5 5"/><path d="m14.5 13.5-5 5"/></symbol>
+  <symbol id="icon-event" viewBox="0 0 24 24"><path d="M4 22V4"/><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1"/></symbol>
 </defs></svg>
 <?php site_header($nav ? SITE_NAME : $title, $nav ?: (str_contains($bodyClass, 'page-marking') ? 'mark' : '')); ?>
 <main class="page-main">
