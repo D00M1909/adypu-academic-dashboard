@@ -62,6 +62,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $e = fn($v): string => htmlspecialchars((string) $v);
+if (($_GET['view'] ?? '') === 'report') {
+    require __DIR__ . '/includes/events-report.php';
+    exit;
+}
 $first = new DateTimeImmutable("$month-01");
 $last = $first->modify('last day of this month');
 $today = date('Y-m-d');
@@ -72,6 +76,9 @@ $inMonth = calendar_between($shown, $first->format('Y-m-d'), $last->format('Y-m-
 
 page_head('Events', 'page-wide page-events', 'events');
 ?>
+<svg style="display:none" aria-hidden="true"><defs>
+  <symbol id="icon-print" viewBox="0 0 24 24"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></symbol>
+</defs></svg>
 <?php page_notice('warn', $error); ?>
 <?php if (($_GET['done'] ?? '') === 'saved') page_notice('ok', 'Saved.'); ?>
 <?php if (($_GET['done'] ?? '') === 'deleted') page_notice('ok', 'Deleted.'); ?>
@@ -101,6 +108,10 @@ page_head('Events', 'page-wide page-events', 'events');
       </select></label>
     <noscript><button class="btn-quiet" type="submit">Show</button></noscript>
   </form>
+  <a class="range-export cal-report" href="<?= $e('events.php?' . http_build_query(array_filter([
+      'view' => 'report', 'from' => $first->format('Y-m-d'), 'to' => $last->format('Y-m-d'),
+      'scope' => $school ? 'schools' : null, 'school' => $school ? [$school] : null, 'year' => $year ? [$year] : null]))) ?>"
+     title="Count the holidays and events in any dates, then save it as a PDF"><svg aria-hidden="true"><use href="#icon-print"/></svg>Report / PDF</a>
   <?php if ($admin): ?><button class="rep-export cal-add" id="cal-new" type="button">Add a day</button><?php endif; ?>
 </div>
 

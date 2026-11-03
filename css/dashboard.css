@@ -2250,6 +2250,26 @@ button.cal-day:hover { background: var(--lecture-tint); }
 .cal-actions [hidden] { display: none; }
 .cal-form-error[hidden] { display: none; }
 #cal-day .btn-quiet { margin-top: 12px; }
+.cal-report { margin: 0; }
+/* The events report (events.php?view=report), built on the attendance report's parts. */
+.evr-back { margin: 0 0 10px; font-size: 14px; }
+.evr-back a { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-muted); font-weight: 600; text-decoration: none; }
+.evr-back a:hover { color: var(--red-ink); }
+.evr-back svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.evr-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.evr-table th:first-child { width: auto; }
+.evr-table td, .evr-table th { text-align: left; }
+.evr-table .cal-tag { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.evr-date { white-space: nowrap; }
+.evr-table [hidden] { display: none; }
+@media (max-width: 640px) {
+  .evr-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .evr-stats .rep-stat:last-child { grid-column: auto; }
+  .evr-table th, .evr-table td { padding: 8px 6px; font-size: 13px; }
+  /* The icon alone says holiday or event; the word does not fit a phone. */
+  .evr-table .cal-tag { padding: 3px 5px; }
+  .evr-table .cal-tag span { display: none; }
+}
 @media (max-width: 960px) {
   .cal-layout { grid-template-columns: minmax(0, 1fr); }
 }
