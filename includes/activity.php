@@ -34,6 +34,7 @@ const ACTIVITY_TYPES = [
     'form'          => 'Google Form entry',
     'password'      => 'Changed password',
     'admin'         => 'Admin action',
+    'audit'         => 'Academic audit',
 ];
 
 function activity_path(string $day): string {

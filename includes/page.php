@@ -45,10 +45,12 @@ function account_menu(): string {
 // the account on the right. $current names the page so its link is marked;
 // 'mark' hides the Mark attendance button on the page it would lead to.
 // The icons it uses must be in each page's sprite: chart, rooms, event, mark,
-// user, caret, sun, moon.
+// audit, user, caret, sun, moon.
 function site_header(string $title, string $current = ''): void {
     $signedIn = function_exists('auth_user') && auth_user() !== null;
     $nav = ['attendance' => ['index.php', 'chart', 'Attendance'], 'timetable' => ['rooms.php', 'rooms', 'Timetable'], 'events' => ['events.php', 'event', 'Events']];
+    // The audit is for staff, so its tab is only there once signed in.
+    if ($signedIn) $nav['audit'] = ['audit.php', 'audit', 'Audit'];
     ?>
 <header class="app-header">
   <div class="header-inner">
@@ -121,6 +123,7 @@ try {
   <symbol id="icon-close" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
   <symbol id="icon-holiday" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/><path d="m9.5 13.5 5 5"/><path d="m14.5 13.5-5 5"/></symbol>
   <symbol id="icon-event" viewBox="0 0 24 24"><path d="M4 22V4"/><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1"/></symbol>
+  <symbol id="icon-audit" viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></symbol>
 </defs></svg>
 <?php site_header($nav ? SITE_NAME : $title, $nav ?: (str_contains($bodyClass, 'page-marking') ? 'mark' : '')); ?>
 <main class="page-main">

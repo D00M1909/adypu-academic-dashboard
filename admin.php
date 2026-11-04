@@ -5,6 +5,7 @@
 // There is no email on this host, so the reset button showing a temporary
 // password once, on screen, is the entire password recovery story.
 
+require_once __DIR__ . '/includes/audit.php';
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/page.php';
 require_once __DIR__ . '/includes/traffic.php';
@@ -17,6 +18,9 @@ $me = auth_require(true);
 $error = '';
 $ok = '';
 $temp = '';
+
+$tt = timetable_read();
+$faculty = $tt ? timetable_faculty($tt) : [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = auth_key((string) ($_POST['email'] ?? ''));
@@ -71,6 +75,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     return $d;
                 });
                 $ok = 'Deleted.';
+                break;
+            case 'audit':
+                // The audit's level and which timetable name the account is.
+                // A blank name goes back to matching the account's own name.
+                $role = (string) ($_POST['role'] ?? '');
+                $tt = (string) ($_POST['tt'] ?? '');
+                $tt = isset($faculty[$tt]) ? $tt : '';
+                auth_put($email, ['role' => isset(AUDIT_ROLES[$role]) ? $role : 'faculty', 'tt' => $tt]);
+                $ok = 'Saved: ' . AUDIT_ROLES[isset(AUDIT_ROLES[$role]) ? $role : 'faculty'] . ($tt !== '' ? ', on the timetable as ' . $faculty[$tt]['name'] : '') . '.';
                 break;
             case 'reset':
                 $temp = auth_reset_password($email);
@@ -171,6 +184,7 @@ $shortSchool = fn(string $id): string => preg_replace('/^School of /', '', SCHOO
           <strong><?= htmlspecialchars($u['name'] ?? $email) ?>
             <span class="status status-<?= htmlspecialchars($status) ?>"><?= htmlspecialchars($status) ?></span>
             <?php if (!empty($u['admin'])): ?><span class="status status-admin">admin</span><?php endif; ?>
+            <?php if (in_array(audit_role($u), ['lead', 'school', 'dean'], true)): ?><span class="status status-admin"><?= htmlspecialchars(AUDIT_ROLES[$u['role']]) ?></span><?php endif; ?>
           </strong>
           <span><?= htmlspecialchars($email) ?></span>
           <span><?= htmlspecialchars(SCHOOLS[$u['school'] ?? '']['name'] ?? 'No school') ?>
@@ -194,6 +208,24 @@ $shortSchool = fn(string $id): string => preg_replace('/^School of /', '', SCHOO
             <button class="btn-quiet" name="action" value="<?= empty($u['admin']) ? 'promote' : 'demote' ?>" type="submit">
               <?= empty($u['admin']) ? 'Make admin' : 'Remove admin' ?></button></form>
         </div>
+        <?php if ($faculty): $linked = audit_person_for($u + ['email' => $email], $faculty);
+          // The account's own school first, so the right name is near the top.
+          $own = array_filter($faculty, fn($f) => in_array($u['school'] ?? '', $f['schools'], true)); ?>
+        <form method="post" class="account-audit"><?= csrf_field() ?><input type="hidden" name="email" value="<?= htmlspecialchars($email) ?>">
+          <label>Audit level<select name="role">
+            <?php foreach (AUDIT_ROLES as $k => $l): ?><option value="<?= $k ?>"<?= ($u['role'] ?? 'faculty') === $k ? ' selected' : '' ?>><?= htmlspecialchars($l) ?></option><?php endforeach; ?>
+          </select></label>
+          <label>On the timetable as<select name="tt">
+            <option value=""><?= $linked !== '' && empty($u['tt']) ? htmlspecialchars($faculty[$linked]['name']) . ' (matched by name)' : 'Not linked' ?></option>
+            <?php foreach ([$own, array_diff_key($faculty, $own)] as $i => $list): if (!$list) continue; ?>
+            <optgroup label="<?= $i === 0 ? htmlspecialchars(SCHOOLS[$u['school'] ?? '']['name'] ?? 'Their school') : 'Other schools' ?>">
+              <?php foreach ($list as $id => $f): ?><option value="<?= htmlspecialchars($id) ?>"<?= ($u['tt'] ?? '') === $id ? ' selected' : '' ?>><?= htmlspecialchars($f['name']) ?></option><?php endforeach; ?>
+            </optgroup>
+            <?php endforeach; ?>
+          </select></label>
+          <button class="btn-quiet" name="action" value="audit" type="submit">Save</button>
+        </form>
+        <?php endif; ?>
       </li>
     <?php endforeach; ?>
   </ul>

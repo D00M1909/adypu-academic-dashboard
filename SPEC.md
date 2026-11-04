@@ -22,6 +22,8 @@ are separate repos with separate data.
 | `report.php` | everyone | Attendance report: schools and years ticked, filled / not filled, year by year, filled first, timetable faculty beside each class not filled; who filed, ranked by lectures; insights; Export PDF |
 | `rooms.php` | everyone | Room timetable: Rooms, Free slots, All rooms, Overlapping slots, Dean and Faculty workload |
 | `events.php` | everyone, admin edits | Holidays and events as a month, by school and year (`data/calendar.php`). A holiday reads Holiday, not Not filled, in the report; an event is a note on a normal day. `?view=report` counts holidays, days off and events in any dates for the schools, years and types ticked, and prints as a PDF |
+| `audit.php` | signed in | Academic audit: each faculty member's course file per subject (from the timetable), the 17 items of the Course File Index to upload and submit once; program leads approve and remark, school deans and the main dean read; one deadline; summary with insights, CSV export and a printable report |
+| `audit-file.php` | signed in | One uploaded audit file, to whoever may see its course file |
 | `login.php` | faculty | Sign in, sign up with a school join code |
 | `mark.php` | faculty | Mark attendance from a phone: tick absentees, or type a count |
 | `account.php` | faculty | Name and password |
@@ -30,7 +32,7 @@ are separate repos with separate data.
 | `activity.php` | admin | Per-account log, a leaderboard of who files, the accounts list |
 | `source.php` | local only | A timetable cell in its source document (off on the live site) |
 
-Header: Attendance, Timetable and Events tabs, Mark attendance (signed in), a theme
+Header: Attendance, Timetable and Events tabs, Audit once signed in, Mark attendance (signed in), a theme
 switch, the account menu. No emoji anywhere: icons are the inline SVG sprite.
 
 ## 3. Brand
@@ -141,6 +143,24 @@ a login. There is no email on the host, so:
 Everything the live site writes for itself lives in `data/`: JSON behind a
 `<?php exit; ?>` first line, so requesting one over the web returns a blank page.
 It is gitignored and never uploaded.
+
+### Audit levels
+
+Set per account on `admin.php`, with the account's timetable name (matched by
+name when not set):
+
+| Level | Sees | Does |
+|---|---|---|
+| Faculty | their own course files | upload, then submit once (a confirm pop-up); locked after |
+| Program lead | their school | approve each upload, remark, hand a file back for editing |
+| School dean | their school | read only |
+| Main dean | every school | read only, sets the one audit deadline |
+| Admin | everything | everything |
+
+A file is on time when its first submission is on or before the deadline;
+later ones still count and read late. Uploads (PDF, Office, images, 10 MB
+each) sit in `data/audit-files/` behind the same guard line, so the only way
+to one is `audit-file.php`.
 
 ## 8. Room timetable
 

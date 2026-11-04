@@ -48,6 +48,7 @@ $kinds = [
     'sign' => 'Sign-ins and sign-outs',
     'signin_failed' => 'Failed sign-ins',
     'admin' => 'Admin actions',
+    'audit' => 'Academic audit',
 ];
 $kind = isset($kinds[(string) ($_GET['kind'] ?? '')]) ? (string) $_GET['kind'] : 'work';
 // One section at a time, so the leaderboard is not a scroll past the log.
@@ -150,6 +151,7 @@ $describe = function (array $x) use ($short, $lag, $nameOf, $when): string {
         'signup' => (SCHOOLS[$d['school'] ?? '']['name'] ?? '') . ', ' . ($d['status'] ?? '') . ', join code ' . ($d['code'] ?? ''),
         'password' => !empty($d['ok']) ? 'Changed' : 'Refused: ' . ($d['why'] ?? ''),
         'admin' => isset($d['label']) ? (string) $d['label'] : ucfirst($d['action'] ?? '') . ' ' . (isset(SCHOOLS[$d['target'] ?? '']) ? SCHOOLS[$d['target']]['name'] . ' join code' : $nameOf((string) ($d['target'] ?? '')) . ' (' . ($d['target'] ?? '') . ')'),
+        'audit' => (string) ($d['label'] ?? ''),
         'view' => ($d['url'] ?? $d['page'] ?? ''),
         'form' => $short($d['class'] ?? '') . ', ' . date('j M', strtotime($d['date'] ?? $x['day'])) . ($d['time'] !== '' ? ' ' . $when($d['time']) : '')
             . ': ' . $d['present'] . ($d['strength'] ? '/' . $d['strength'] : '') . ' present'
