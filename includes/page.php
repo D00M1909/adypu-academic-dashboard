@@ -49,8 +49,8 @@ function account_menu(): string {
 function site_header(string $title, string $current = ''): void {
     $signedIn = function_exists('auth_user') && auth_user() !== null;
     $nav = ['attendance' => ['index.php', 'chart', 'Attendance'], 'timetable' => ['rooms.php', 'rooms', 'Timetable'], 'events' => ['events.php', 'event', 'Events']];
-    // The audit is for staff, so its tab is only there once signed in.
-    if ($signedIn) $nav['audit'] = ['audit.php', 'audit', 'Audit'];
+    // Open to everyone to read; changing anything needs an account (audit.php).
+    $nav['audit'] = ['audit.php', 'audit', 'Audit'];
     ?>
 <header class="app-header">
   <div class="header-inner">

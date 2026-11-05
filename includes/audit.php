@@ -275,7 +275,7 @@ function audit_all(): array {
 
 // A course's file as stored, with the parts it has not reached yet filled in.
 function audit_file(array $all, string $id): array {
-    return ($all[$id] ?? []) + ['items' => [], 'submitted' => '', 'first' => '', 'reviewed' => '', 'reviewer' => '', 'reopened' => '', 'note' => ''];
+    return ($all[$id] ?? []) + ['items' => [], 'submitted' => '', 'first' => '', 'by' => '', 'reviewed' => '', 'reviewer' => '', 'reopened' => '', 'note' => ''];
 }
 
 // draft, submitted (waiting for a lead), approved (a lead reviewed it).
@@ -403,11 +403,12 @@ function audit_remove(array $course, string $item, string $email): string {
 function audit_submit(array $course, bool $sure, string $email): string {
     if (!$sure) return 'Please confirm the submission.';
     $why = '';
-    audit_save($course, function (array $f) use (&$why) {
+    audit_save($course, function (array $f) use (&$why, $email) {
         if (audit_locked($f)) { $why = 'This course file is already submitted.'; return null; }
         if ($m = audit_missing($f)) { $why = 'Still to upload: item ' . implode(', ', $m) . '.'; return null; }
         $f['submitted'] = date('Y-m-d H:i');
         if ($f['first'] === '') $f['first'] = $f['submitted'];
+        $f['by'] = $email;
         $f['reviewed'] = '';
         return $f;
     });
@@ -463,7 +464,7 @@ function audit_summary(array $courses, array $files, array $faculty, array $scho
         $f = audit_file($files, $c['id']);
         $r = &$rows[$c['school']][$c['person']];
         $r ??= ['person' => $c['person'], 'name' => $faculty[$c['person']]['name'] ?? $c['person'], 'courses' => 0, 'started' => 0, 'submitted' => 0, 'reviewed' => 0,
-            'ontime' => 0, 'late' => 0, 'pending' => 0, 'filled' => 0, 'approved' => 0, 'remarks' => []];
+            'ontime' => 0, 'late' => 0, 'pending' => 0, 'filled' => 0, 'approved' => 0, 'remarks' => [], 'last' => '', 'reviewers' => []];
         $r['courses']++;
         $r[audit_timing($f, $deadline)]++;
         [, , $any] = audit_progress($f);
@@ -471,6 +472,8 @@ function audit_summary(array $courses, array $files, array $faculty, array $scho
         $s = audit_status($f);
         if ($s !== 'draft') $r['submitted']++;
         if ($s === 'approved') $r['reviewed']++;
+        if ($f['submitted'] > $r['last']) $r['last'] = $f['submitted'];
+        if ($s === 'approved' && $f['reviewer'] !== '') $r['reviewers'][$f['reviewer']] = true;
         foreach (AUDIT_ITEMS as $k => [$title]) {
             $it = $f['items'][$k] ?? [];
             if (audit_filled($it)) $r['filled']++;

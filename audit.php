@@ -1,12 +1,14 @@
 <?php
 // The Audit tab: course files for the academic audit (includes/audit.php).
-// Signed-in accounts only, unlike the dashboard. Three views:
+// Anyone may look, signed in or not; only a course's own faculty member
+// uploads and submits, only a program lead of its school reviews, only the
+// main dean sets the deadline. Three views:
 //   My subjects  every course the timetable lists for this account's person,
 //                each opening its 17 items to upload and, once, submit.
 //   Review       one school's files: a program lead ticks and remarks them
 //                here, a school dean reads them.
-//   Summary      leads and school deans (their school), the main dean (every
-//                school): the deadline, the insights, the tables, the export.
+//   Summary      the view the tab opens on: the deadline, the tables, the
+//                export, and the insights below them.
 // ?c=<course> is one course file, drawn for its owner to fill in or for a lead
 // to review, whichever the account is. Every view prints as its own report.
 
@@ -19,39 +21,43 @@ require_once __DIR__ . '/includes/traffic.php';
 header('Cache-Control: no-store');
 auth_boot();
 traffic_hit('audit');
-$me = auth_require();
-$role = audit_role($me);
+$me = auth_user() ?? [];
+$role = $me ? audit_role($me) : 'visitor';
 
 $t = timetable_read();
 $faculty = $t ? timetable_faculty($t) : [];
 $courses = $t ? audit_courses($t, $faculty) : [];
-$person = audit_person_for($me, $faculty);
+$person = $me ? audit_person_for($me, $faculty) : '';
 $files = audit_all();
 $deadline = audit_deadline();
 $today = date('Y-m-d');
 
 $canReview = in_array($role, ['lead', 'admin'], true);
-$seesSchool = $role !== 'faculty';
+$seesSchool = true;
 $canDeadline = audit_can_set_deadline($me);
-// A lead and a school dean see one school; the main dean and an admin any.
-$schoolsShown = in_array($role, ['dean', 'admin'], true) ? array_keys(SCHOOLS) : [(string) ($me['school'] ?? '')];
+// Every school is open to everyone; a lead and a school dean start on their own.
+$schoolsShown = array_keys(SCHOOLS);
 
 $cid = (string) ($_GET['c'] ?? $_POST['c'] ?? '');
 $course = $courses[$cid] ?? null;
-if ($cid !== '' && ($course === null || !audit_can_view($me, $person, $course))) {
+if ($cid !== '' && $course === null) {
     http_response_code(404);
     $course = null;
 }
 
-$school = (string) ($_GET['school'] ?? '');
-if (!in_array($school, $schoolsShown, true)) $school = count($schoolsShown) === 1 ? $schoolsShown[0] : '';
+$school = isset($_GET['school']) ? (string) $_GET['school'] : (in_array($role, ['lead', 'school'], true) ? (string) ($me['school'] ?? '') : '');
+if (!in_array($school, $schoolsShown, true)) $school = '';
 $when = isset(AUDIT_TIMING_LABEL[$_GET['when'] ?? '']) ? (string) $_GET['when'] : '';
 
 $e = fn($v): string => htmlspecialchars((string) $v);
+$accounts = auth_data()['users'];
+$nameOf = fn(string $email): string => $email === '' ? '' : (string) ($accounts[auth_key($email)]['name'] ?? $email);
 
 // --- Changes, all back to a GET ---------------------------------------------
 $error = '';
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'deadline') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$me) {
+    $error = 'Please sign in to change anything here.';
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'deadline') {
     if (!csrf_ok()) {
         $error = 'That form expired. Please try again.';
     } elseif (!$canDeadline) {
@@ -106,14 +112,14 @@ if (($_GET['export'] ?? '') === 'csv' && $seesSchool) {
     // Excel reads a CSV as the local code page unless it starts with a BOM.
     fwrite($out, "\xEF\xBB\xBF");
     fputcsv($out, ['School', 'Faculty', 'Subject', 'Class', 'Divisions', 'Year', 'Semester', 'Required uploaded', 'Status',
-        'First submitted', 'Deadline', 'Against deadline', 'Reviewed', 'Items approved', 'Remarks']);
+        'First submitted', 'Submitted by', 'Deadline', 'Against deadline', 'Reviewed', 'Reviewed by', 'Items approved', 'Remarks']);
     foreach ($rows as $r) {
         $c = $r['course'];
         $f = $r['file'];
         fputcsv($out, [SCHOOLS[$c['school']]['name'] ?? '', $r['faculty'], $c['subject'], $c['class'], implode(', ', $c['divs']),
             $c['year'] ?: '', $c['sem'] ?: '', "{$r['have']}/{$r['req']}", AUDIT_STATUS_LABEL[$r['status']],
-            $f['first'] !== '' ? $f['first'] : $f['submitted'], $deadline, AUDIT_TIMING_LABEL[$r['timing']],
-            $f['reviewed'], $r['approved'], $r['remarks']]);
+            $f['first'] !== '' ? $f['first'] : $f['submitted'], $f['submitted'] === '' ? '' : ($nameOf($f['by']) ?: $r['faculty']), $deadline, AUDIT_TIMING_LABEL[$r['timing']],
+            $f['reviewed'], $nameOf($f['reviewer']), $r['approved'], $r['remarks']]);
     }
     fclose($out);
     exit;
@@ -121,9 +127,9 @@ if (($_GET['export'] ?? '') === 'csv' && $seesSchool) {
 
 $mineList = array_filter($courses, fn($c) => $c['person'] === $person && $person !== '');
 $tabs = [];
+$tabs['summary'] = 'Summary';
+$tabs['review'] = $canReview ? 'Review' : 'Course files';
 if ($mineList || $role === 'faculty') $tabs['mine'] = 'My subjects';
-if ($seesSchool) $tabs['review'] = $canReview ? 'Review' : 'Course files';
-if ($seesSchool) $tabs['summary'] = 'Summary';
 $view = isset($tabs[(string) ($_GET['view'] ?? '')]) ? (string) $_GET['view'] : array_key_first($tabs);
 if ($course !== null) $view = $course['person'] === $person ? 'mine' : ($seesSchool ? 'review' : 'summary');
 
@@ -228,9 +234,9 @@ if ($error === '' && $done !== '') page_notice('ok', match ($done) {
     </div>
     <div class="aud-bar" aria-hidden="true"><i style="width:<?= $req ? round(100 * $have / $req) : 0 ?>%"></i></div>
     <?php if ($status === 'submitted'): ?>
-      <p class="field-help">Submitted <?= $e($f['submitted']) ?>. Locked: nothing can change unless a program lead opens it for editing.</p>
+      <p class="field-help">Submitted by <strong><?= $e($nameOf($f['by']) ?: $who($course['person'])) ?></strong> on <?= $e($f['submitted']) ?>. Locked: nothing can change unless a program lead opens it for editing.</p>
     <?php elseif ($status === 'approved'): ?>
-      <p class="field-help">Submitted <?= $e($f['submitted']) ?>, reviewed <?= $e($f['reviewed']) ?>.</p>
+      <p class="field-help">Submitted by <strong><?= $e($nameOf($f['by']) ?: $who($course['person'])) ?></strong> on <?= $e($f['submitted']) ?>. Approved by <strong><?= $e($nameOf($f['reviewer']) ?: 'a program lead') ?></strong> on <?= $e($f['reviewed']) ?>.</p>
     <?php elseif ($f['reopened'] !== ''): ?>
       <p class="field-help">A program lead opened this for editing on <?= $e($f['reopened']) ?>. Fix what the remarks ask for, then submit again.</p>
     <?php elseif ($editable): ?>
@@ -401,7 +407,6 @@ if ($error === '' && $done !== '') page_notice('ok', match ($done) {
     </form>
     <?= $whenTabs(['view' => 'review', 'school' => count($schoolsShown) > 1 ? $school : '', 'status' => $want]) ?>
   </div>
-  <?= $insightsFor('review') ?>
   <?php if ($school === ''): ?>
     <p class="card">Pick a school to see its course files.</p>
   <?php elseif (!$byPerson): ?>
@@ -415,7 +420,7 @@ if ($error === '' && $done !== '') page_notice('ok', match ($done) {
       <ul class="aud-list">
         <?php foreach ($list as $r): $c = $r['course']; $f = $r['file']; ?>
         <li><a href="audit.php?c=<?= $e($c['id']) ?>">
-          <span><strong><?= $e($c['subject']) ?></strong><small><?= $e(audit_course_label($c)) ?> &middot; <?= $e(audit_term_label($c)) ?><?= $f['submitted'] !== '' ? ' &middot; submitted ' . $e($day($f['first'] ?: $f['submitted'])) : '' ?></small></span>
+          <span><strong><?= $e($c['subject']) ?></strong><small><?= $e(audit_course_label($c)) ?> &middot; <?= $e(audit_term_label($c)) ?><?= $f['submitted'] !== '' ? ' &middot; submitted by ' . $e($nameOf($f['by']) ?: $who($p)) . ' ' . $e($day($f['first'] ?: $f['submitted'])) : '' ?><?= $f['reviewed'] !== '' ? ' &middot; approved by ' . $e($nameOf($f['reviewer'])) . ' ' . $e($day($f['reviewed'])) : '' ?></small></span>
           <span class="aud-list-end"><small><?= $r['have'] ?>/<?= $r['req'] ?></small><?= $timingPill($r['timing']) ?><?= $statusPill($r['status']) ?></span>
         </a></li>
         <?php endforeach; ?>
@@ -423,6 +428,7 @@ if ($error === '' && $done !== '') page_notice('ok', match ($done) {
     </details>
     <?php endforeach; ?>
   <?php endif; ?>
+  <?= $insightsFor('review') ?>
 
 <?php else:
   // ---------------------------------------------------------------- summary
@@ -465,8 +471,6 @@ if ($error === '' && $done !== '') page_notice('ok', match ($done) {
   </form>
   <?php endif; ?>
 
-  <?= $insightsFor('summary') ?>
-
   <?php if ($school === ''): ?>
   <section class="card">
     <h2>By school</h2>
@@ -491,12 +495,14 @@ if ($error === '' && $done !== '') page_notice('ok', match ($done) {
       <span class="count-pill"><?= count($shownPeople) ?><?= $when !== '' ? ' ' . $e(strtolower(AUDIT_TIMING_LABEL[$when])) : '' ?></span></h2>
     <?php if (!$shownPeople): ?><p class="field-help">Nobody here matches.</p><?php else: ?>
     <div class="stat-table-wrap"><table class="stat-table aud-table">
-      <thead><tr><th>Faculty</th><?php if ($school === ''): ?><th class="aud-left">School</th><?php endif; ?><th>Course files</th><th>On time</th><th>Late</th><th>Not submitted</th><th>Reviewed</th><th>Items approved</th><th>Remarks</th><th class="aud-left">Against deadline</th></tr></thead>
+      <thead><tr><th>Faculty</th><?php if ($school === ''): ?><th class="aud-left">School</th><?php endif; ?><th>Course files</th><th>On time</th><th>Late</th><th>Not submitted</th><th class="aud-left">Last submitted</th><th>Reviewed</th><th class="aud-left">Approved by</th><th>Items approved</th><th>Remarks</th><th class="aud-left">Against deadline</th></tr></thead>
       <tbody>
         <?php foreach ($shownPeople as $r): ?>
         <tr><th><?= $e($r['name']) ?></th><?php if ($school === ''): ?><td class="aud-left"><?= $e(preg_replace('/^School of /', '', SCHOOLS[$r['school']]['name'] ?? '')) ?></td><?php endif; ?>
           <td><?= $r['courses'] ?></td><td><?= $r['ontime'] ?></td><td><?= $r['late'] ?></td><td><?= $r['pending'] ?></td>
-          <td><?= $r['reviewed'] ?></td><td><?= $r['approved'] ?>/<?= $r['filled'] ?></td><td><?= count($r['remarks']) ?></td><td class="aud-left"><?= $personPill($r) ?></td></tr>
+          <td class="aud-left"><?= $r['last'] !== '' ? $e($day($r['last'])) : '-' ?></td>
+          <td><?= $r['reviewed'] ?></td><td class="aud-left"><?= $r['reviewers'] ? $e(implode(', ', array_map($nameOf, array_keys($r['reviewers'])))) : '-' ?></td>
+          <td><?= $r['approved'] ?>/<?= $r['filled'] ?></td><td><?= count($r['remarks']) ?></td><td class="aud-left"><?= $personPill($r) ?></td></tr>
         <?php endforeach; ?>
       </tbody>
     </table></div>
@@ -513,6 +519,8 @@ if ($error === '' && $done !== '') page_notice('ok', match ($done) {
       <?php endforeach; endforeach; ?>
     </ul>
   </section>
+
+  <?= $insightsFor('summary') ?>
 <?php endif; ?>
 
 <script src="js/audit.js?v=<?= filemtime(__DIR__ . '/js/audit.js') ?>"></script>

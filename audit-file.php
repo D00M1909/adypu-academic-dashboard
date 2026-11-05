@@ -1,13 +1,10 @@
 <?php
-// One uploaded audit file, to whoever may see its course file: its faculty
-// member, a lead of its school, the main dean, an admin. The bytes sit behind
-// the store guard in data/audit-files/, so this is the only way to them.
+// One uploaded audit file. The audit is open to read, so anyone may open it;
+// the bytes still sit behind the store guard in data/audit-files/, so this is
+// the only way to them.
 
 require_once __DIR__ . '/includes/audit.php';
-require_once __DIR__ . '/includes/auth.php';
 
-auth_boot();
-$me = auth_require();
 
 $t = timetable_read();
 $faculty = $t ? timetable_faculty($t) : [];
@@ -17,7 +14,7 @@ $item = (string) ($_GET['i'] ?? '');
 $it = $course ? (audit_file(audit_all(), $course['id'])['items'][$item] ?? []) : [];
 
 $bytes = null;
-if ($course && audit_can_view($me, audit_person_for($me, $faculty), $course) && !empty($it['blob'])) {
+if ($course && !empty($it['blob'])) {
     $bytes = audit_blob_read($it['blob']);
 }
 if ($bytes === null) {
