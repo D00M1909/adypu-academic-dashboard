@@ -11,6 +11,7 @@
 // to review, whichever the account is. Every view prints as its own report.
 
 require_once __DIR__ . '/includes/audit.php';
+require_once __DIR__ . '/includes/audit-insights.php';
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/page.php';
 require_once __DIR__ . '/includes/traffic.php';
@@ -138,6 +139,7 @@ $scope = $school !== '' ? [$school] : $schoolsShown;
 // every school, or its own courses.
 $dueRows = $seesSchool ? audit_rows($courses, $files, $faculty, $scope, $deadline)
     : audit_rows($mineList, $files, $faculty, array_keys(SCHOOLS) + [99 => ''], $deadline);
+$insightsFor = fn(string $v): string => audit_insights_html($dueRows, ['view' => $v, 'school' => $school, 'schools' => $schoolsShown, 'deadline' => $deadline, 'today' => $today, 'when' => $when]);
 $due = array_count_values(array_column($dueRows, 'timing')) + ['ontime' => 0, 'late' => 0, 'pending' => 0];
 $dueTotal = count($dueRows);
 
@@ -399,6 +401,7 @@ if ($error === '' && $done !== '') page_notice('ok', match ($done) {
     </form>
     <?= $whenTabs(['view' => 'review', 'school' => count($schoolsShown) > 1 ? $school : '', 'status' => $want]) ?>
   </div>
+  <?= $insightsFor('review') ?>
   <?php if ($school === ''): ?>
     <p class="card">Pick a school to see its course files.</p>
   <?php elseif (!$byPerson): ?>
@@ -406,7 +409,7 @@ if ($error === '' && $done !== '') page_notice('ok', match ($done) {
   <?php else: ?>
     <?php foreach ($byPerson as $p => $list):
       $n = array_count_values(array_column($list, 'timing')); ?>
-    <details class="card aud-person"<?= in_array('submitted', array_column($list, 'status'), true) || $when !== '' ? ' open' : '' ?>>
+    <details class="card aud-person" id="p-<?= $e($p) ?>"<?= in_array('submitted', array_column($list, 'status'), true) || $when !== '' ? ' open' : '' ?>>
       <summary><strong><?= $e($who($p)) ?></strong>
         <span class="aud-counts"><?php foreach (AUDIT_TIMING_LABEL as $k => $l): if (!empty($n[$k])): ?><span class="status aud-when-<?= $k ?>"><?= $n[$k] ?> <?= $e(strtolower($l)) ?></span><?php endif; endforeach; ?></span></summary>
       <ul class="aud-list">
@@ -435,7 +438,6 @@ if ($error === '' && $done !== '') page_notice('ok', match ($done) {
   $shownPeople = array_values(array_filter($everyone, fn($r) => $when === '' || audit_person_timing($r) === $when));
   $all = $tot($everyone);
   $rows = audit_rows($courses, $files, $faculty, $scope, $deadline);
-  $ins = audit_insights($rows);
   $exportUrl = 'audit.php?' . http_build_query(array_filter(['view' => 'summary', 'school' => count($schoolsShown) > 1 ? $school : '', 'when' => $when, 'export' => 'csv']));
   $personPill = fn(array $r): string => '<span class="status aud-when-' . audit_person_timing($r) . '">' . (audit_person_timing($r) === 'pending' ? 'Not submitted' : (audit_person_timing($r) === 'late' ? 'Late' : 'All on time')) . '</span>';
 ?>
@@ -463,80 +465,7 @@ if ($error === '' && $done !== '') page_notice('ok', match ($done) {
   </form>
   <?php endif; ?>
 
-  <section class="aud-ins" aria-label="Insights">
-    <div class="card aud-ins-card">
-      <h3>Against the deadline</h3>
-      <div class="aud-stack" role="img" aria-label="<?= $all['ontime'] ?> on time, <?= $all['late'] ?> late, <?= $all['pending'] ?> not submitted">
-        <?php foreach (['ontime', 'late', 'pending'] as $k): if ($all[$k]): ?><i class="is-<?= $k ?>" style="flex:<?= $all[$k] ?>" title="<?= $e(AUDIT_TIMING_LABEL[$k] . ': ' . $all[$k]) ?>"></i><?php endif; endforeach; ?>
-      </div>
-      <ul class="aud-legend">
-        <?php foreach (AUDIT_TIMING_LABEL as $k => $l): ?><li><i class="is-<?= $k ?>"></i><?= $e($l) ?> <strong><?= $all[$k] ?></strong> <small><?= $pct($all[$k], $all['courses']) ?></small></li><?php endforeach; ?>
-        <li><i class="is-reviewed"></i>Reviewed <strong><?= $all['reviewed'] ?></strong> <small><?= $pct($all['reviewed'], $all['courses']) ?></small></li>
-      </ul>
-    </div>
-
-    <div class="card aud-ins-card">
-      <h3><?= $school === '' ? 'Submitted, by school' : 'Submitted, by faculty' ?></h3>
-      <?php
-        $bars = $school === ''
-            ? array_map(fn($sid) => ['label' => preg_replace('/^School of /', '', SCHOOLS[$sid]['name'] ?? $sid), 'x' => $tot($sum[$sid])], array_keys($sum))
-            : array_map(fn($r) => ['label' => $r['name'], 'x' => $r], $sum[$school] ?? []);
-        usort($bars, fn($a, $b) => ($b['x']['ontime'] + $b['x']['late']) / max(1, $b['x']['courses']) <=> ($a['x']['ontime'] + $a['x']['late']) / max(1, $a['x']['courses']));
-      ?>
-      <div class="aud-bars">
-        <?php foreach ($bars as $b): $x = $b['x']; ?>
-        <div class="aud-bar-row" title="<?= $e("{$b['label']}: {$x['ontime']} on time, {$x['late']} late, {$x['pending']} not submitted") ?>">
-          <span><?= $e($b['label']) ?></span>
-          <span class="aud-hbar"><i class="is-ontime" style="width:<?= $x['courses'] ? 100 * $x['ontime'] / $x['courses'] : 0 ?>%"></i><i class="is-late" style="width:<?= $x['courses'] ? 100 * $x['late'] / $x['courses'] : 0 ?>%"></i></span>
-          <small><?= $pct($x['ontime'] + $x['late'], $x['courses']) ?></small>
-        </div>
-        <?php endforeach; ?>
-      </div>
-    </div>
-
-    <div class="card aud-ins-card">
-      <h3>Submissions by day</h3>
-      <?php
-        // From the first submission (or two weeks back) to the deadline or
-        // today, whichever is later, at most six weeks.
-        $from = $ins['days'] ? min(array_key_first($ins['days']), date('Y-m-d', strtotime('-13 days'))) : date('Y-m-d', strtotime('-13 days'));
-        $to = max($today, $deadline);
-        if ((strtotime($to) - strtotime($from)) / 86400 > 41) $from = date('Y-m-d', strtotime("$to -41 days"));
-        $peak = max(1, ...array_values($ins['days'] ?: [0]));
-      ?>
-      <div class="aud-cols">
-        <?php for ($d = $from; $d <= $to; $d = date('Y-m-d', strtotime("$d +1 day"))): $n = $ins['days'][$d] ?? 0; ?>
-        <span class="aud-col<?= $d === $deadline ? ' is-deadline' : '' ?><?= $d === $today ? ' is-today' : '' ?><?= $d > $today ? ' is-future' : '' ?>" title="<?= $e($day($d) . ": $n submitted" . ($d === $deadline ? ' (deadline)' : '')) ?>"><i style="height:<?= round(100 * $n / $peak) ?>%"></i></span>
-        <?php endfor; ?>
-      </div>
-      <p class="aud-cols-axis"><span><?= $e(date('j M', strtotime($from))) ?></span><?php if ($deadline !== '' && $deadline < $to): ?><span class="is-deadline">Deadline <?= $e(date('j M', strtotime($deadline))) ?></span><?php endif; ?>
-        <span<?= $to === $deadline ? ' class="is-deadline"' : '' ?>><?= $to === $deadline ? 'Deadline ' : '' ?><?= $e(date('j M', strtotime($to))) ?></span></p>
-    </div>
-
-    <div class="card aud-ins-card">
-      <h3>Items most often missing</h3>
-      <?php if (!$ins['started']): ?>
-        <p class="field-help">Nobody has started a course file here yet.</p>
-      <?php else:
-        $gaps = [];
-        foreach ($ins['items'] as $k => $n) if (AUDIT_ITEMS[$k][1]) $gaps[$k] = $ins['started'] - $n;
-        arsort($gaps);
-        $gaps = array_slice(array_filter($gaps), 0, 6, true);
-      ?>
-        <?php if (!$gaps): ?><p class="field-help">Every started file has every required item.</p><?php endif; ?>
-        <div class="aud-bars">
-          <?php foreach ($gaps as $k => $n): ?>
-          <div class="aud-bar-row" title="<?= $e(AUDIT_ITEMS[$k][0] . ": missing in $n of {$ins['started']} started files") ?>">
-            <span><?= $e($k . '. ' . AUDIT_ITEMS[$k][0]) ?></span>
-            <span class="aud-hbar"><i class="is-pending" style="width:<?= 100 * $n / $ins['started'] ?>%"></i></span>
-            <small><?= $n ?>/<?= $ins['started'] ?></small>
-          </div>
-          <?php endforeach; ?>
-        </div>
-        <p class="field-help">Out of the <?= $ins['started'] ?> course file<?= $ins['started'] === 1 ? '' : 's' ?> with at least one upload.</p>
-      <?php endif; ?>
-    </div>
-  </section>
+  <?= $insightsFor('summary') ?>
 
   <?php if ($school === ''): ?>
   <section class="card">

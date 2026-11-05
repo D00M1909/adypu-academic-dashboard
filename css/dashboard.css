@@ -2475,3 +2475,36 @@ button.cal-day:hover { background: var(--lecture-tint); }
   .page-audit .aud-remark-input { border: 0; padding: 0; min-height: 0; }
   .page-audit .aud-ins { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* Audit Insights (includes/audit-insights.php): the homepage's chart cards. */
+.aud-insights { margin-bottom: 20px; }
+.aud-seg { fill: none; stroke-width: 11; transition: stroke-width 0.15s; outline: none; }
+.aud-seg.is-ontime { stroke: var(--att-good); }
+.aud-seg.is-late { stroke: var(--att-warn); }
+.aud-seg.is-pending { stroke: var(--hairline); }
+.aud-seg:hover, .aud-seg:focus-visible, .aud-seg.is-hot { stroke-width: 15; }
+.aud-donut.is-hot { transform: none; }
+.aud-sw.is-ontime { background: var(--att-good); }
+.aud-sw.is-late { background: var(--att-warn); }
+.aud-sw.is-pending { background: var(--hairline); border: 1px solid var(--ink-faint); }
+.aud-chart-legend { flex-wrap: wrap; gap: 8px 14px; }
+.aud-rank { justify-content: flex-start; gap: 8px; }
+.aud-rank-row { display: grid; grid-template-columns: minmax(0, 200px) minmax(0, 1fr) 76px; gap: 10px; align-items: center;
+  font-size: 13px; padding: 4px 6px; border-radius: 8px; outline: none; }
+.aud-rank-row.chart-click:hover, .aud-rank-row.is-hot, .aud-rank-row:focus-visible { background: var(--surface); }
+.aud-rank-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aud-rank-val { display: flex; justify-content: flex-end; align-items: baseline; gap: 4px; font-variant-numeric: tabular-nums; }
+.aud-rank-val small { font-size: 11.5px; color: var(--ink-faint); }
+.aud-hbar .is-st-none { background: var(--hairline); }
+.aud-hbar .is-st-draft { background: var(--att-warn); }
+.aud-hbar .is-st-submitted { background: var(--lab-ink); }
+.aud-hbar .is-st-approved { background: var(--att-good); }
+.aud-hbar .is-ontime { background: var(--att-good); }
+.aud-compare { max-height: 420px; overflow-y: auto; }
+.aud-day-bar.is-ontime { fill: var(--att-good); fill-opacity: 0.8; }
+.aud-day-bar.is-late { fill: var(--att-warn); fill-opacity: 0.85; }
+.chart-day.is-hot .aud-day-bar { fill-opacity: 1; }
+.aud-deadline-rule { stroke: var(--red-ink); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.aud-deadline-text { fill: var(--red-ink); font-size: 11.5px; }
+@media (max-width: 640px) { .aud-rank-row { grid-template-columns: minmax(0, 1fr) 64px; } .aud-rank-row .aud-hbar { grid-column: 1 / -1; grid-row: 2; } }
+@media print { .aud-compare { max-height: none; overflow: visible; } .page-audit .chart-card { break-inside: avoid; } }

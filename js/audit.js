@@ -58,4 +58,70 @@
     boxes.forEach(function (b) { b.addEventListener('change', sync); });
     sync();
   }
+  // Insights: the homepage's hover tip (.chart-tip), and a click on a mark
+  // with somewhere to go opens it. On a touch screen the first tap shows the
+  // tip and the second one opens.
+  var tipEl = null, current = null;
+  function hot(t) { return t.closest('.chart-day') || t; }
+  function show(t, x, y) {
+    if (!tipEl) {
+      tipEl = document.createElement('div');
+      tipEl.className = 'chart-tip';
+      tipEl.setAttribute('role', 'tooltip');
+      document.body.appendChild(tipEl);
+    }
+    if (current !== t) {
+      if (current) hot(current).classList.remove('is-hot');
+      current = t;
+      tipEl.innerHTML = t.getAttribute('data-tip');
+      tipEl.hidden = false;
+      hot(t).classList.add('is-hot');
+    }
+    var r = tipEl.getBoundingClientRect();
+    tipEl.style.left = Math.min(window.innerWidth - r.width - 8, Math.max(8, x - r.width / 2)) + 'px';
+    var top = y - r.height - 14;
+    tipEl.style.top = (top < 8 ? y + 18 : top) + 'px';
+  }
+  function hide() {
+    if (current) hot(current).classList.remove('is-hot');
+    current = null;
+    if (tipEl) tipEl.hidden = true;
+  }
+  function go(t) { if (t.dataset.href) window.location.href = t.dataset.href; }
+  if (document.querySelector('.aud-insights [data-tip]')) {
+    document.addEventListener('pointermove', function (e) {
+      if (e.pointerType === 'touch') return;
+      var t = e.target.closest && e.target.closest('.aud-insights [data-tip]');
+      if (t) show(t, e.clientX, e.clientY); else if (current) hide();
+    });
+    document.addEventListener('click', function (e) {
+      var t = e.target.closest && e.target.closest('.aud-insights [data-tip]');
+      if (!t) { hide(); return; }
+      if ((e.pointerType === 'touch' || (!e.pointerType && 'ontouchstart' in window)) && current !== t) {
+        var r = t.getBoundingClientRect();
+        show(t, r.left + r.width / 2, r.top);
+        return;
+      }
+      go(t);
+    });
+    document.addEventListener('keydown', function (e) {
+      var t = e.target.closest && e.target.closest('.aud-insights [data-tip]');
+      if (!t) return;
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(t); }
+      if (e.key === 'Escape') hide();
+    });
+    document.addEventListener('focusin', function (e) {
+      var t = e.target.closest && e.target.closest('.aud-insights [data-tip]');
+      if (!t) { hide(); return; }
+      var r = t.getBoundingClientRect();
+      show(t, r.left + r.width / 2, r.top);
+    });
+    window.addEventListener('scroll', hide, { passive: true });
+  }
+
+  // A faculty bar links to #p-<person> on Review: open that person's files.
+  if (location.hash.indexOf('#p-') === 0) {
+    var d = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+    if (d && d.tagName === 'DETAILS') { d.open = true; d.scrollIntoView({ block: 'start' }); }
+  }
 })();
