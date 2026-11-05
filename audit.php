@@ -487,8 +487,9 @@ if ($error === '' && $done !== '') page_notice('ok', match ($done) {
         <?php endforeach; ?>
       </tbody>
     </table></div>
+    <p class="field-help no-print">Pick a school to see each faculty member.</p>
   </section>
-  <?php endif; ?>
+  <?php else: /* Faculty one by one only inside a school (the VC's call). */ ?>
 
   <section class="card">
     <h2><?= $school !== '' ? $e(SCHOOLS[$school]['name']) . ': every faculty member' : 'Every faculty member' ?>
@@ -508,6 +509,7 @@ if ($error === '' && $done !== '') page_notice('ok', match ($done) {
     </table></div>
     <?php endif; ?>
   </section>
+  <?php endif; ?>
 
   <section class="card">
     <h2>Remarks <span class="count-pill"><?= $all['remarks'] ?></span></h2>
