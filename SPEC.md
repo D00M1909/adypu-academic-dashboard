@@ -24,6 +24,7 @@ are separate repos with separate data.
 | `events.php` | everyone, admin edits | Holidays and events as a month, by school and year (`data/calendar.php`). A holiday reads Holiday, not Not filled, in the report; an event is a note on a normal day. `?view=report` counts holidays, days off and events in any dates for the schools, years and types ticked, and prints as a PDF |
 | `audit.php` | everyone (changes signed in) | Academic audit: each faculty member's course file per subject (from the timetable), the 17 items of the Course File Index to upload and submit once; program leads approve and remark, everyone else reads; one deadline; opens on the summary table, insights below it, CSV export and a printable report |
 | `audit-file.php` | everyone | One uploaded audit file |
+| `exams.php` | everyone (changes admin only) | Exam duties: the exam schedule by date, invigilators allocated per exam, attendance against the reporting time, faculty duty counts, a printable report and CSV export; see section 8b |
 | `login.php` | faculty | Sign in, sign up with a school join code |
 | `mark.php` | faculty | Mark attendance from a phone: tick absentees, or type a count |
 | `account.php` | faculty | Name and password |
@@ -32,7 +33,7 @@ are separate repos with separate data.
 | `activity.php` | admin | Per-account log, a leaderboard of who files, the accounts list |
 | `source.php` | local only | A timetable cell in its source document (off on the live site) |
 
-Header: Attendance, Timetable and Events and Audit tabs, Mark attendance (signed in), a theme
+Header: Attendance, Timetable and Events, Audit and Exams tabs, Mark attendance (signed in), a theme
 switch, the account menu. No emoji anywhere: icons are the inline SVG sprite.
 
 ## 3. Brand
@@ -185,6 +186,30 @@ transcriptions carry faculty names, so they stay out of the repo
 
 Design's timetables are dated calendars rather than weekly grids, so the week
 shown follows the date.
+
+## 8b. Exams
+
+`exams.php` over `includes/exams.php`, stored in one guarded file, `data/exams.php`:
+`exams` (school, class, subject, date, start, end, reporting time, room, invigilators
+needed), `duties` (exam, faculty member from the timetable, role, status, arrival time,
+remark) and `mail` (late notices).
+
+- Anyone reads; an admin changes (`exam_can_edit()`). `exam_can_mark()` is the hook for a
+  future exam cell coordinator who marks attendance without editing the schedule.
+- The schedule is added by hand, uploaded as .csv or .xlsx, or downloaded in that same format
+  (Date, Start, End, Reporting, School, Class, Subject, Room, Invigilators needed,
+  Invigilators). Reporting defaults to 30 minutes before the start.
+- Allocation is manual or automatic: the exam's own school first, only faculty not teaching
+  or on another duty at that time, fewest duties first.
+- Attendance: a status and an arrival time per duty. An arrival after the reporting time is
+  Late. A duty that becomes Late and has an email on file (the duty's, else the faculty
+  member's account) queues one late notice.
+- Mail: this host cannot send mail. The notice rides in the reply to the Apps Script's next
+  push (`mail` in `api/ingest.php`'s response); the script sends it with MailApp from the
+  production target only and reports the ids back in the `X-Mail-Sent` header of the push
+  after, which marks them sent.
+- A sample week built from the timetable can be loaded onto an empty schedule and removed
+  again.
 
 ## 9. Tech and deploy
 

@@ -195,6 +195,13 @@ try {
       <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
       <path d="m9 14 2 2 4-4" />
     </symbol>
+    <symbol id="icon-exam" viewBox="0 0 24 24">
+      <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+      <path d="M8 8h4" />
+      <path d="M8 12h3" />
+      <path d="M8 16h5" />
+      <path d="M18.4 2.6a2.1 2.1 0 0 1 3 3L16 11l-4 1 1-4Z" />
+    </symbol>
     <symbol id="icon-mark" viewBox="0 0 24 24">
       <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
       <path d="m9 11 3 3L22 4" />

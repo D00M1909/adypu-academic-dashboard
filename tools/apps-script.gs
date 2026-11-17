@@ -27,6 +27,9 @@
  *      that eventually gets through. Five minutes rather than fifteen because
  *      only about a third of runs get past the host's bot check, so the gap
  *      between successes is several times the trigger interval.
+ *      The exam late-notice emails go out through MailApp: the first time they
+ *      are due Google asks for permission to send mail, so approve that prompt
+ *      once after pasting (run pushNow() again if it was not shown).
  *   6. Run pushStatus() any time to see when the last push actually landed.
  *   7. Deploy -> New deployment -> Web app, Execute as: Me, Who has access:
  *      Anyone. Its /exec url is what the hub's project card reads its usage
@@ -121,6 +124,7 @@ function pushNow() {
     const outcome = attemptPush(payload, TARGETS[0]);
     if (outcome.ok) {
       recordSuccess(outcome.result);
+      sendExamMail(outcome.result.mail);
       return;
     }
     lastProblem = outcome.problem;
@@ -136,7 +140,7 @@ function attemptPush(payload, target) {
     method: 'post',
     contentType: 'text/csv',
     payload: payload,
-    headers: { 'X-Ingest-Secret': target.secret },
+    headers: { 'X-Ingest-Secret': target.secret, 'X-Mail-Sent': sentMailIds().join(',') },
     muteHttpExceptions: true,
     followRedirects: true,
   });
@@ -167,6 +171,34 @@ function attemptPush(payload, target) {
     return { ok: false, problem: 'ingest refused the push: ' + body.slice(0, 200) };
   }
   return { ok: true, result: result };
+}
+
+// Ids of exam emails already sent, newest last (script property examMailSent).
+function sentMailIds() {
+  try {
+    return JSON.parse(PropertiesService.getScriptProperties().getProperty('examMailSent') || '[]');
+  } catch (e) {
+    return [];
+  }
+}
+
+// Sends the late-notice emails the dashboard queued (production only). The
+// ids are reported back in the next push's X-Mail-Sent header, which is what
+// stops the site handing the same mail out again.
+function sendExamMail(mail) {
+  if (!mail || !mail.length) return;
+  const sent = sentMailIds();
+  mail.forEach(function (m) {
+    if (sent.indexOf(m.id) !== -1) return;
+    try {
+      MailApp.sendEmail({ to: m.to, subject: m.subject, body: m.body, name: 'ADYPU Exam Cell' });
+      sent.push(m.id);
+      Logger.log('exam mail sent to ' + m.to);
+    } catch (e) {
+      Logger.log('exam mail to ' + m.to + ' failed: ' + e.message);
+    }
+  });
+  PropertiesService.getScriptProperties().setProperty('examMailSent', JSON.stringify(sent.slice(-300)));
 }
 
 function recordSuccess(result) {

@@ -97,6 +97,16 @@ try {
 } catch (Throwable $e) {
     $usage = null;
 }
+// Exam late-notice mail: the Apps Script says which it has sent (X-Mail-Sent)
+// and is handed what is still waiting. Must never break the push.
+$pending = [];
+try {
+    require_once __DIR__ . '/../includes/exams.php';
+    $sentIds = array_values(array_filter(array_map(fn($v) => preg_replace('/[^a-f0-9]/', '', strtolower($v)), explode(',', (string) ($_SERVER['HTTP_X_MAIL_SENT'] ?? '')))));
+    $pending = exam_mail_handoff($sentIds);
+} catch (Throwable $e) {
+    $pending = [];
+}
 echo json_encode([
     'ok'       => true,
     'rows'     => count($rows),
@@ -110,4 +120,5 @@ echo json_encode([
     // the Apps Script log names them instead of them just not being counted.
     'skipped'  => array_values(array_unique($skipped)),
     'usage'    => $usage,
+    'mail'     => $pending,
 ]);

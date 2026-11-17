@@ -2508,3 +2508,36 @@ button.cal-day:hover { background: var(--lecture-tint); }
 .aud-deadline-text { fill: var(--red-ink); font-size: 11.5px; }
 @media (max-width: 640px) { .aud-rank-row { grid-template-columns: minmax(0, 1fr) 64px; } .aud-rank-row .aud-hbar { grid-column: 1 / -1; grid-row: 2; } }
 @media print { .aud-compare { max-height: none; overflow: visible; } .page-audit .chart-card { break-inside: avoid; } }
+
+/* ---------- Exams tab (exams.php); the rest comes from the audit classes ---------- */
+.aud-due.exm-due { grid-template-columns: repeat(5, 1fr); }
+.exm-due .is-pending strong { color: var(--red-ink); }
+.exm-st-ontime { background: var(--good-tint); color: var(--good-ink); }
+.exm-st-late, .exm-short { background: rgba(180, 83, 9, 0.12); color: var(--att-warn); }
+.exm-st-absent { background: var(--red-tint-strong); color: var(--red-ink); }
+.exm-st-allocated { background: var(--surface); color: var(--ink-muted); }
+.exm-date-head { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--hairline); }
+.exm-day .aud-list-end { gap: 8px; }
+.page-main .exm-filters .exm-date input { width: auto; min-width: 150px; }
+.exm-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.exm-admin > summary { cursor: pointer; }
+.exm-admin form { margin-top: 12px; }
+.exm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px 12px; margin-bottom: 12px; }
+.exm-grid label { margin: 0; font-size: 13px; font-weight: 600; }
+.exm-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.exm-table td input, .exm-table td select { min-height: 38px; }
+.exm-table td input[type="text"] { min-width: 160px; }
+.exm-mail { font-size: 12px; color: var(--ink-muted); }
+.exm-exams a { display: inline-block; margin: 0 10px 2px 0; }
+.exm-save { width: auto; }
+.exm-add { margin-top: 16px; }
+@media (max-width: 760px) {
+  .aud-due.exm-due { grid-template-columns: repeat(2, 1fr); }
+  .aud-due.exm-due .aud-due-cell:first-child { grid-column: 1 / -1; }
+  .page-main .exm-filters .exm-date input { width: 100%; }
+  .exm-filters .exm-date { flex: 1; }
+}
+@media print {
+  .page-exams .exm-day, .page-exams .card { break-inside: avoid; }
+  .page-exams .exm-table td input, .page-exams .exm-table td select { border: 0; padding: 0; min-height: 0; background: none; }
+}
