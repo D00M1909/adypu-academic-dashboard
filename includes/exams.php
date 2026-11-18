@@ -423,8 +423,9 @@ function exam_read_rows(string $path, string $name): array {
 // The upload: every row of the schedule in EXAM_COLUMNS' format, the header
 // found wherever it sits. A row already on the schedule (same date, start,
 // class and subject) is updated in place, its duties kept; named invigilators
-// are added. Returns [added, updated, problems].
-function exam_import(array $rows, array $faculty, string $by): array {
+// are added. $sample marks every row as test data: it never mails, and
+// Remove sample data clears it. Returns [added, updated, problems].
+function exam_import(array $rows, array $faculty, string $by, bool $sample = false): array {
     $head = null;
     $col = [];
     foreach ($rows as $i => $r) {
@@ -452,7 +453,7 @@ function exam_import(array $rows, array $faculty, string $by): array {
         if (!array_filter($r, fn($v) => trim($v) !== '')) continue;
         $in = [];
         foreach ($col as $k => $c) $in[$k] = (string) ($r[$c] ?? '');
-        [$x, $why] = exam_make($in);
+        [$x, $why] = exam_make($in + ['sample' => $sample]);
         if (!$x) { $problems[] = 'Row ' . ($i + 1) . ": needs $why."; continue; }
         $names = [];
         foreach (preg_split('/\s*[;,\n]\s*/', $in['names'] ?? '') as $n) {
@@ -463,7 +464,7 @@ function exam_import(array $rows, array $faculty, string $by): array {
         }
         $made[] = [$x, $names];
     }
-    exam_save(function (array $d) use ($made, $by, &$added, &$updated) {
+    exam_save(function (array $d) use ($made, $by, $sample, &$added, &$updated) {
         foreach ($made as [$x, $names]) {
             if (isset($d['exams'][$x['id']])) {
                 $d['exams'][$x['id']] = $x + $d['exams'][$x['id']];
@@ -476,7 +477,7 @@ function exam_import(array $rows, array $faculty, string $by): array {
             foreach ($d['duties'] as $duty) if ($duty['exam'] === $x['id']) $have[] = strtolower($duty['name']);
             foreach ($names as [$p, $n]) {
                 if (in_array(strtolower($n), $have, true)) continue;
-                $d['duties'][exam_new_id()] = exam_duty($x['id'], $p, $n, EXAM_ROLES[0], '', $by);
+                $d['duties'][exam_new_id()] = exam_duty($x['id'], $p, $n, EXAM_ROLES[0], '', $by) + ($sample ? ['sample' => true] : []);
                 $have[] = strtolower($n);
             }
         }

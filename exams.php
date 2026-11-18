@@ -90,7 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $error = 'The schedule must be a .csv or .xlsx file.';
                 } else {
                     try {
-                        [$added, $updated, $problems] = exam_import(exam_read_rows($f['tmp_name'], (string) $f['name']), $faculty, $by);
+                        [$added, $updated, $problems] = exam_import(exam_read_rows($f['tmp_name'], (string) $f['name']), $faculty, $by, !empty($_POST['sample']));
                         $info = ['added' => $added, 'updated' => $updated, 'problems' => $problems];
                         $data = exam_data();
                     } catch (Throwable $x) {
@@ -586,6 +586,7 @@ $filterForm = function (string $viewKey, array $with) use ($e, $school, $from, $
       <p class="field-help">A .csv or .xlsx with a header row: <?= $e(implode(', ', EXAM_COLUMNS)) ?>. Only Date and Subject are needed to find the header; the rest are read by name, in any order. A row already on the schedule is updated and keeps its duties. </p>
       <p class="field-help"><a href="exams.php?<?= $e($keep(['export' => 'template'])) ?>">Download template</a>: the schedule below in this format, to fill in or edit and upload again.</p>
       <input type="file" name="file" accept=".csv,.xlsx" required>
+      <label class="aud-tick exm-sample-tick"><input type="checkbox" name="sample" value="1"> Test data: never sends a late email, and Remove sample data clears it</label>
       <button class="btn-quiet" type="submit">Upload</button>
     </form>
   </details>

@@ -106,6 +106,16 @@ assert($export[0] === EXAM_COLUMNS && count($export) === 3);
 $back = exam_import($export, $faculty, 'admin@x.in');
 assert($back[0] === 0 && $back[1] === 2, 'a downloaded schedule uploads back as updates');
 
+// --- An upload marked as test data ---------------------------------------------------------
+$test = [EXAM_COLUMNS, ['2026-10-29', '15:00', '16:00', '', 'School of Engineering', 'B.Tech First Year', 'Unit Test', '', '1', 'Asha Rao']];
+[$added] = exam_import($test, $faculty, 'admin@x.in', true);
+$ut = array_values(array_filter(exam_data()['exams'], fn($x) => $x['subject'] === 'Unit Test'))[0];
+$utDuty = (string) array_key_first(exam_duties_of(exam_data(), $ut['id']));
+assert($added === 1 && $ut['sample'] && !empty(exam_data()['duties'][$utDuty]['sample']), 'a test-data upload flags its exams and duties');
+assert(exam_set_status($ut['id'], $utDuty, 'late', ['pa' => 'a@x.in'], 'admin@x.in') === 0, 'test data never mails');
+exam_clear_sample();
+assert(!isset(exam_data()['exams'][$ut['id']]) && !isset(exam_data()['duties'][$utDuty]), 'and Remove sample data clears it');
+
 // --- One-click status and editing an exam -------------------------------------------------------
 $pd = (string) array_key_first(array_filter(exam_duties_of(exam_data(), $new['id']), fn($d) => $d['person'] === 'pa'));
 assert(exam_set_status($new['id'], $pd, 'late', ['pa' => 'a@x.in'], 'admin@x.in') === 1, 'a click on Late queues the email');
