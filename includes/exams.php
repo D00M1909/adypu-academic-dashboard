@@ -18,7 +18,7 @@ require_once __DIR__ . '/timetable.php';
 require_once __DIR__ . '/xlsx-read.php';
 
 // On time and Late are never chosen, only worked out (exam_set_status()).
-const EXAM_STATUS_LABEL = ['allocated' => 'Not marked', 'ontime' => 'On time', 'late' => 'Late', 'absent' => 'Absent', 'na' => 'Not needed'];
+const EXAM_STATUS_LABEL = ['allocated' => 'Not marked', 'ontime' => 'On time', 'late' => 'Late', 'absent' => 'Absent', 'na' => 'Not applicable'];
 const EXAM_ROLES = ['Invigilator', 'Senior supervisor', 'Squad'];
 // Reporting time when a row or the form gives none: half an hour before.
 const EXAM_REPORT_BEFORE = 30;
@@ -276,14 +276,14 @@ function exam_auto_allocate(array $t, array $faculty, array $ids, string $by): i
     return $added;
 }
 
-// The marking buttons: Present, Absent, Not needed. There is no On time or
+// The marking buttons: Present, Absent, Not applicable. There is no On time or
 // Late button and no arrival time to type, so neither can be chosen: Present
 // stamps this server's clock at the click, and a click after the reporting
 // time is Late (with its email), before it On time. Present on a duty that is
 // already present keeps its first stamp, so it cannot be re-clicked earlier
-// or later. Not needed is a reserve invigilator who was not called on.
+// or later. Not applicable is a reserve invigilator who was not called on.
 // Returns 1 when a late email was queued. $now ('Y-m-d H:i') is for tests.
-const EXAM_MARKS = ['present' => 'Present', 'absent' => 'Absent', 'na' => 'Not needed'];
+const EXAM_MARKS = ['present' => 'Present', 'absent' => 'Absent', 'na' => 'Not applicable'];
 
 function exam_set_status(string $examId, string $dutyId, string $mark, array $emails, string $by, ?string $now = null): int {
     if (!isset(EXAM_MARKS[$mark])) return 0;

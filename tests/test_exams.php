@@ -85,7 +85,7 @@ assert($pbDuty['status'] === 'ontime' && exam_arrived($pbDuty, exam_data()['exam
 assert(exam_arrived(['status' => 'ontime', 'arrived' => '', 'marked_at' => '2026-11-18 11:05'], ['date' => '2026-11-24']) === exam_clock('11:05') . ', 18 Nov');
 assert(exam_arrived(['status' => 'absent', 'arrived' => '', 'marked_at' => '2026-11-18 11:05'], ['date' => '2026-11-24']) === '');
 
-// Not needed: a reserve who was not called on, out of the attendance counts.
+// Not applicable: a reserve who was not called on, out of the attendance counts.
 exam_set_status($id, $duty['pb'], 'na', [], 'admin@x.in');
 assert(exam_data()['duties'][$duty['pb']]['status'] === 'na' && exam_data()['duties'][$duty['pb']]['arrived'] === '');
 

@@ -211,7 +211,7 @@ remark) and `mail` (late notices).
   upload skips them. By exam and Duty chart show upcoming exams unless Past or All is picked.
 - Allocation is manual or automatic: the exam's own school first, only faculty not teaching
   or on another duty at that time, fewest duties first.
-- Attendance: three buttons per duty, Present, Absent and Not needed (a reserve invigilator
+- Attendance: three buttons per duty, Present, Absent and Not applicable (a reserve invigilator
   who was not called on, left out of the percentages). On time and Late are never chosen and
   no time is typed: Present stamps the server's clock at the click, and a click after the
   reporting time is Late. Present again keeps the first stamp. A duty that becomes Late and

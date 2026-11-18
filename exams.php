@@ -336,7 +336,7 @@ $tileCounts = $exam ? exam_counts(array_map(fn($did) => ['duty' => $data['duties
 <?php $needed = $tileCounts['duties'] - $tileCounts['na']; // a reserve not called on is nobody's attendance ?>
 <div class="aud-due exm-due<?= in_array($view, ['chart', 'letter'], true) && !$exam ? ' no-print' : '' ?>">
   <span class="aud-due-cell"><small>Exams</small><strong><?= $exam ? 1 : count(exam_list($data, $school, $from, $to)) ?></strong><em><?= $exam ? $e($exam['subject']) : 'on the schedule' ?></em></span>
-  <span class="aud-due-cell"><small>Duties allocated</small><strong><?= $tileCounts['duties'] ?></strong><em><?= $tileCounts['allocated'] ?> not marked<?= $tileCounts['na'] ? ', ' . $tileCounts['na'] . ' not needed' : '' ?></em></span>
+  <span class="aud-due-cell"><small>Duties allocated</small><strong><?= $tileCounts['duties'] ?></strong><em><?= $tileCounts['allocated'] ?> not marked<?= $tileCounts['na'] ? ', ' . $tileCounts['na'] . ' not applicable' : '' ?></em></span>
   <span class="aud-due-cell is-ontime"><small>On time</small><strong><?= $tileCounts['ontime'] ?></strong><em><?= $needed ? round(100 * $tileCounts['ontime'] / $needed) . '%' : '-' ?></em></span>
   <span class="aud-due-cell is-late"><small>Late</small><strong><?= $tileCounts['late'] ?></strong><em><?= $needed ? round(100 * $tileCounts['late'] / $needed) . '%' : '-' ?></em></span>
   <span class="aud-due-cell is-pending"><small>Absent</small><strong><?= $tileCounts['absent'] ?></strong><em><?= $needed ? round(100 * $tileCounts['absent'] / $needed) . '%' : '-' ?></em></span>
@@ -480,7 +480,7 @@ $filterForm = function (string $viewKey, array $with) use ($e, $school, $from, $
     </table></div>
     <?php endif; ?>
     <?php if ($canMark && $duties): ?>
-    <p class="field-help no-print">Reporting time is <?= $e(exam_clock($exam['report'])) ?>. Present records the time it is clicked: after the reporting time it counts as late, and a late duty with an email on file is sent a notice. The time cannot be typed or changed. Not needed is for a reserve invigilator who was not called on.</p>
+    <p class="field-help no-print">Reporting time is <?= $e(exam_clock($exam['report'])) ?>. Present records the time it is clicked: after the reporting time it counts as late, and a late duty with an email on file is sent a notice. The time cannot be typed or changed. Not applicable is for a reserve invigilator who was not called on.</p>
     <button class="btn-quiet no-print exm-save" type="submit">Save remarks</button>
     <?php endif; ?>
   </section>
@@ -551,7 +551,7 @@ $filterForm = function (string $viewKey, array $with) use ($e, $school, $from, $
     </table></div>
   </section>
 
-  <?php foreach ([['absent', 'Missed'], ['late', 'Late'], ['ontime', 'Attended on time'], ['na', 'Not needed (reserve)'], ['allocated', 'Not marked yet']] as [$k, $label]): $set = $by($k);
+  <?php foreach ([['absent', 'Missed'], ['late', 'Late'], ['ontime', 'Attended on time'], ['na', 'Not applicable (reserve)'], ['allocated', 'Not marked yet']] as [$k, $label]): $set = $by($k);
     if (($st !== '' && $st !== $k) || (in_array($k, ['allocated', 'na'], true) && !$set)) continue; ?>
   <section class="card exm-sec-<?= $k ?>">
     <h2><?= $e($label) ?> <span class="count-pill"><?= count($set) ?></span></h2>
