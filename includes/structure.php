@@ -176,10 +176,10 @@ function placeholder_schools(): array {
             if ($y < $length) $out['law'][$ordinals[$y] . ' Year'][$program] = $divisions;
         }
     }
-    // Liberal Arts' programmes (27 Oct 2026): its BA keeps the A and B every
-    // year had before, so readings filed under those labels land on it
-    // (LEGACY_BRANCH); the three MAs are new this year, one class each.
-    $lib = ['BA' => [4, ['A' => 30, 'B' => 60]],
+    // Liberal Arts' programmes (27 Oct 2026): readings filed under the old
+    // branchless labels land on the BA (LEGACY_BRANCH); the three MAs are new
+    // this year. Every class is Division A only (school's call, 18 Nov 2026).
+    $lib = ['BA' => [4, ['A' => 30]],
         'MA Psychology (Industrial-Organizational)' => [1, ['A' => 30]],
         'MA Psychology (Counselling)' => [1, ['A' => 30]],
         'MA Politics & International Relations' => [1, ['A' => 30]]];
