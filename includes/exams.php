@@ -261,16 +261,59 @@ function exam_mark(string $examId, array $status, array $arrived, array $remark,
             $duty['remark'] = mb_substr(trim((string) ($remark[$id] ?? '')), 0, 500);
             $duty['marked_by'] = $by;
             $duty['marked_at'] = date('Y-m-d H:i');
-            $to = $duty['email'] !== '' ? $duty['email'] : (string) ($emails[$duty['person']] ?? '');
-            if ($s === 'late' && $was !== 'late' && $to !== '' && empty($duty['sample'])) {
-                $d['mail'][$id] = exam_late_mail($to, $duty, $x);
-                $queued++;
-            }
+            $queued += exam_queue_late($d, (string) $id, $was, $x, $emails);
         }
         unset($duty);
         return $d;
     });
     return $queued;
+}
+
+// One duty's status from a one-click button. "On time" drops an arrival that
+// says otherwise, "Absent" drops any arrival. Returns 1 when a late email was
+// queued.
+function exam_set_status(string $examId, string $dutyId, string $status, array $emails, string $by): int {
+    if (!isset(EXAM_STATUS_LABEL[$status])) return 0;
+    $queued = 0;
+    exam_save(function (array $d) use ($examId, $dutyId, $status, $emails, $by, &$queued) {
+        $x = $d['exams'][$examId] ?? null;
+        if (!$x || ($d['duties'][$dutyId]['exam'] ?? '') !== $examId) return $d;
+        $duty = &$d['duties'][$dutyId];
+        $was = $duty['status'];
+        if ($status === 'absent' || $status === 'allocated') $duty['arrived'] = '';
+        if ($status === 'ontime' && $duty['arrived'] !== '' && exam_min($duty['arrived']) > exam_min($x['report'])) $duty['arrived'] = '';
+        if ($status === 'late' && $duty['arrived'] !== '' && exam_min($duty['arrived']) <= exam_min($x['report'])) $duty['arrived'] = '';
+        $duty['status'] = $status;
+        $duty['marked_by'] = $by;
+        $duty['marked_at'] = date('Y-m-d H:i');
+        unset($duty);
+        $queued = exam_queue_late($d, $dutyId, $was, $x, $emails);
+        return $d;
+    });
+    return $queued;
+}
+
+// Queues a duty's late email when it has just turned late and an address is
+// known. Sample duties never mail. Returns how many were queued (0 or 1).
+function exam_queue_late(array &$d, string $id, string $was, array $x, array $emails): int {
+    $duty = $d['duties'][$id];
+    $to = $duty['email'] !== '' ? $duty['email'] : (string) ($emails[$duty['person']] ?? '');
+    if ($duty['status'] !== 'late' || $was === 'late' || $to === '' || !empty($duty['sample'])) return 0;
+    $d['mail'][$id] = exam_late_mail($to, $duty, $x);
+    return 1;
+}
+
+// Changes an exam's details in place. Its id stays, so its duties stay with it.
+function exam_update(string $id, array $in): string {
+    [$x, $why] = exam_make($in);
+    if (!$x) return "Please give $why.";
+    $gone = false;
+    exam_save(function (array $d) use ($id, $x, &$gone) {
+        if (!isset($d['exams'][$id])) { $gone = true; return $d; }
+        $d['exams'][$id] = ['id' => $id, 'sample' => !empty($d['exams'][$id]['sample'])] + $x + $d['exams'][$id];
+        return $d;
+    });
+    return $gone ? 'That exam is gone.' : '';
 }
 
 function exam_late_mail(string $to, array $duty, array $x): array {

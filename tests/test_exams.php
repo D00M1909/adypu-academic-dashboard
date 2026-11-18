@@ -106,4 +106,15 @@ assert($export[0] === EXAM_COLUMNS && count($export) === 3);
 $back = exam_import($export, $faculty, 'admin@x.in');
 assert($back[0] === 0 && $back[1] === 2, 'a downloaded schedule uploads back as updates');
 
+// --- One-click status and editing an exam -------------------------------------------------------
+$pd = (string) array_key_first(array_filter(exam_duties_of(exam_data(), $new['id']), fn($d) => $d['person'] === 'pa'));
+assert(exam_set_status($new['id'], $pd, 'late', ['pa' => 'a@x.in'], 'admin@x.in') === 1, 'a click on Late queues the email');
+assert(exam_set_status($new['id'], $pd, 'late', ['pa' => 'a@x.in'], 'admin@x.in') === 0, 'and only once');
+exam_set_status($new['id'], $pd, 'absent', [], 'admin@x.in');
+assert(exam_data()['duties'][$pd]['status'] === 'absent' && exam_data()['duties'][$pd]['arrived'] === '');
+assert(exam_set_status($id, $pd, 'ontime', [], 'admin@x.in') === 0 && exam_data()['duties'][$pd]['status'] === 'absent', 'a duty of another exam is left alone');
+assert(exam_update($new['id'], ['date' => '2026-11-26', 'start' => '10:00', 'end' => '13:00', 'school' => 'eng', 'class' => 'B.Tech CSE Sem V', 'subject' => 'Physics', 'room' => '202', 'need' => 3]) === '');
+$moved = exam_data()['exams'][$new['id']];
+assert($moved['date'] === '2026-11-26' && $moved['room'] === '202' && $moved['report'] === '09:30' && count(exam_duties_of(exam_data(), $new['id'])) === 2, 'an edit keeps the id and the duties');
+
 echo "OK\n";
