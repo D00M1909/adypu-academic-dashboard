@@ -298,8 +298,9 @@ function exam_set_status(string $examId, string $dutyId, string $mark, array $em
             $duty['status'] = $mark;
             $duty['arrived'] = '';
         } elseif (!in_array($was, ['ontime', 'late'], true)) {
-            // Only the exam's own day has a time worth keeping.
-            $duty['arrived'] = substr($now, 0, 10) === $x['date'] ? substr($now, 11, 5) : '';
+            // The click's time, always; and its day, for a click not on the exam's own day.
+            $duty['arrived'] = substr($now, 11, 5);
+            $duty['present_at'] = $now;
             $duty['status'] = $now > "{$x['date']} {$x['report']}" ? 'late' : 'ontime';
         }
         $duty['marked_by'] = $by;
@@ -349,9 +350,24 @@ function exam_update(string $id, array $in): string {
     return $gone ? 'That exam is gone.' : '';
 }
 
+// When Present was clicked, as shown: "3.26 pm", or "3.26 pm, 18 Nov" when
+// the click was not on the exam's own day. '' before anyone is present.
+// A Present clicked before the exam's day, under the first version of the
+// buttons, kept no time; its marked_at is that click, so it stands in.
+function exam_arrived(array $duty, array $x): string {
+    $at = (string) ($duty['present_at'] ?? '');
+    if (($duty['arrived'] ?? '') === '' && in_array($duty['status'] ?? '', ['ontime', 'late'], true) && preg_match('/^\d{4}-\d\d-\d\d \d\d:\d\d$/', (string) ($duty['marked_at'] ?? ''))) {
+        $at = $duty['marked_at'];
+        $duty['arrived'] = substr($at, 11, 5);
+    }
+    if (($duty['arrived'] ?? '') === '') return '';
+    $on = substr($at, 0, 10);
+    return exam_clock($duty['arrived']) . ($on !== '' && $on !== $x['date'] ? ', ' . date('j M', strtotime($on)) : '');
+}
+
 function exam_late_mail(string $to, array $duty, array $x): array {
     $day = date('l j F Y', strtotime($x['date']));
-    $arrived = $duty['arrived'] !== '' ? ' You reported at ' . exam_clock($duty['arrived']) . '.' : '';
+    $arrived = $duty['arrived'] !== '' ? ' You were marked present at ' . exam_arrived($duty, $x) . '.' : '';
     $body = "Dear {$duty['name']},\n\n"
         . "You were on {$duty['role']} duty for {$x['subject']} ({$x['class']}" . ($x['room'] !== '' ? ", {$x['room']}" : '') . ") on $day. "
         . 'The reporting time was ' . exam_clock($x['report']) . '.' . $arrived . "\n\n"

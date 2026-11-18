@@ -64,6 +64,8 @@ assert(count($d['mail']) === 1 && $d['mail'][$duty['pa']]['to'] === 'asha@adypu.
 assert(exam_set_status($id, $duty['pa'], 'ontime', $emails, 'admin@x.in') === 0 && exam_data()['duties'][$duty['pa']]['status'] === 'late', 'On time cannot be chosen');
 assert(exam_set_status($id, $duty['pa'], 'late', $emails, 'admin@x.in') === 0, 'nor Late');
 
+assert(exam_arrived(exam_data()['duties'][$duty['pa']], exam_data()['exams'][$id]) === exam_clock('09:50'), 'a click on the day shows its time alone');
+
 // Present again keeps the first stamp, so the time cannot be redone.
 exam_set_status($id, $duty['pa'], 'present', $emails, 'admin@x.in', '2026-11-24 09:00');
 assert(exam_data()['duties'][$duty['pa']]['arrived'] === '09:50' && count(exam_data()['mail']) === 1, 'and does not mail twice');
@@ -73,6 +75,15 @@ exam_set_status($id, $duty['pb'], 'absent', [], 'admin@x.in');
 assert(exam_data()['duties'][$duty['pb']]['status'] === 'absent' && exam_data()['duties'][$duty['pb']]['arrived'] === '');
 exam_set_status($id, $duty['pb'], 'present', [], 'admin@x.in', '2026-11-24 09:45');
 assert(exam_data()['duties'][$duty['pb']]['status'] === 'late' && count(exam_data()['mail']) === 1, 'no address, no mail');
+
+// A Present clicked on another day keeps its time, and says which day.
+exam_set_status($id, $duty['pb'], 'absent', [], 'admin@x.in');
+exam_set_status($id, $duty['pb'], 'present', [], 'admin@x.in', '2026-11-18 15:26');
+$pbDuty = exam_data()['duties'][$duty['pb']];
+assert($pbDuty['status'] === 'ontime' && exam_arrived($pbDuty, exam_data()['exams'][$id]) === exam_clock('15:26') . ', 18 Nov', 'before the exam day: ' . exam_arrived($pbDuty, exam_data()['exams'][$id]));
+// A mark from before the time was always kept still shows when it was clicked.
+assert(exam_arrived(['status' => 'ontime', 'arrived' => '', 'marked_at' => '2026-11-18 11:05'], ['date' => '2026-11-24']) === exam_clock('11:05') . ', 18 Nov');
+assert(exam_arrived(['status' => 'absent', 'arrived' => '', 'marked_at' => '2026-11-18 11:05'], ['date' => '2026-11-24']) === '');
 
 // Not needed: a reserve who was not called on, out of the attendance counts.
 exam_set_status($id, $duty['pb'], 'na', [], 'admin@x.in');

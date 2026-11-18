@@ -446,7 +446,7 @@ $filterForm = function (string $viewKey, array $with) use ($e, $school, $from, $
     <h2>Invigilators <span class="count-pill"><?= count($duties) ?><?= $st !== '' ? ' ' . $e(strtolower(EXAM_STATUS_LABEL[$st])) : '' ?></span></h2>
     <?php if (!$duties): ?><p class="field-help"><?= $allDuties ? 'Nobody here has this status.' : 'Nobody is allocated yet.' . ($canEdit ? ' Add someone below or use Auto-fill.' : '') ?></p><?php else: ?>
     <div class="stat-table-wrap"><table class="stat-table aud-table exm-table">
-      <thead><tr><th>Name</th><?php if ($canMark): ?><th class="aud-left no-print">Update</th><?php endif; ?><th class="aud-left">Role</th><th class="aud-left">Status</th><th class="aud-left">Arrived</th><th class="aud-left">Remark</th><th class="aud-left">Email</th><?php if ($canMark): ?><th class="no-print"></th><?php endif; ?></tr></thead>
+      <thead><tr><th>Name</th><?php if ($canMark): ?><th class="aud-left no-print">Update</th><?php endif; ?><th class="aud-left">Role</th><th class="aud-left">Status</th><th class="aud-left">Present at</th><th class="aud-left">Remark</th><th class="aud-left">Email</th><?php if ($canMark): ?><th class="no-print"></th><?php endif; ?></tr></thead>
       <tbody>
         <?php foreach ($duties as $did => $d):
           $mail = $data['mail'][$did] ?? null;
@@ -462,7 +462,7 @@ $filterForm = function (string $viewKey, array $with) use ($e, $school, $from, $
           <?php endif; ?>
           <td class="aud-left"><?= $e($d['role']) ?></td>
           <td class="aud-left"><?= $pill($d['status']) ?></td>
-          <td class="aud-left"><?= $d['arrived'] !== '' ? $e(exam_clock($d['arrived'])) : '-' ?></td>
+          <td class="aud-left"><?= $e(exam_arrived($d, $exam) ?: '-') ?></td>
           <?php if ($canMark): ?>
           <td class="aud-left"><input type="text" name="remark[<?= $e($did) ?>]" value="<?= $e($d['remark']) ?>" maxlength="500" placeholder="Remark" aria-label="Remark for <?= $e($d['name']) ?>"></td>
           <?php else: ?>
@@ -557,13 +557,13 @@ $filterForm = function (string $viewKey, array $with) use ($e, $school, $from, $
     <h2><?= $e($label) ?> <span class="count-pill"><?= count($set) ?></span></h2>
     <?php if (!$set): ?><p class="field-help">None.</p><?php else: ?>
     <div class="stat-table-wrap"><table class="stat-table aud-table exm-table">
-      <thead><tr><th>Date and time</th><th class="aud-left">Exam</th><th class="aud-left">Faculty</th><?php if ($k === 'late' || $k === 'ontime'): ?><th class="aud-left">Reporting</th><th class="aud-left">Arrived</th><?php endif; ?><th class="aud-left">Remark</th></tr></thead>
+      <thead><tr><th>Date and time</th><th class="aud-left">Exam</th><th class="aud-left">Faculty</th><?php if ($k === 'late' || $k === 'ontime'): ?><th class="aud-left">Reporting</th><th class="aud-left">Present at</th><?php endif; ?><th class="aud-left">Remark</th></tr></thead>
       <tbody>
         <?php foreach ($set as $r): ?>
         <tr class="exm-row-<?= $e($k) ?>"><td class="aud-left"><?= $e($when($r)) ?></td>
           <td class="aud-left"><a href="exams.php?e=<?= $e($r['exam']['id']) ?>"><?= $e(exam_label($r['exam'])) ?></a></td>
           <td class="aud-left"><?= $e($r['duty']['name']) ?></td>
-          <?php if ($k === 'late' || $k === 'ontime'): ?><td class="aud-left"><?= $e(exam_clock($r['exam']['report'])) ?></td><td class="aud-left"><?= $r['duty']['arrived'] !== '' ? $e(exam_clock($r['duty']['arrived'])) : '-' ?></td><?php endif; ?>
+          <?php if ($k === 'late' || $k === 'ontime'): ?><td class="aud-left"><?= $e(exam_clock($r['exam']['report'])) ?></td><td class="aud-left"><?= $e(exam_arrived($r['duty'], $r['exam']) ?: '-') ?></td><?php endif; ?>
           <td class="aud-left"><?= $r['duty']['remark'] !== '' ? $e($r['duty']['remark']) : '-' ?></td></tr>
         <?php endforeach; ?>
       </tbody>

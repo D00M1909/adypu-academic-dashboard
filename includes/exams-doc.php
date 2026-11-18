@@ -44,13 +44,13 @@ function exam_doc_cell(string $s): array {
 
 // The sheet every per-duty export shares: one row per duty.
 function exam_doc_duty_sheet(array $rows): array {
-    $out = [array_map(fn($h) => ['b', $h], ['Date', 'Time', 'Reporting', 'School', 'Class', 'Subject', 'Room', 'Faculty', 'Role', 'Status', 'Arrived', 'Remark'])];
+    $out = [array_map(fn($h) => ['b', $h], ['Date', 'Time', 'Reporting', 'School', 'Class', 'Subject', 'Room', 'Faculty', 'Role', 'Status', 'Present at', 'Remark'])];
     foreach ($rows as $r) {
         $x = $r['exam'];
         $d = $r['duty'] ?? [];
         $out[] = [exam_doc_day($x['date']), exam_doc_span($x), exam_clock($x['report']), SCHOOLS[$x['school']]['name'] ?? $x['school'],
             $x['class'], $x['subject'], $x['room'], $d['name'] ?? '', $d['role'] ?? '', exam_doc_cell($d['status'] ?? ''),
-            ($d['arrived'] ?? '') !== '' ? exam_clock($d['arrived']) : '', $d['remark'] ?? ''];
+            exam_arrived($d, $x), $d['remark'] ?? ''];
     }
     return $out;
 }
@@ -228,18 +228,18 @@ function exam_doc_report(array $rows, string $scope, string $fileBit): array {
         if (!$set) continue;
         $timed = $k === 'late' || $k === 'ontime';
         $sections .= '<h3 class="exm-doc-sub exm-sub-' . $k . '">' . $label . ' <span>' . count($set) . '</span></h3><table class="exm-doc-table"><thead><tr><th>Date and time</th><th>Exam</th><th>Faculty</th>'
-            . ($timed ? '<th>Report by</th><th>Arrived</th>' : '') . '<th>Remark</th></tr></thead><tbody>';
+            . ($timed ? '<th>Report by</th><th>Present at</th>' : '') . '<th>Remark</th></tr></thead><tbody>';
         $text .= "\n" . strtoupper($label) . ' (' . count($set) . ")\n";
         foreach ($set as $r) {
             $x = $r['exam'];
             $d = $r['duty'];
             $sections .= '<tr class="exm-row-' . $k . '"><td>' . exam_doc_e(exam_doc_day($x['date'])) . '<small>' . exam_doc_e(exam_doc_span($x)) . '</small></td>'
                 . '<td>' . exam_doc_e($x['subject']) . '<small>' . exam_doc_e($x['class']) . '</small></td><td>' . exam_doc_e($d['name']) . '</td>'
-                . ($timed ? '<td>' . exam_doc_e(exam_clock($x['report'])) . '</td><td>' . ($d['arrived'] !== '' ? exam_doc_e(exam_clock($d['arrived'])) : '-') . '</td>' : '')
+                . ($timed ? '<td>' . exam_doc_e(exam_clock($x['report'])) . '</td><td>' . exam_doc_e(exam_arrived($d, $x) ?: '-') . '</td>' : '')
                 . '<td>' . exam_doc_e($d['remark'] ?: '-') . '</td></tr>';
             if ($k !== 'ontime') {
                 $text .= '- ' . $d['name'] . ': ' . $x['subject'] . ', ' . exam_doc_day($x['date']) . ' ' . exam_clock($x['start'])
-                    . ($k === 'late' && $d['arrived'] !== '' ? ' (arrived ' . exam_clock($d['arrived']) . ', report by ' . exam_clock($x['report']) . ')' : '')
+                    . ($k === 'late' && exam_arrived($d, $x) !== '' ? ' (present at ' . exam_arrived($d, $x) . ', report by ' . exam_clock($x['report']) . ')' : '')
                     . ($d['remark'] !== '' ? ' - ' . $d['remark'] : '') . "\n";
             }
         }
@@ -259,7 +259,7 @@ function exam_doc_sheet(array $x, array $duties): array {
     $i = 0;
     foreach ($duties as $d) {
         $i++;
-        $in = $d['arrived'] !== '' ? exam_clock($d['arrived']) : '';
+        $in = exam_arrived($d, $x);
         $rows .= '<tr class="exm-row-' . $d['status'] . '"><td class="exm-num">' . $i . '</td><td><strong>' . exam_doc_e($d['name']) . '</strong></td><td>' . exam_doc_e($d['role']) . '</td>'
             . '<td class="exm-doc-fill">' . exam_doc_e($in) . '</td><td class="exm-doc-fill">' . ($d['status'] !== 'allocated' ? exam_doc_pill($d['status']) : '') . '</td><td class="exm-doc-fill exm-doc-signbox"></td></tr>';
         $text .= "$i. {$d['name']} ({$d['role']})" . ($d['status'] !== 'allocated' ? ' - ' . EXAM_STATUS_LABEL[$d['status']] . ($in !== '' ? " at $in" : '') : '') . "\n";
@@ -271,7 +271,7 @@ function exam_doc_sheet(array $x, array $duties): array {
         . '<div><dt>Room</dt><dd>' . exam_doc_e($x['room'] ?: '-') . '</dd></div>'
         . '<div><dt>Class</dt><dd>' . exam_doc_e($x['class']) . '</dd></div>'
         . '<div><dt>School</dt><dd>' . exam_doc_e(SCHOOLS[$x['school']]['name'] ?? $x['school']) . '</dd></div></dl>';
-    $body = $facts . ($duties ? '<table class="exm-doc-table"><thead><tr><th class="exm-num">#</th><th>Invigilator</th><th>Role</th><th>Time in</th><th>Status</th><th>Signature</th></tr></thead><tbody>' . $rows . '</tbody></table>'
+    $body = $facts . ($duties ? '<table class="exm-doc-table"><thead><tr><th class="exm-num">#</th><th>Invigilator</th><th>Role</th><th>Present at</th><th>Status</th><th>Signature</th></tr></thead><tbody>' . $rows . '</tbody></table>'
         : '<p class="field-help">Nobody is allocated to this exam yet.</p>')
         . '<p class="exm-doc-note">Invigilators report by ' . exam_doc_e(exam_clock($x['report'])) . '. Arrival after it is recorded as late.</p>';
     return ['title' => 'Duty sheet: ' . $x['subject'], 'scope' => $x['class'], 'body' => $body, 'text' => $text . "\n" . str_replace("\n", ', ', EXAM_DOC_SIGN),
