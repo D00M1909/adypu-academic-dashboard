@@ -57,13 +57,96 @@ function exam_doc_duty_sheet(array $rows): array {
 
 const EXAM_DOC_SIGN = "Exam Cell\nAjeenkya D Y Patil University";
 
-// The whole document: the university's head, the body, the key or signature.
+// The whole document: the university's head, the body, the key, and a line
+// to sign for each signatory in $doc['sign'] (exam_signatories()).
 function exam_doc_html(array $doc): string {
+    $sign = '';
+    foreach ($doc['sign'] ?? [] as [$role, $name]) {
+        $sign .= '<div class="exm-doc-signer"><span class="exm-doc-signline"></span>' . ($name !== '' ? '<strong>' . exam_doc_e($name) . '</strong>' : '')
+            . '<small>' . exam_doc_e($role) . '</small></div>';
+    }
     return '<article class="card exm-doc"><header class="exm-doc-head"><img src="img/logo.png" alt="" width="56" height="56"><div>'
         . '<p class="exm-doc-org">Ajeenkya D Y Patil University &middot; Exam Cell</p>'
         . '<h2>' . exam_doc_e($doc['title']) . '</h2>'
         . '<p class="exm-doc-scope">' . exam_doc_e($doc['scope']) . ' &middot; issued ' . date('j M Y') . '</p></div></header>'
-        . $doc['body'] . '</article>';
+        . $doc['body'] . ($sign !== '' ? '<footer class="exm-doc-signers">' . $sign . '</footer>' : '') . '</article>';
+}
+
+// The signatories as the last lines of a text version.
+function exam_doc_sign_text(array $sign): string {
+    return implode("\n", array_map(fn($s) => trim($s[1] !== '' ? "{$s[1]}, {$s[0]}" : $s[0]), $sign));
+}
+
+// --- Duty chart: faculty down the side, one column per session -------------------
+// The exam cell's own layout. A session is one day and time: several papers
+// at the same hour share a column, and a person holds the session if they are
+// on any of them. Its Excel keeps the two header rows (date, then time), so
+// it uploads back in (exam_chart_parse()).
+
+function exam_doc_chart(array $data, array $exams, string $st, string $scope, string $fileBit): array {
+    $cols = [];
+    $people = [];
+    foreach ($exams as $id => $x) {
+        $k = "{$x['date']}|{$x['start']}|{$x['end']}";
+        $cols[$k] ??= ['date' => $x['date'], 'start' => $x['start'], 'end' => $x['end'], 'subjects' => []];
+        $cols[$k]['subjects'][$x['subject']] = true;
+        foreach (exam_duties_of($data, $id) as $d) {
+            $p = $d['person'] !== '' ? $d['person'] : 'name:' . strtolower($d['name']);
+            $people[$p] ??= ['name' => $d['name'], 'cells' => []];
+            // A person twice in one session shows the worse of the two.
+            $rank = ['absent' => 3, 'late' => 2, 'allocated' => 1, 'ontime' => 0];
+            $was = $people[$p]['cells'][$k] ?? null;
+            if ($was === null || $rank[$d['status']] > $rank[$was]) $people[$p]['cells'][$k] = $d['status'];
+        }
+    }
+    if ($st !== '') $people = array_filter($people, fn($p) => in_array($st, $p['cells'], true));
+    uasort($people, fn($a, $b) => timetable_person($a['name']) <=> timetable_person($b['name']));
+    $subjects = array_keys(array_merge(...array_values(array_map(fn($c) => $c['subjects'], $cols)) ?: [[]]));
+    $classes = array_values(array_unique(array_column($exams, 'class')));
+    $title = (count($subjects) === 1 ? $subjects[0] . ' ' : '') . 'Duty Chart' . (count($classes) === 1 ? ' (' . $classes[0] . ')' : '');
+
+    $timeOf = fn($c) => exam_clock($c['start']) . ' to ' . exam_clock($c['end']);
+    $head = '<tr><th rowspan="2">S. No</th><th rowspan="2">Name of Faculty</th>';
+    $sub = '<tr>';
+    $lastDate = '';
+    $span = array_count_values(array_column($cols, 'date'));
+    foreach ($cols as $c) {
+        if ($c['date'] !== $lastDate) {
+            $head .= '<th colspan="' . $span[$c['date']] . '" class="exm-chart-date">' . exam_doc_e(date('D j M', strtotime($c['date']))) . '</th>';
+            $lastDate = $c['date'];
+        }
+        $sub .= '<th class="exm-chart-time">' . exam_doc_e($timeOf($c)) . '</th>';
+    }
+    $head .= '<th rowspan="2">Duties</th></tr>';
+    $sub .= '</tr>';
+    $body = '';
+    $n = 0;
+    $sheet = [[['b', $title . ' - ' . $scope]], array_merge([['b', 'S. No'], ['b', 'Name of Faculty']], array_map(fn($c) => ['b', date('d-m-Y', strtotime($c['date']))], array_values($cols)), [['b', 'Duties']]),
+        array_merge(['', ''], array_map(fn($c) => ['b', $timeOf($c)], array_values($cols)), [''])];
+    $text = "$title\n$scope\n\n";
+    $perCol = array_fill_keys(array_keys($cols), 0);
+    foreach ($people as $p) {
+        $n++;
+        $row = '<tr><td>' . $n . '</td><th>' . exam_doc_e($p['name']) . '</th>';
+        $line = [$n, $p['name']];
+        $held = [];
+        foreach ($cols as $k => $c) {
+            $s = $p['cells'][$k] ?? '';
+            if ($s !== '') { $perCol[$k]++; $held[] = date('j M', strtotime($c['date'])) . ' ' . exam_clock($c['start']); }
+            $row .= $s === '' ? '<td></td>' : '<td class="exm-chart-tick exm-st-' . $s . '" title="' . exam_doc_e(EXAM_STATUS_LABEL[$s]) . '">&#10003;</td>';
+            $line[] = $s === '' ? '' : [['ontime' => 'g', 'late' => 'y', 'absent' => 'r'][$s] ?? '', '✓'];
+        }
+        $body .= $row . '<td>' . count($held) . '</td></tr>';
+        $line[] = (string) count($held);
+        $sheet[] = $line;
+        $text .= "$n. {$p['name']}: " . implode(', ', $held) . "\n";
+    }
+    $foot = '<tr class="exm-chart-total"><td></td><th>Invigilators</th>' . implode('', array_map(fn($v) => "<td>$v</td>", $perCol)) . '<td>' . array_sum($perCol) . '</td></tr>';
+    $html = $cols ? '<div class="exm-chart-wrap"><table class="exm-doc-table exm-chart"><thead>' . $head . $sub . '</thead><tbody>' . $body . $foot . '</tbody></table></div>'
+        . '<p class="exm-doc-key"><span class="exm-chip exm-st-allocated">&#10003; on duty</span><span class="exm-chip exm-st-ontime">On time</span><span class="exm-chip exm-st-late">Late</span><span class="exm-chip exm-st-absent">Absent</span></p>'
+        : '<p class="field-help">No exams match these filters.</p>';
+    return ['title' => $title, 'scope' => $scope, 'body' => $html, 'text' => $text, 'sheet' => $sheet,
+        'file' => 'exam-duty-chart-' . $fileBit . '.xlsx', 'email' => '', 'subject' => "$title - $scope"];
 }
 
 const EXAM_DOC_KEY = '<p class="exm-doc-key"><span class="exm-chip exm-st-ontime">On time</span><span class="exm-chip exm-st-late">Late</span>'

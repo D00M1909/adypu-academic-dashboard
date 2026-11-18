@@ -47,14 +47,17 @@ $tTo = $validTime((string) ($_GET['tto'] ?? ''));
 $alloc = in_array($_GET['alloc'] ?? '', ['full', 'short'], true) ? (string) $_GET['alloc'] : '';
 // The status every view can be narrowed to: Not marked, On time, Late, Absent.
 $st = isset(EXAM_STATUS_LABEL[$_GET['st'] ?? '']) ? (string) $_GET['st'] : '';
+// Upcoming (today on, the default), past (read only), or both.
+$when = in_array($_GET['when'] ?? '', ['past', 'all'], true) ? (string) $_GET['when'] : '';
 
-$tabs = ['exams' => 'By exam', 'faculty' => 'Faculty duties', 'report' => 'Report', 'roster' => 'Duty roster'];
+$tabs = ['exams' => 'By exam', 'chart' => 'Duty chart', 'faculty' => 'Faculty duties', 'report' => 'Report'];
 $view = (string) ($_GET['view'] ?? '');
+if ($view === 'roster') $view = 'chart'; // the old Duty roster tab's links
 $view = isset($tabs[$view]) || $view === 'letter' ? $view : 'exams';
 
 // The filters every view carries, as a query string.
 $keep = fn(array $more = []): string => http_build_query(array_filter($more + ['school' => $school, 'from' => $from, 'to' => $to, 'alloc' => $alloc,
-    'st' => $st, 'tfrom' => $tFrom, 'tto' => $tTo], fn($v) => $v !== ''));
+    'st' => $st, 'when' => $when, 'tfrom' => $tFrom, 'tto' => $tTo], fn($v) => $v !== ''));
 $hasStatus = fn(array $rows): array => $st === '' ? $rows : array_values(array_filter($rows, fn($r) => $r['duty']['status'] === $st));
 
 // --- Changes, all back to a GET ---------------------------------------------
@@ -75,6 +78,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'That form expired. Please try again.';
     } elseif ($needsMark ? !$canMark : !$canEdit) {
         $error = 'Only an admin can change exams.';
+    } elseif ($exam && exam_is_past($exam) && in_array($action, ['update', 'delete', 'assign', 'mark', 'auto'], true)) {
+        $error = 'This exam is over. Past exams are kept as they were and cannot be changed.';
     } else {
         $by = (string) $me['email'];
         $done = $action;
@@ -90,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $error = 'The schedule must be a .csv or .xlsx file.';
                 } else {
                     try {
-                        [$added, $updated, $problems] = exam_import(exam_read_rows($f['tmp_name'], (string) $f['name']), $faculty, $by, !empty($_POST['sample']));
+                        [$added, $updated, $problems] = exam_import(exam_read_rows($f['tmp_name'], (string) $f['name']), $faculty, $by, !empty($_POST['sample']), (string) ($_POST['school'] ?? ''));
                         $info = ['added' => $added, 'updated' => $updated, 'problems' => $problems];
                         $data = exam_data();
                     } catch (Throwable $x) {
@@ -110,6 +115,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 break;
             case 'clear_sample':
                 exam_clear_sample();
+                break;
+            case 'sign':
+                $sk = (string) ($_POST['sign_school'] ?? '');
+                exam_set_signatories(isset(SCHOOLS[$sk]) ? $sk : '', (array) ($_POST['sign_role'] ?? []), (array) ($_POST['sign_name'] ?? []));
+                $back = ['view' => 'chart'] + array_filter(['school' => isset(SCHOOLS[$sk]) ? $sk : '']);
                 break;
             case 'update':
                 if (!$exam) { $error = 'That exam is gone.'; break; }
@@ -151,8 +161,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $exam = $data['exams'][$eid] ?? null;
 }
 
+// A past exam is shown, never changed: no edit, duty or attendance controls.
+$locked = $exam !== null && exam_is_past($exam);
+if ($locked) $canEdit = $canMark = false;
+
 // --- The lists ---------------------------------------------------------------
 $list = exam_list($data, $school, $from, $to);
+if ($when === '') $list = array_filter($list, fn($x) => !exam_is_past($x));
+if ($when === 'past') $list = array_reverse(array_filter($list, fn($x) => exam_is_past($x)), true);
 if ($alloc !== '') $list = array_filter($list, fn($x) => ($alloc === 'short') === (exam_short($data, $x['id']) > 0));
 if ($st !== '') $list = array_filter($list, fn($x) => in_array($st, array_column(exam_duties_of($data, $x['id']), 'status'), true));
 $scopeRows = exam_report_rows($data, $school, $from, $to, '', '');
@@ -176,8 +192,8 @@ $csv = function (string $name, array $rows) {
 // An Excel file, header bold and each status cell coloured the way the page
 // colours it, so it can be forwarded as it is. Built in cache/ (the one
 // folder this host lets us write and is not data/) and deleted once sent.
-$xlsx = function (string $name, array $rows) use ($csv) {
-    $cols = count($rows[0] ?? []) === 8 ? [30, 24, 8, 9, 8, 8, 11, 90] : [16, 20, 10, 24, 26, 34, 14, 26, 16, 12, 10, 30];
+$xlsx = function (string $name, array $rows, array $cols = []) use ($csv) {
+    $cols = $cols ?: (count($rows[0] ?? []) === 8 ? [30, 24, 8, 9, 8, 8, 11, 90] : [16, 20, 10, 24, 26, 34, 14, 26, 16, 12, 10, 30]);
     if (!class_exists('ZipArchive')) $csv(preg_replace('/\.xlsx$/', '.csv', $name), array_map(fn($r) => array_map(fn($c) => is_array($c) ? $c[1] : $c, $r), $rows));
     require_once __DIR__ . '/includes/xlsx-write.php';
     $tmp = __DIR__ . '/cache/export-' . bin2hex(random_bytes(6)) . '.xlsx';
@@ -228,11 +244,21 @@ if ($exam !== null) {
 } elseif ($view === 'letter') {
     $d0 = $letterRows[0]['duty'] ?? ['name' => '', 'email' => '', 'person' => ''];
     $doc = exam_doc_letter($d0['name'], $letterRows, $d0['email'] !== '' ? $d0['email'] : (string) ($emails[$d0['person']] ?? ''), $scope);
+} elseif ($view === 'chart') {
+    $doc = exam_doc_chart($data, $list, $st, $scope, $fileBit);
+    $doc['cols'] = array_merge([7, 30], array_fill(0, max(0, count($doc['sheet'][1] ?? []) - 3), 13), [8]);
 } else {
     $doc = exam_doc_roster($rosterRows, $scope, $fileBit);
 }
+// Every document but a duty letter is signed off by the exam cell's signatories.
+if ($view !== 'letter' || $exam !== null) {
+    $doc['sign'] = exam_signatories($data, $exam !== null ? $exam['school'] : $school);
+    $doc['text'] = rtrim($doc['text']) . "
+
+" . exam_doc_sign_text($doc['sign']);
+}
 $export = (string) ($_GET['export'] ?? '');
-if ($export === 'xlsx') $xlsx($doc['file'], $doc['sheet']);
+if ($export === 'xlsx') $xlsx($doc['file'], $doc['sheet'], $doc['cols'] ?? []);
 // The upload's own format, for an admin to fill in or re-upload.
 if ($export === 'template') $csv('exam-schedule-' . ($school ?: 'all-schools') . "-$today.csv", exam_export_rows($data, $list));
 $printDoc = !empty($_GET['doc']);
@@ -256,7 +282,7 @@ if ($error === '' && !$info && $done !== '') page_notice('ok', match ($done) {
     'add' => 'Exam added.', 'auto' => $n ? "Allocated $n invigilator" . ($n === 1 ? '' : 's') . '.' : 'Nobody free was found to allocate.',
     'sample' => "Loaded $n sample exams. They can be removed again.", 'clear_sample' => 'Sample data removed.',
     'quick' => 'Status updated.' . ($n ? ' A late email is queued; it is sent within a few minutes.' : ''), 'update' => 'Exam details saved.',
-    'delete' => 'Exam deleted.', 'assign' => 'Invigilator added.', 'remove' => 'Invigilator removed.',
+    'sign' => 'Signatures saved.', 'delete' => 'Exam deleted.', 'assign' => 'Invigilator added.', 'remove' => 'Invigilator removed.',
     'mark' => 'Attendance saved.' . ($n ? " $n late email" . ($n === 1 ? '' : 's') . ' queued; they are sent within a few minutes.' : ''),
     default => 'Saved.',
 });
@@ -286,6 +312,7 @@ if ($printDoc): ?>
 ?>
 <svg style="display:none" aria-hidden="true"><defs>
   <symbol id="icon-print" viewBox="0 0 24 24"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></symbol>
+  <symbol id="icon-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
   <symbol id="icon-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></symbol>
 </defs></svg>
 <div class="aud-head">
@@ -306,7 +333,7 @@ if ($printDoc): ?>
 <?php
 $tileCounts = $exam ? exam_counts(array_map(fn($did) => ['duty' => $data['duties'][$did], 'exam' => $exam], array_keys(exam_duties_of($data, $eid)))) : $counts;
 ?>
-<div class="aud-due exm-due<?= in_array($view, ['roster', 'letter'], true) && !$exam ? ' no-print' : '' ?>">
+<div class="aud-due exm-due<?= in_array($view, ['chart', 'letter'], true) && !$exam ? ' no-print' : '' ?>">
   <span class="aud-due-cell"><small>Exams</small><strong><?= $exam ? 1 : count(exam_list($data, $school, $from, $to)) ?></strong><em><?= $exam ? $e($exam['subject']) : 'on the schedule' ?></em></span>
   <span class="aud-due-cell"><small>Duties allocated</small><strong><?= $tileCounts['duties'] ?></strong><em><?= $tileCounts['allocated'] ?> not marked</em></span>
   <span class="aud-due-cell is-ontime"><small>On time</small><strong><?= $tileCounts['ontime'] ?></strong><em><?= $tileCounts['duties'] ? round(100 * $tileCounts['ontime'] / $tileCounts['duties']) . '%' : '-' ?></em></span>
@@ -316,8 +343,15 @@ $tileCounts = $exam ? exam_counts(array_map(fn($did) => ['duty' => $data['duties
 
 <?php
 // The filter form every list view carries. $with picks the extra controls.
-$filterForm = function (string $viewKey, array $with) use ($e, $school, $from, $to, $tFrom, $tTo, $alloc, $st, $schoolName): void { ?>
+$filterForm = function (string $viewKey, array $with) use ($e, $school, $from, $to, $tFrom, $tTo, $alloc, $st, $when, $schoolName): void { ?>
   <form class="aud-filters exm-filters" method="get"><input type="hidden" name="view" value="<?= $e($viewKey) ?>">
+    <?php if (in_array('when', $with, true)): ?>
+    <label><span class="sr-only">Which exams</span><select name="when" onchange="this.form.submit()" class="exm-when<?= $when === 'past' ? ' is-past' : '' ?>">
+      <option value="">Upcoming exams</option>
+      <option value="past"<?= $when === 'past' ? ' selected' : '' ?>>Past exams (read only)</option>
+      <option value="all"<?= $when === 'all' ? ' selected' : '' ?>>All exams</option>
+    </select></label>
+    <?php endif; ?>
     <label><span class="sr-only">School</span><select name="school" onchange="this.form.submit()">
       <option value="">Every school</option>
       <?php foreach (SCHOOLS as $id => $sc): ?><option value="<?= $e($id) ?>"<?= $id === $school ? ' selected' : '' ?>><?= $e($sc['name']) ?></option><?php endforeach; ?>
@@ -365,6 +399,7 @@ $filterForm = function (string $viewKey, array $with) use ($e, $school, $from, $
         <p class="aud-meta"><?= $e($exam['class']) ?> &middot; <?= $e($schoolName($exam['school'])) ?></p>
         <p class="aud-meta"><?= $e($day($exam['date'])) ?> &middot; <?= $e($span($exam)) ?> &middot; report by <strong><?= $e(exam_clock($exam['report'])) ?></strong><?= $exam['room'] !== '' ? ' &middot; Room ' . $e($exam['room']) : '' ?></p>
         <?php if (!empty($exam['sample'])): ?><p class="aud-meta">Sample data</p><?php endif; ?>
+        <?php if ($locked): ?><p class="exm-locked"><svg aria-hidden="true"><use href="#icon-lock"/></svg>This exam is over. It is kept as it was and cannot be changed.</p><?php endif; ?>
       </div>
       <?php if ($canEdit): ?>
       <div class="exm-actions no-print">
@@ -541,16 +576,33 @@ $filterForm = function (string $viewKey, array $with) use ($e, $school, $from, $
   <?php endforeach; ?>
   <?php endif; ?>
 
-<?php elseif ($view === 'roster' || $view === 'letter'):
+<?php elseif ($view === 'chart' || $view === 'letter'):
   // ---------------------------------------------------------------- the documents
-  // The roster and one person's duty letter, drawn as they print. Export in
-  // the header sends them on.
+  // The duty chart (the exam cell's own layout) and one person's duty letter,
+  // drawn as they print. Export in the header sends them on.
+  $signFor = $school;
+  $signers = exam_signatories($data, $signFor);
 ?>
   <?php if ($view === 'letter'): ?><p class="evr-back no-print"><a href="exams.php?<?= $e($keep(['view' => 'faculty'])) ?>"><svg aria-hidden="true"><use href="#icon-back"/></svg>Faculty duties</a></p><?php endif; ?>
   <div class="aud-tools no-print">
-    <?php $filterForm($view, $view === 'letter' ? ['p' => $letterKey] : ['alloc']); ?>
+    <?php $filterForm($view, $view === 'letter' ? ['p' => $letterKey] : ['when', 'alloc']); ?>
   </div>
   <?= exam_doc_html($doc) ?>
+  <?php if ($view === 'chart' && $canEdit): ?>
+  <details class="card exm-admin no-print">
+    <summary><strong>Signatures on printed documents</strong> <span class="field-help">for <?= $e($signFor !== '' ? $schoolName($signFor) : 'every school') ?></span></summary>
+    <form method="post"><?= csrf_field() ?><input type="hidden" name="action" value="sign"><input type="hidden" name="sign_school" value="<?= $e($signFor) ?>">
+      <p class="field-help">Each one gets a line to sign at the foot of the chart, roster, report and duty sheet. <?= $signFor !== '' ? 'Leave every box empty to use the list for every school.' : 'Pick a school above to give it its own list.' ?></p>
+      <div class="exm-sign-grid">
+        <?php for ($i = 0; $i < 4; $i++): ?>
+        <label>Role<input type="text" name="sign_role[]" maxlength="60" value="<?= $e($signers[$i][0] ?? '') ?>" placeholder="<?= $i === 0 ? 'ECR In-charge' : '' ?>"></label>
+        <label>Name <span class="label-hint">(optional)</span><input type="text" name="sign_name[]" maxlength="60" value="<?= $e($signers[$i][1] ?? '') ?>"></label>
+        <?php endfor; ?>
+      </div>
+      <button class="btn-quiet" type="submit">Save signatures</button>
+    </form>
+  </details>
+  <?php endif; ?>
 
 <?php else:
   // ---------------------------------------------------------------- by exam
@@ -558,7 +610,7 @@ $filterForm = function (string $viewKey, array $with) use ($e, $school, $from, $
   foreach ($list as $id => $x) $byDate[$x['date']][$id] = $x;
 ?>
   <div class="aud-tools no-print">
-    <?php $filterForm('exams', ['alloc']); ?>
+    <?php $filterForm('exams', ['when', 'alloc']); ?>
   </div>
 
   <?php if ($canEdit): ?>
@@ -583,9 +635,14 @@ $filterForm = function (string $viewKey, array $with) use ($e, $school, $from, $
   <details class="card exm-admin no-print">
     <summary><strong>Upload schedule</strong></summary>
     <form method="post" enctype="multipart/form-data"><?= csrf_field() ?><input type="hidden" name="action" value="import">
-      <p class="field-help">A .csv or .xlsx with a header row: <?= $e(implode(', ', EXAM_COLUMNS)) ?>. Only Date and Subject are needed to find the header; the rest are read by name, in any order. A row already on the schedule is updated and keeps its duties. </p>
+      <p class="field-help">Two layouts are read. <strong>A schedule</strong>: a .csv or .xlsx with a header row of <?= $e(implode(', ', EXAM_COLUMNS)) ?> (only Date and Subject are needed, the rest are read by name, in any order). <strong>A duty chart</strong>, as the exam cell sends it: S. No, Name of Faculty, a date over each session and its time under it, and a tick for each duty; the subject and class come from its title. A PDF cannot be read reliably, so save the chart as .xlsx or .csv first. Anything already on the schedule is updated and keeps its duties; past exams are left as they were.</p>
       <p class="field-help"><a href="exams.php?<?= $e($keep(['export' => 'template'])) ?>">Download template</a>: the schedule below in this format, to fill in or edit and upload again.</p>
-      <input type="file" name="file" accept=".csv,.xlsx" required>
+      <div class="exm-upload-row">
+        <input type="file" name="file" accept=".csv,.xlsx" required>
+        <label>School <span class="label-hint">(for a duty chart)</span><select name="school">
+          <option value="">From the file</option>
+          <?php foreach (SCHOOLS as $id => $sc): ?><option value="<?= $e($id) ?>"<?= $id === $school ? ' selected' : '' ?>><?= $e($sc['name']) ?></option><?php endforeach; ?></select></label>
+      </div>
       <label class="aud-tick exm-sample-tick"><input type="checkbox" name="sample" value="1"> Test data: never sends a late email, and Remove sample data clears it</label>
       <button class="btn-quiet" type="submit">Upload</button>
     </form>
@@ -598,7 +655,7 @@ $filterForm = function (string $viewKey, array $with) use ($e, $school, $from, $
   <?php endif; ?>
 
   <?php if (!$list): ?>
-    <p class="card"><?= $data['exams'] ? 'No exams match these filters.' : 'No exams are on the schedule yet.' . ($canEdit ? ' Add one, upload a schedule, or load the sample week.' : '') ?></p>
+    <p class="card"><?= $data['exams'] ? ($when === '' ? 'No upcoming exams match these filters. Pick Past exams to see the ones already held.' : 'No exams match these filters.') : 'No exams are on the schedule yet.' . ($canEdit ? ' Add one, upload a schedule, or load the sample week.' : '') ?></p>
   <?php endif; ?>
   <?php foreach ($byDate as $date => $items): ?>
   <section class="card exm-day">

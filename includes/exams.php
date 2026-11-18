@@ -42,7 +42,41 @@ function exam_can_mark(array $u): bool {
 
 function exam_data(): array {
     $d = store_read('exams');
-    return ['exams' => $d['exams'] ?? [], 'duties' => $d['duties'] ?? [], 'mail' => $d['mail'] ?? []];
+    return ['exams' => $d['exams'] ?? [], 'duties' => $d['duties'] ?? [], 'mail' => $d['mail'] ?? [], 'sign' => $d['sign'] ?? []];
+}
+
+// Today, as the lock sees it. A test pins it with EXAM_TODAY.
+function exam_today(): string {
+    return defined('EXAM_TODAY') ? EXAM_TODAY : date('Y-m-d');
+}
+
+// An exam whose day is over is kept as it was: nothing about it changes any
+// more, its duties and attendance included. The exam's own day stays open,
+// since that is when attendance is marked.
+function exam_is_past(array $x): bool {
+    return $x['date'] < exam_today();
+}
+
+// Who signs the printed documents: a school's own list, else the one for
+// every school, else the exam cell's two defaults. Each is [role, name].
+const EXAM_SIGN_DEFAULT = [['ECR In-charge', ''], ['Dean', '']];
+
+function exam_signatories(array $data, string $school): array {
+    return $data['sign'][$school] ?? $data['sign'][''] ?? EXAM_SIGN_DEFAULT;
+}
+
+function exam_set_signatories(string $school, array $roles, array $names): void {
+    $list = [];
+    foreach ($roles as $i => $r) {
+        $r = trim(preg_replace('/\s+/', ' ', (string) $r));
+        $n = trim(preg_replace('/\s+/', ' ', (string) ($names[$i] ?? '')));
+        if ($r !== '' || $n !== '') $list[] = [mb_substr($r, 0, 60), mb_substr($n, 0, 60)];
+    }
+    exam_save(function (array $d) use ($school, $list) {
+        if ($list) $d['sign'][$school] = array_slice($list, 0, 4);
+        else unset($d['sign'][$school]);
+        return $d;
+    });
 }
 
 function exam_min(string $hhmm): int {
@@ -224,7 +258,7 @@ function exam_auto_allocate(array $t, array $faculty, array $ids, string $by): i
     exam_save(function (array $d) use ($t, $faculty, $ids, $by, &$added) {
         foreach ($ids as $id) {
             $x = $d['exams'][$id] ?? null;
-            if (!$x) continue;
+            if (!$x || exam_is_past($x)) continue;
             for ($short = exam_short($d, $id); $short > 0; $short--) {
                 $pick = null;
                 foreach (exam_candidates($t, $faculty, $d, $x) as $p => $c) {
@@ -425,7 +459,131 @@ function exam_read_rows(string $path, string $name): array {
 // class and subject) is updated in place, its duties kept; named invigilators
 // are added. $sample marks every row as test data: it never mails, and
 // Remove sample data clears it. Returns [added, updated, problems].
-function exam_import(array $rows, array $faculty, string $by, bool $sample = false): array {
+// The exam cell's own duty chart: a title ("Unit Test Duty Chart (Lateral
+// Entry Students) - October 2026"), a header row with S. No, Name of Faculty
+// and one date per session ("26-10-2026", "29th October (E)"), the session's
+// time under each date ("12:30 pm to 1:30 pm", "3:00-4:00PM"), then one row
+// per person with a tick under each session they hold. A date merged across
+// columns is read by the first, so an empty date cell repeats the last one.
+// null when the rows are not laid out like that.
+const EXAM_TICKS = ['✓', '✔', '√', '☑', '✅', 'y', 'yes', '1', 'x', 'p', 'tick'];
+
+function exam_chart_parse(array $rows): ?array {
+    $title = '';
+    $year = 0;
+    foreach ($rows as $i => $r) {
+        $nameCol = null;
+        foreach ($r as $c => $v) if (preg_match('/^\s*name/i', (string) $v)) { $nameCol = $c; break; }
+        if ($nameCol === null) {
+            // Rows above the header: the title, and the year a "29th October" lacks.
+            $line = trim(implode(' ', array_filter(array_map('trim', $r), fn($v) => $v !== '')));
+            if ($line !== '' && $title === '') $title = $line;
+            if (preg_match('/\b(20\d\d)\b/', $line, $m)) $year = (int) $m[1];
+            continue;
+        }
+        $times = $rows[$i + 1] ?? [];
+        $sessions = [];
+        $date = '';
+        foreach ($r as $c => $v) {
+            if ($c <= $nameCol) continue;
+            $d = exam_chart_date((string) $v, $year ?: (int) date('Y', strtotime(exam_today())));
+            if ($d !== '') $date = $d;
+            [$start, $end] = exam_chart_time((string) ($times[$c] ?? ''));
+            if ($date !== '' && $start !== '') $sessions[$c] = ['date' => $date, 'start' => $start, 'end' => $end, 'names' => []];
+        }
+        if (!$sessions) return null;
+        foreach (array_slice($rows, $i + 2) as $p) {
+            $name = trim((string) ($p[$nameCol] ?? ''));
+            if ($name === '') continue;
+            foreach ($sessions as $c => $s) {
+                if (in_array(mb_strtolower(trim((string) ($p[$c] ?? ''))), EXAM_TICKS, true)) $sessions[$c]['names'][] = $name;
+            }
+        }
+        $subject = trim(preg_replace('/\s*(duty chart|invigilation).*$/i', '', $title), " -–:");
+        $class = preg_match('/\(([^)]+)\)/', $title, $m) ? trim($m[1]) : '';
+        return ['subject' => $subject !== '' ? $subject : 'Exam', 'class' => $class !== '' ? $class : 'All classes', 'sessions' => array_values($sessions)];
+    }
+    return null;
+}
+
+// A chart's date heading: "26-10-2026", "26/10/2026", "29th October (E)", an
+// Excel serial. The year comes from the title when the cell has none.
+function exam_chart_date(string $s, int $year): string {
+    $s = trim(preg_replace(['/\([^)]*\)/', '/(\d)(st|nd|rd|th)\b/i'], ['', '$1'], $s));
+    if ($s === '' || !preg_match('/\d/', $s)) return '';
+    if (preg_match('/^\d{5}(\.0+)?$/', $s) || preg_match('#^\d{1,4}[/.-]\d{1,2}[/.-]\d{2,4}$#', $s)) return exam_parse_date($s);
+    if (!preg_match('/[a-z]{3}/i', $s)) return '';
+    $ts = strtotime(preg_match('/\b20\d\d\b/', $s) ? $s : "$s $year");
+    return $ts ? date('Y-m-d', $ts) : '';
+}
+
+// A chart's time cell: "12:30 pm to 1:30 pm", "3:00-4:00PM", "10:30-11:30AM".
+// A start written without am/pm takes the end's, unless that puts it after the end.
+function exam_chart_time(string $s): array {
+    $parts = preg_split('/\s*(?:\bto\b|-|–|—)\s*/i', trim(strtolower($s)));
+    if (count($parts) !== 2) return ['', ''];
+    $end = exam_parse_time($parts[1]);
+    $start = exam_parse_time($parts[0]);
+    if (!preg_match('/[ap]\.?m/', $parts[0]) && preg_match('/([ap])\.?m/', $parts[1], $m)) {
+        $with = exam_parse_time($parts[0] . ' ' . $m[1] . 'm');
+        if ($with !== '' && $end !== '' && exam_min($with) < exam_min($end)) $start = $with;
+    }
+    return $start !== '' && $end !== '' && exam_min($end) > exam_min($start) ? [$start, $end] : ['', ''];
+}
+
+// A duty chart as exams: a session already on the schedule (same school, day
+// and times) gets the names, a new one is made from the chart's title. Each
+// session asks for as many invigilators as it has ticks.
+function exam_chart_import(array $chart, string $school, array $faculty, string $by, bool $sample): array {
+    $who = exam_name_index($faculty);
+    $data = exam_data();
+    $made = [];
+    $problems = [];
+    foreach ($chart['sessions'] as $s) {
+        $when = date('j M', strtotime($s['date'])) . ' ' . exam_clock($s['start']);
+        if ($s['date'] < exam_today()) { $problems[] = "$when: that day is over, and past exams cannot be changed."; continue; }
+        $x = null;
+        foreach ($data['exams'] as $old) {
+            if ($old['school'] === $school && $old['date'] === $s['date'] && $old['start'] === $s['start'] && $old['end'] === $s['end']) { $x = $old; break; }
+        }
+        if ($x) {
+            $x['need'] = max((int) $x['need'], min(40, count($s['names'])));
+        } else {
+            [$x, $why] = exam_make(['date' => $s['date'], 'start' => $s['start'], 'end' => $s['end'], 'school' => $school, 'class' => $chart['class'],
+                'subject' => $chart['subject'], 'need' => max(1, count($s['names'])), 'sample' => $sample]);
+            if (!$x) { $problems[] = "$when: needs $why."; continue; }
+        }
+        $made[] = [$x, exam_match_names($s['names'], $who, $faculty, $when, $problems)];
+    }
+    return [$made, $problems];
+}
+
+// Timetable people by every spelling they go by.
+function exam_name_index(array $faculty): array {
+    $who = [];
+    foreach ($faculty as $id => $f) {
+        foreach ($f['as'] as $a) $who[$a] = $id;
+        $who[timetable_person($f['name'])] ??= $id;
+    }
+    return $who;
+}
+
+// Names as [person id, name]: the timetable's spelling when it knows them,
+// as written (and said so) when it does not.
+function exam_match_names(array $names, array $who, array $faculty, string $where, array &$problems): array {
+    $out = [];
+    foreach ($names as $n) {
+        if (trim($n) === '') continue;
+        $p = $who[timetable_person($n)] ?? '';
+        if ($p === '') $problems[] = "$where: \"$n\" is not a name on the timetable; added as written.";
+        $out[] = [$p, $p !== '' ? $faculty[$p]['name'] : trim($n)];
+    }
+    return $out;
+}
+
+// An upload, in either layout: the schedule's own columns (EXAM_COLUMNS) or
+// the exam cell's duty chart, which names no school, so $school says it.
+function exam_import(array $rows, array $faculty, string $by, bool $sample = false, string $school = ''): array {
     $head = null;
     $col = [];
     foreach ($rows as $i => $r) {
@@ -440,29 +598,26 @@ function exam_import(array $rows, array $faculty, string $by, bool $sample = fal
         }
         if (isset($found['date'], $found['subject'])) { $head = $i; $col = $found; break; }
     }
-    if ($head === null) return [0, 0, ['No header row with at least Date and Subject was found. Download the format to see the columns.']];
-    $who = [];
-    foreach ($faculty as $id => $f) {
-        foreach ($f['as'] as $a) $who[$a] = $id;
-        $who[timetable_person($f['name'])] ??= $id;
-    }
     $added = $updated = 0;
-    $problems = [];
-    $made = [];
-    foreach (array_slice($rows, $head + 1, null, true) as $i => $r) {
-        if (!array_filter($r, fn($v) => trim($v) !== '')) continue;
-        $in = [];
-        foreach ($col as $k => $c) $in[$k] = (string) ($r[$c] ?? '');
-        [$x, $why] = exam_make($in + ['sample' => $sample]);
-        if (!$x) { $problems[] = 'Row ' . ($i + 1) . ": needs $why."; continue; }
-        $names = [];
-        foreach (preg_split('/\s*[;,\n]\s*/', $in['names'] ?? '') as $n) {
-            if (trim($n) === '') continue;
-            $p = $who[timetable_person($n)] ?? '';
-            if ($p === '') $problems[] = 'Row ' . ($i + 1) . ': "' . $n . '" is not a name on the timetable; added as written.';
-            $names[] = [$p, $p !== '' ? $faculty[$p]['name'] : trim($n)];
+    if ($head === null) {
+        $chart = exam_chart_parse($rows);
+        if ($chart === null) return [0, 0, ['No header row was found: neither Date and Subject columns, nor a duty chart with Name of Faculty and a date over each session. Download the template to see the columns.']];
+        if (!isset(SCHOOLS[$school])) return [0, 0, ['A duty chart names no school. Please pick the school it is for and upload it again.']];
+        [$made, $problems] = exam_chart_import($chart, $school, $faculty, $by, $sample);
+    } else {
+        $who = exam_name_index($faculty);
+        $problems = [];
+        $made = [];
+        $today = exam_today();
+        foreach (array_slice($rows, $head + 1, null, true) as $i => $r) {
+            if (!array_filter($r, fn($v) => trim($v) !== '')) continue;
+            $in = [];
+            foreach ($col as $k => $c) $in[$k] = (string) ($r[$c] ?? '');
+            [$x, $why] = exam_make($in + ['sample' => $sample]);
+            if (!$x) { $problems[] = 'Row ' . ($i + 1) . ": needs $why."; continue; }
+            if ($x['date'] < $today) { $problems[] = 'Row ' . ($i + 1) . ': that day is over, and past exams cannot be changed.'; continue; }
+            $made[] = [$x, exam_match_names(preg_split('/\s*[;,\n]\s*/', $in['names'] ?? ''), $who, $faculty, 'Row ' . ($i + 1), $problems)];
         }
-        $made[] = [$x, $names];
     }
     exam_save(function (array $d) use ($made, $by, $sample, &$added, &$updated) {
         foreach ($made as [$x, $names]) {
@@ -547,7 +702,8 @@ function exam_sample(array $t, array $faculty, string $by): int {
         if ($c['school'] === '' || !$c['theory'] || isset($bySchool[$c['school']][$c['class']]) || count($bySchool[$c['school']] ?? []) >= 6) continue;
         $bySchool[$c['school']][$c['class']] = $c;
     }
-    $monday = new DateTimeImmutable('monday this week');
+    // Next week, so every sample exam is still ahead and can be marked.
+    $monday = new DateTimeImmutable('monday next week');
     $sessions = [['10:00', '13:00'], ['14:00', '17:00']];
     $ids = [];
     $n = 0;

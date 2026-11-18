@@ -6,6 +6,8 @@
 
 // Before store.php is loaded, so nothing here touches the live data directory.
 define('STORE_DIR', __DIR__ . '/../cache/test-exams-' . getmypid());
+// Pinned, so the dates below stay ahead of "today" whenever this runs.
+define('EXAM_TODAY', '2026-11-18');
 require_once __DIR__ . '/../includes/exams.php';
 
 register_shutdown_function(function () {
@@ -107,7 +109,7 @@ $back = exam_import($export, $faculty, 'admin@x.in');
 assert($back[0] === 0 && $back[1] === 2, 'a downloaded schedule uploads back as updates');
 
 // --- An upload marked as test data ---------------------------------------------------------
-$test = [EXAM_COLUMNS, ['2026-10-29', '15:00', '16:00', '', 'School of Engineering', 'B.Tech First Year', 'Unit Test', '', '1', 'Asha Rao']];
+$test = [EXAM_COLUMNS, ['2026-12-03', '15:00', '16:00', '', 'School of Engineering', 'B.Tech First Year', 'Unit Test', '', '1', 'Asha Rao']];
 [$added] = exam_import($test, $faculty, 'admin@x.in', true);
 $ut = array_values(array_filter(exam_data()['exams'], fn($x) => $x['subject'] === 'Unit Test'))[0];
 $utDuty = (string) array_key_first(exam_duties_of(exam_data(), $ut['id']));
@@ -126,5 +128,59 @@ assert(exam_set_status($id, $pd, 'ontime', [], 'admin@x.in') === 0 && exam_data(
 assert(exam_update($new['id'], ['date' => '2026-11-26', 'start' => '10:00', 'end' => '13:00', 'school' => 'eng', 'class' => 'B.Tech CSE Sem V', 'subject' => 'Physics', 'room' => '202', 'need' => 3]) === '');
 $moved = exam_data()['exams'][$new['id']];
 assert($moved['date'] === '2026-11-26' && $moved['room'] === '202' && $moved['report'] === '09:30' && count(exam_duties_of(exam_data(), $new['id'])) === 2, 'an edit keeps the id and the duties');
+
+// --- The exam cell's duty chart layout -------------------------------------------------------
+assert(exam_chart_time('12:30 pm to 1:30 pm') === ['12:30', '13:30']);
+assert(exam_chart_time('3:00-4:00PM') === ['15:00', '16:00']);
+assert(exam_chart_time('10:30-11:30AM') === ['10:30', '11:30']);
+assert(exam_chart_time('11:30-12:30 pm') === ['11:30', '12:30'], 'a morning start keeps its am');
+assert(exam_chart_date('29th October (E)', 2026) === '2026-10-29');
+assert(exam_chart_date('26-10-2026', 2000) === '2026-10-26');
+assert(exam_chart_date('Duties', 2026) === '');
+$chart = [
+    ['Unit Test Duty Chart (Lateral Entry Students) - December 2026', '', '', '', ''],
+    ['S. No', 'Name of Faculty', '7th December (M)', '', '8-12-2026'],
+    ['', '', '10:30-11:30AM', '3:00-4:00PM', '12:30 pm to 1:30 pm'],
+    ['1', 'Dr. Asha Rao', '✓', '', '√'],
+    ['2', 'Prof. Bimal Das', '', 'Y', '✓'],
+    ['3', 'Someone Else', '', '', ''],
+    ['', 'ECR In-charge', '', '', ''],
+];
+$c = exam_chart_parse($chart);
+assert($c['subject'] === 'Unit Test' && $c['class'] === 'Lateral Entry Students', 'subject and class from the title');
+assert(count($c['sessions']) === 3 && $c['sessions'][1]['date'] === '2026-12-07' && $c['sessions'][1]['start'] === '15:00', 'a merged date repeats over the next column');
+assert($c['sessions'][2]['names'] === ['Dr. Asha Rao', 'Prof. Bimal Das']);
+$noSchool = exam_import($chart, $faculty, 'admin@x.in');
+assert($noSchool[0] === 0 && str_contains($noSchool[2][0], 'school'), 'a chart needs a school');
+[$added, $updated, $problems] = exam_import($chart, $faculty, 'admin@x.in', true, 'eng');
+assert($added === 3 && $updated === 0 && !$problems, "chart: $added added, " . implode(' / ', $problems));
+$s3 = array_values(array_filter(exam_data()['exams'], fn($x) => $x['date'] === '2026-12-08'))[0];
+assert($s3['need'] === 2 && $s3['subject'] === 'Unit Test' && $s3['school'] === 'eng' && count(exam_duties_of(exam_data(), $s3['id'])) === 2);
+assert(exam_import($chart, $faculty, 'admin@x.in', true, 'eng')[1] === 3, 'the same chart again updates its sessions');
+assert(count(exam_duties_of(exam_data(), $s3['id'])) === 2, 'and adds nobody twice');
+
+// The chart as the page exports it uploads straight back.
+require_once __DIR__ . '/../includes/exams-doc.php';
+$ids = array_keys(array_filter(exam_data()['exams'], fn($x) => $x['subject'] === 'Unit Test'));
+$doc = exam_doc_chart(exam_data(), array_intersect_key(exam_data()['exams'], array_flip($ids)), '', 'School of Engineering', 'x');
+assert($doc['title'] === 'Unit Test Duty Chart (Lateral Entry Students)', $doc['title']);
+$flat = array_map(fn($r) => array_map(fn($v) => is_array($v) ? $v[1] : (string) $v, $r), $doc['sheet']);
+assert(exam_import($flat, $faculty, 'admin@x.in', true, 'eng')[1] === 3, 'a downloaded chart uploads back as updates');
+exam_clear_sample();
+
+// --- Past exams are kept as they were ----------------------------------------------------------
+assert(exam_is_past(['date' => '2026-11-17']) && !exam_is_past(['date' => '2026-11-18']), "the exam's own day is still open");
+$old = [EXAM_COLUMNS, ['2026-10-29', '15:00', '16:00', '', 'School of Engineering', 'B.Tech First Year', 'Old paper', '', '1', '']];
+[$added, , $problems] = exam_import($old, $faculty, 'admin@x.in');
+assert($added === 0 && str_contains($problems[0], 'past'), 'an upload never writes a past exam');
+
+// --- Signatories ----------------------------------------------------------------------------------
+assert(exam_signatories(exam_data(), 'eng') === EXAM_SIGN_DEFAULT);
+exam_set_signatories('', ['ECR In-charge', 'Dean SOE'], ['', 'Dr. Dean']);
+assert(exam_signatories(exam_data(), 'eng') === [['ECR In-charge', ''], ['Dean SOE', 'Dr. Dean']], 'every school falls back to the shared list');
+exam_set_signatories('eng', ['Head First Year'], ['']);
+assert(exam_signatories(exam_data(), 'eng') === [['Head First Year', '']] && count(exam_signatories(exam_data(), 'law')) === 2);
+exam_set_signatories('eng', [''], ['']);
+assert(count(exam_signatories(exam_data(), 'eng')) === 2, 'an empty list goes back to the shared one');
 
 echo "OK\n";

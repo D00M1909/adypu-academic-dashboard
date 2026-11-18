@@ -24,7 +24,7 @@ are separate repos with separate data.
 | `events.php` | everyone, admin edits | Holidays and events as a month, by school and year (`data/calendar.php`). A holiday reads Holiday, not Not filled, in the report; an event is a note on a normal day. `?view=report` counts holidays, days off and events in any dates for the schools, years and types ticked, and prints as a PDF |
 | `audit.php` | everyone (changes signed in) | Academic audit: each faculty member's course file per subject (from the timetable), the 17 items of the Course File Index to upload and submit once; program leads approve and remark, everyone else reads; one deadline; opens on the summary table, insights below it, CSV export and a printable report |
 | `audit-file.php` | everyone | One uploaded audit file |
-| `exams.php` | everyone (changes admin only) | Exam duties: the exam schedule by date, invigilators allocated per exam, attendance against the reporting time, faculty duty counts, a printable report and CSV export; see section 8b |
+| `exams.php` | everyone (changes admin only) | Exam duties: the exam schedule by date, invigilators allocated per exam, attendance against the reporting time, faculty duty counts, a duty chart, a printable report and exports; see section 8b |
 | `login.php` | faculty | Sign in, sign up with a school join code |
 | `mark.php` | faculty | Mark attendance from a phone: tick absentees, or type a count |
 | `account.php` | faculty | Name and password |
@@ -199,6 +199,16 @@ remark) and `mail` (late notices).
 - The schedule is added by hand, uploaded as .csv or .xlsx, or downloaded in that same format
   (Date, Start, End, Reporting, School, Class, Subject, Room, Invigilators needed,
   Invigilators). Reporting defaults to 30 minutes before the start.
+- The upload also reads the exam cell's own duty chart (.xlsx or .csv, not PDF): a title
+  naming the subject and, in brackets, the class; S. No, Name of Faculty and one date per
+  session, its time on the row under it, a tick per duty. The school is picked on the form.
+  A session already on the schedule at that day and time gets the names; a new one asks for
+  as many invigilators as it has ticks.
+- Views: By exam, Duty chart (faculty down the side, one column per session, the same layout
+  as the exam cell's chart; its Excel uploads back in), Faculty duties, Report. Printed
+  documents end with a line to sign per signatory, set per school with a shared fallback.
+- Past exams (dated before today) are read only: no edit, duty or attendance change, and an
+  upload skips them. By exam and Duty chart show upcoming exams unless Past or All is picked.
 - Allocation is manual or automatic: the exam's own school first, only faculty not teaching
   or on another duty at that time, fewest duties first.
 - Attendance: a status and an arrival time per duty. An arrival after the reporting time is
@@ -208,7 +218,7 @@ remark) and `mail` (late notices).
   push (`mail` in `api/ingest.php`'s response); the script sends it with MailApp from the
   production target only and reports the ids back in the `X-Mail-Sent` header of the push
   after, which marks them sent.
-- A sample week built from the timetable can be loaded onto an empty schedule and removed
+- A sample week (next week) built from the timetable can be loaded onto an empty schedule and removed
   again.
 
 ## 9. Tech and deploy
