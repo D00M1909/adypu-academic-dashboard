@@ -83,6 +83,9 @@ function exam_doc_sign_text(array $sign): string {
 // on any of them. Its Excel keeps the two header rows (date, then time), so
 // it uploads back in (exam_chart_parse()).
 
+// Sessions on one printed page of the duty chart: fits A4 upright with names.
+const EXAM_CHART_PAGE = 8;
+
 function exam_doc_chart(array $data, array $exams, string $st, string $scope, string $fileBit): array {
     $cols = [];
     $people = [];
@@ -110,46 +113,62 @@ function exam_doc_chart(array $data, array $exams, string $st, string $scope, st
     $title = (count($subjects) === 1 ? $subjects[0] . ' ' : '') . 'Duty Chart' . (count($classes) === 1 ? ' (' . $classes[0] . ')' : '');
 
     $timeOf = fn($c) => exam_clock($c['start']) . ' to ' . exam_clock($c['end']);
-    $head = '<tr><th rowspan="2">S. No</th><th rowspan="2">Name of Faculty</th>';
-    $sub = '<tr>';
-    $lastDate = '';
-    $span = array_count_values(array_column($cols, 'date'));
-    foreach ($cols as $c) {
-        if ($c['date'] !== $lastDate) {
-            $head .= '<th colspan="' . $span[$c['date']] . '" class="exm-chart-date">' . exam_doc_e(date('D j M', strtotime($c['date']))) . '</th>';
-            $lastDate = $c['date'];
-        }
-        $sub .= '<th class="exm-chart-time">' . exam_doc_e($timeOf($c)) . '</th>';
-    }
-    $head .= '<th rowspan="2">Duties</th></tr>';
-    $sub .= '</tr>';
-    $body = '';
-    $n = 0;
     $sheet = [[['b', $title . ' - ' . $scope]], array_merge([['b', 'S. No'], ['b', 'Name of Faculty']], array_map(fn($c) => ['b', date('d-m-Y', strtotime($c['date']))], array_values($cols)), [['b', 'Duties']]),
         array_merge(['', ''], array_map(fn($c) => ['b', $timeOf($c)], array_values($cols)), [''])];
     $text = "$title\n$scope\n\n";
     $perCol = array_fill_keys(array_keys($cols), 0);
-    foreach ($people as $p) {
+    $cells = [];
+    $n = 0;
+    foreach ($people as $pk => $p) {
         $n++;
-        $row = '<tr><td>' . $n . '</td><th>' . exam_doc_e($p['name']) . '</th>';
         $line = [$n, $p['name']];
         $held = [];
         foreach ($cols as $k => $c) {
             $s = $p['cells'][$k] ?? '';
             $at = $p['times'][$k] ?? '';
             if ($s !== '') { $perCol[$k]++; $held[] = date('j M', strtotime($c['date'])) . ' ' . exam_clock($c['start']) . ($at !== '' ? " (present $at)" : ($s === 'absent' ? ' (absent)' : '')); }
-            $row .= $s === '' ? '<td></td>' : '<td class="exm-chart-tick exm-st-' . $s . '" title="' . exam_doc_e(EXAM_STATUS_LABEL[$s] . ($at !== '' ? ", present at $at" : '')) . '">'
+            $cells[$pk][$k] = $s === '' ? '<td></td>' : '<td class="exm-chart-tick exm-st-' . $s . '" title="' . exam_doc_e(EXAM_STATUS_LABEL[$s] . ($at !== '' ? ", present at $at" : '')) . '">'
                 . ($s === 'na' ? 'N/A' : '&#10003;') . ($at !== '' ? '<small>' . exam_doc_e($at) . '</small>' : '') . '</td>';
             // "✓ 3.26 pm": exam_chart_parse() reads the tick and leaves the time.
             $line[] = $s === '' ? '' : [['ontime' => 'g', 'late' => 'y', 'absent' => 'r'][$s] ?? '', '✓' . ($at !== '' ? " $at" : '')];
         }
-        $body .= $row . '<td>' . count($held) . '</td></tr>';
+        $people[$pk]['held'] = count($held);
         $line[] = (string) count($held);
         $sheet[] = $line;
         $text .= "$n. {$p['name']}: " . implode(', ', $held) . "\n";
     }
-    $foot = '<tr class="exm-chart-total"><td></td><th>Invigilators</th>' . implode('', array_map(fn($v) => "<td>$v</td>", $perCol)) . '<td>' . array_sum($perCol) . '</td></tr>';
-    $html = $cols ? '<div class="exm-chart-wrap"><table class="exm-doc-table exm-chart"><thead>' . $head . $sub . '</thead><tbody>' . $body . $foot . '</tbody></table></div>'
+
+    // A page holds EXAM_CHART_PAGE sessions, so a long exam week is drawn as
+    // several tables, names repeated, each starting a new printed page. One
+    // scrolling table was cut off at the paper's edge.
+    $parts = array_chunk(array_keys($cols), EXAM_CHART_PAGE);
+    $html = '';
+    foreach ($parts as $pi => $keys) {
+        $head = '<tr><th rowspan="2" class="exm-chart-sno">S. No</th><th rowspan="2" class="exm-chart-name">Name of Faculty</th>';
+        $sub = '<tr>';
+        $span = array_count_values(array_map(fn($k) => $cols[$k]['date'], $keys));
+        $lastDate = '';
+        foreach ($keys as $k) {
+            $c = $cols[$k];
+            if ($c['date'] !== $lastDate) {
+                $head .= '<th colspan="' . $span[$c['date']] . '" class="exm-chart-date">' . exam_doc_e(date('D j M', strtotime($c['date']))) . '</th>';
+                $lastDate = $c['date'];
+            }
+            $sub .= '<th class="exm-chart-time">' . exam_doc_e($timeOf($c)) . '</th>';
+        }
+        $head .= '<th rowspan="2" class="exm-chart-sno">Duties</th></tr>';
+        $sub .= '</tr>';
+        $body = '';
+        $n = 0;
+        foreach ($people as $pk => $p) {
+            $n++;
+            $body .= '<tr><td>' . $n . '</td><th>' . exam_doc_e($p['name']) . '</th>' . implode('', array_map(fn($k) => $cells[$pk][$k], $keys)) . '<td>' . $p['held'] . '</td></tr>';
+        }
+        $body .= '<tr class="exm-chart-total"><td></td><th>Invigilators</th>' . implode('', array_map(fn($k) => '<td>' . $perCol[$k] . '</td>', $keys)) . '<td>' . array_sum($perCol) . '</td></tr>';
+        $label = count($parts) > 1 ? '<h3 class="exm-chart-part-head">Sessions ' . ($pi * EXAM_CHART_PAGE + 1) . ' to ' . ($pi * EXAM_CHART_PAGE + count($keys)) . ' of ' . count($cols) . '</h3>' : '';
+        $html .= '<section class="exm-chart-part">' . $label . '<div class="exm-chart-wrap"><table class="exm-doc-table exm-chart"><colgroup><col class="exm-col-sno"><col class="exm-col-name">' . str_repeat('<col>', count($keys)) . '<col class="exm-col-duties"></colgroup><thead>' . $head . $sub . '</thead><tbody>' . $body . '</tbody></table></div></section>';
+    }
+    $html = $cols ? $html
         . '<p class="exm-doc-key"><span class="exm-chip exm-st-allocated">&#10003; on duty</span><span class="exm-chip exm-st-ontime">On time</span><span class="exm-chip exm-st-late">Late</span><span class="exm-chip exm-st-absent">Absent</span><span class="exm-chip exm-st-na">N/A not applicable</span></p>'
         : '<p class="field-help">No exams match these filters.</p>';
     return ['title' => $title, 'scope' => $scope, 'body' => $html, 'text' => $text, 'sheet' => $sheet,
