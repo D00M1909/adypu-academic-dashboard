@@ -146,7 +146,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $back += ['n' => exam_set_status($eid, $qid, $qs, $emails, $by)];
                     $done = 'quick';
                 } else {
-                    $back += ['n' => exam_mark($eid, (array) ($_POST['status'] ?? []), (array) ($_POST['arrived'] ?? []), (array) ($_POST['remark'] ?? []), $emails, $by)];
+                    exam_remarks($eid, (array) ($_POST['remark'] ?? []), $by);
                 }
                 break;
             default:
@@ -283,7 +283,7 @@ if ($error === '' && !$info && $done !== '') page_notice('ok', match ($done) {
     'sample' => "Loaded $n sample exams. They can be removed again.", 'clear_sample' => 'Sample data removed.',
     'quick' => 'Status updated.' . ($n ? ' A late email is queued; it is sent within a few minutes.' : ''), 'update' => 'Exam details saved.',
     'sign' => 'Signatures saved.', 'delete' => 'Exam deleted.', 'assign' => 'Invigilator added.', 'remove' => 'Invigilator removed.',
-    'mark' => 'Attendance saved.' . ($n ? " $n late email" . ($n === 1 ? '' : 's') . ' queued; they are sent within a few minutes.' : ''),
+    'mark' => 'Remarks saved.',
     default => 'Saved.',
 });
 // The one Export menu: the same five ways out on every view, each for exactly
@@ -333,12 +333,13 @@ if ($printDoc): ?>
 <?php
 $tileCounts = $exam ? exam_counts(array_map(fn($did) => ['duty' => $data['duties'][$did], 'exam' => $exam], array_keys(exam_duties_of($data, $eid)))) : $counts;
 ?>
+<?php $needed = $tileCounts['duties'] - $tileCounts['na']; // a reserve not called on is nobody's attendance ?>
 <div class="aud-due exm-due<?= in_array($view, ['chart', 'letter'], true) && !$exam ? ' no-print' : '' ?>">
   <span class="aud-due-cell"><small>Exams</small><strong><?= $exam ? 1 : count(exam_list($data, $school, $from, $to)) ?></strong><em><?= $exam ? $e($exam['subject']) : 'on the schedule' ?></em></span>
-  <span class="aud-due-cell"><small>Duties allocated</small><strong><?= $tileCounts['duties'] ?></strong><em><?= $tileCounts['allocated'] ?> not marked</em></span>
-  <span class="aud-due-cell is-ontime"><small>On time</small><strong><?= $tileCounts['ontime'] ?></strong><em><?= $tileCounts['duties'] ? round(100 * $tileCounts['ontime'] / $tileCounts['duties']) . '%' : '-' ?></em></span>
-  <span class="aud-due-cell is-late"><small>Late</small><strong><?= $tileCounts['late'] ?></strong><em><?= $tileCounts['duties'] ? round(100 * $tileCounts['late'] / $tileCounts['duties']) . '%' : '-' ?></em></span>
-  <span class="aud-due-cell is-pending"><small>Absent</small><strong><?= $tileCounts['absent'] ?></strong><em><?= $tileCounts['duties'] ? round(100 * $tileCounts['absent'] / $tileCounts['duties']) . '%' : '-' ?></em></span>
+  <span class="aud-due-cell"><small>Duties allocated</small><strong><?= $tileCounts['duties'] ?></strong><em><?= $tileCounts['allocated'] ?> not marked<?= $tileCounts['na'] ? ', ' . $tileCounts['na'] . ' not needed' : '' ?></em></span>
+  <span class="aud-due-cell is-ontime"><small>On time</small><strong><?= $tileCounts['ontime'] ?></strong><em><?= $needed ? round(100 * $tileCounts['ontime'] / $needed) . '%' : '-' ?></em></span>
+  <span class="aud-due-cell is-late"><small>Late</small><strong><?= $tileCounts['late'] ?></strong><em><?= $needed ? round(100 * $tileCounts['late'] / $needed) . '%' : '-' ?></em></span>
+  <span class="aud-due-cell is-pending"><small>Absent</small><strong><?= $tileCounts['absent'] ?></strong><em><?= $needed ? round(100 * $tileCounts['absent'] / $needed) . '%' : '-' ?></em></span>
 </div>
 
 <?php
@@ -454,21 +455,17 @@ $filterForm = function (string $viewKey, array $with) use ($e, $school, $from, $
           <th><?= $e($d['name']) ?></th>
           <?php if ($canMark): ?>
           <td class="aud-left no-print"><span class="exm-quick">
-            <?php foreach (['ontime' => 'On time', 'late' => 'Late', 'absent' => 'Absent'] as $k => $l): ?>
-            <button class="exm-q exm-q-<?= $k ?>" name="quick" value="<?= $e("$did:$k") ?>" type="submit" formnovalidate<?= $d['status'] === $k ? ' aria-pressed="true"' : '' ?>><?= $l ?></button>
+            <?php foreach (EXAM_MARKS as $k => $l): $on = $k === 'present' ? in_array($d['status'], ['ontime', 'late'], true) : $d['status'] === $k; ?>
+            <button class="exm-q exm-q-<?= $k ?><?= $k === 'present' && $d['status'] === 'late' ? ' is-late' : '' ?>" name="quick" value="<?= $e("$did:$k") ?>" type="submit" formnovalidate<?= $on ? ' aria-pressed="true"' : '' ?><?= $k === 'present' && $on ? ' disabled' : '' ?>><?= $l ?></button>
             <?php endforeach; ?>
           </span></td>
           <?php endif; ?>
           <td class="aud-left"><?= $e($d['role']) ?></td>
-          <?php if ($canMark): ?>
-          <td class="aud-left"><select name="status[<?= $e($did) ?>]" aria-label="Status for <?= $e($d['name']) ?>">
-            <?php foreach (EXAM_STATUS_LABEL as $k => $l): ?><option value="<?= $k ?>"<?= $k === $d['status'] ? ' selected' : '' ?>><?= $e($l) ?></option><?php endforeach; ?>
-          </select></td>
-          <td class="aud-left"><input type="time" name="arrived[<?= $e($did) ?>]" value="<?= $e($d['arrived']) ?>" data-report="<?= $e($exam['report']) ?>" aria-label="Arrival time for <?= $e($d['name']) ?>"></td>
-          <td class="aud-left"><input type="text" name="remark[<?= $e($did) ?>]" value="<?= $e($d['remark']) ?>" maxlength="500" placeholder="Remark" aria-label="Remark for <?= $e($d['name']) ?>"></td>
-          <?php else: ?>
           <td class="aud-left"><?= $pill($d['status']) ?></td>
           <td class="aud-left"><?= $d['arrived'] !== '' ? $e(exam_clock($d['arrived'])) : '-' ?></td>
+          <?php if ($canMark): ?>
+          <td class="aud-left"><input type="text" name="remark[<?= $e($did) ?>]" value="<?= $e($d['remark']) ?>" maxlength="500" placeholder="Remark" aria-label="Remark for <?= $e($d['name']) ?>"></td>
+          <?php else: ?>
           <td class="aud-left"><?= $d['remark'] !== '' ? $e($d['remark']) : '-' ?></td>
           <?php endif; ?>
           <td class="aud-left exm-mail">
@@ -483,8 +480,8 @@ $filterForm = function (string $viewKey, array $with) use ($e, $school, $from, $
     </table></div>
     <?php endif; ?>
     <?php if ($canMark && $duties): ?>
-    <p class="field-help no-print">Reporting time is <?= $e(exam_clock($exam['report'])) ?>. An arrival after it is recorded as late, and a late duty with an email on file is sent a notice.</p>
-    <button class="btn-primary no-print exm-save" type="submit">Save attendance</button>
+    <p class="field-help no-print">Reporting time is <?= $e(exam_clock($exam['report'])) ?>. Present records the time it is clicked: after the reporting time it counts as late, and a late duty with an email on file is sent a notice. The time cannot be typed or changed. Not needed is for a reserve invigilator who was not called on.</p>
+    <button class="btn-quiet no-print exm-save" type="submit">Save remarks</button>
     <?php endif; ?>
   </section>
   <?php if ($canMark && $duties): ?></form><?php endif; ?>
@@ -554,19 +551,19 @@ $filterForm = function (string $viewKey, array $with) use ($e, $school, $from, $
     </table></div>
   </section>
 
-  <?php foreach ([['absent', 'Missed'], ['late', 'Late'], ['ontime', 'Attended on time'], ['allocated', 'Not marked yet']] as [$k, $label]): $set = $by($k);
-    if (($st !== '' && $st !== $k) || ($k === 'allocated' && !$set)) continue; ?>
+  <?php foreach ([['absent', 'Missed'], ['late', 'Late'], ['ontime', 'Attended on time'], ['na', 'Not needed (reserve)'], ['allocated', 'Not marked yet']] as [$k, $label]): $set = $by($k);
+    if (($st !== '' && $st !== $k) || (in_array($k, ['allocated', 'na'], true) && !$set)) continue; ?>
   <section class="card exm-sec-<?= $k ?>">
     <h2><?= $e($label) ?> <span class="count-pill"><?= count($set) ?></span></h2>
     <?php if (!$set): ?><p class="field-help">None.</p><?php else: ?>
     <div class="stat-table-wrap"><table class="stat-table aud-table exm-table">
-      <thead><tr><th>Date and time</th><th class="aud-left">Exam</th><th class="aud-left">Faculty</th><?php if ($k !== 'absent'): ?><th class="aud-left">Reporting</th><th class="aud-left">Arrived</th><?php endif; ?><th class="aud-left">Remark</th></tr></thead>
+      <thead><tr><th>Date and time</th><th class="aud-left">Exam</th><th class="aud-left">Faculty</th><?php if ($k === 'late' || $k === 'ontime'): ?><th class="aud-left">Reporting</th><th class="aud-left">Arrived</th><?php endif; ?><th class="aud-left">Remark</th></tr></thead>
       <tbody>
         <?php foreach ($set as $r): ?>
         <tr class="exm-row-<?= $e($k) ?>"><td class="aud-left"><?= $e($when($r)) ?></td>
           <td class="aud-left"><a href="exams.php?e=<?= $e($r['exam']['id']) ?>"><?= $e(exam_label($r['exam'])) ?></a></td>
           <td class="aud-left"><?= $e($r['duty']['name']) ?></td>
-          <?php if ($k !== 'absent'): ?><td class="aud-left"><?= $e(exam_clock($r['exam']['report'])) ?></td><td class="aud-left"><?= $r['duty']['arrived'] !== '' ? $e(exam_clock($r['duty']['arrived'])) : '-' ?></td><?php endif; ?>
+          <?php if ($k === 'late' || $k === 'ontime'): ?><td class="aud-left"><?= $e(exam_clock($r['exam']['report'])) ?></td><td class="aud-left"><?= $r['duty']['arrived'] !== '' ? $e(exam_clock($r['duty']['arrived'])) : '-' ?></td><?php endif; ?>
           <td class="aud-left"><?= $r['duty']['remark'] !== '' ? $e($r['duty']['remark']) : '-' ?></td></tr>
         <?php endforeach; ?>
       </tbody>

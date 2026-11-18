@@ -2560,6 +2560,12 @@ button.cal-day:hover { background: var(--lecture-tint); }
 .exm-q-ontime[aria-pressed="true"] { background: var(--good-ink); border-color: var(--good-ink); color: #fff; }
 .exm-q-late[aria-pressed="true"] { background: var(--att-warn); border-color: var(--att-warn); color: #fff; }
 .exm-q-absent[aria-pressed="true"] { background: var(--red-ink); border-color: var(--red-ink); color: #fff; }
+.exm-q-present[aria-pressed="true"] { background: var(--good-ink); border-color: var(--good-ink); color: #fff; cursor: default; opacity: 1; }
+.exm-q-present.is-late[aria-pressed="true"] { background: var(--att-warn); border-color: var(--att-warn); }
+.exm-q-na[aria-pressed="true"] { background: var(--ink-muted); border-color: var(--ink-muted); color: #fff; }
+.exm-st-na { background: var(--surface); color: var(--ink-muted); font-style: italic; }
+.exm-table tr.exm-row-na > *, .exm-doc-table tr.exm-row-na > * { color: var(--ink-muted); }
+.exm-chart-tick.exm-st-na { font-size: 11px; font-weight: 600; }
 .exm-st-pick.is-ontime { border-color: var(--good-ink); color: var(--good-ink); }
 .exm-st-pick.is-late { border-color: var(--att-warn); color: var(--att-warn); }
 .exm-st-pick.is-absent { border-color: var(--red-ink); color: var(--red-ink); }

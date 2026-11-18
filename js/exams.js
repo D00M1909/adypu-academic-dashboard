@@ -1,7 +1,5 @@
-// The Exams tab (exams.php). On the attendance form, an arrival time sets the
-// row's status (late when after the reporting time, otherwise on time), and
-// choosing Absent clears the time, and the row's colour follows the status.
-// On the roster and duty letter, "Copy as text" copies the plain version.
+// The Exams tab (exams.php): the Export menu's "Copy as text". Attendance
+// needs no script: Present is stamped by the server's clock (exam_set_status()).
 (function () {
   'use strict';
 
@@ -19,37 +17,6 @@
         area.classList.add('sr-only');
         done();
       }
-    });
-  });
-
-  var form = document.getElementById('exm-mark');
-  if (!form) return;
-
-  function paint(select) {
-    var row = select.closest('tr');
-    row.className = row.className.replace(/\bexm-row-\w+/g, '') + ' exm-row-' + select.value;
-  }
-
-  function statusOf(input) {
-    return input.closest('tr').querySelector('select[name^="status["]');
-  }
-
-  form.querySelectorAll('input[type="time"][data-report]').forEach(function (input) {
-    input.addEventListener('change', function () {
-      var select = statusOf(input);
-      if (!select || !input.value) return;
-      // "HH:MM" strings compare correctly as text.
-      select.value = input.value > input.dataset.report ? 'late' : 'ontime';
-      paint(select);
-    });
-  });
-
-  form.querySelectorAll('select[name^="status["]').forEach(function (select) {
-    select.addEventListener('change', function () {
-      paint(select);
-      if (select.value !== 'absent') return;
-      var time = select.closest('tr').querySelector('input[type="time"]');
-      if (time) time.value = '';
     });
   });
 }());

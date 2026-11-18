@@ -53,26 +53,35 @@ $duty = [];
 foreach (exam_data()['duties'] as $did => $d) $duty[$d['person']] = $did;
 $emails = ['pa' => 'asha@adypu.edu.in'];
 
-// Late, email known: late, and one mail queued.
-$queued = exam_mark($id, [$duty['pa'] => 'ontime', $duty['pb'] => 'ontime'], [$duty['pa'] => '09:50', $duty['pb'] => '09:20'], [], $emails, 'admin@x.in');
-assert($queued === 1);
+// Present stamps the clock at the click: after the 09:30 reporting time is
+// late, and queues one mail when an email is known.
+assert(exam_set_status($id, $duty['pa'], 'present', $emails, 'admin@x.in', '2026-11-24 09:50') === 1);
+assert(exam_set_status($id, $duty['pb'], 'present', $emails, 'admin@x.in', '2026-11-24 09:20') === 0);
 $d = exam_data();
-assert($d['duties'][$duty['pa']]['status'] === 'late', 'an arrival after the reporting time is late');
-assert($d['duties'][$duty['pb']]['status'] === 'ontime');
+assert($d['duties'][$duty['pa']]['status'] === 'late' && $d['duties'][$duty['pa']]['arrived'] === '09:50', 'a click after the reporting time is late');
+assert($d['duties'][$duty['pb']]['status'] === 'ontime' && $d['duties'][$duty['pb']]['arrived'] === '09:20');
 assert(count($d['mail']) === 1 && $d['mail'][$duty['pa']]['to'] === 'asha@adypu.edu.in', 'only the late duty with an email is mailed');
-assert(!isset($d['mail'][$duty['pb']]), 'an on-time duty queues nothing');
+assert(exam_set_status($id, $duty['pa'], 'ontime', $emails, 'admin@x.in') === 0 && exam_data()['duties'][$duty['pa']]['status'] === 'late', 'On time cannot be chosen');
+assert(exam_set_status($id, $duty['pa'], 'late', $emails, 'admin@x.in') === 0, 'nor Late');
 
-// Saving the same form again does not mail twice.
-assert(exam_mark($id, [$duty['pa'] => 'late'], [$duty['pa'] => '09:50'], [], $emails, 'admin@x.in') === 0);
+// Present again keeps the first stamp, so the time cannot be redone.
+exam_set_status($id, $duty['pa'], 'present', $emails, 'admin@x.in', '2026-11-24 09:00');
+assert(exam_data()['duties'][$duty['pa']]['arrived'] === '09:50' && count(exam_data()['mail']) === 1, 'and does not mail twice');
 
-// Late with no email on file: late, nothing queued.
-exam_mark($id, [$duty['pb'] => 'ontime'], [$duty['pb'] => '09:45'], [], [], 'admin@x.in');
+// Absent clears the time; Present after it stamps afresh. No address, no mail.
+exam_set_status($id, $duty['pb'], 'absent', [], 'admin@x.in');
+assert(exam_data()['duties'][$duty['pb']]['status'] === 'absent' && exam_data()['duties'][$duty['pb']]['arrived'] === '');
+exam_set_status($id, $duty['pb'], 'present', [], 'admin@x.in', '2026-11-24 09:45');
 assert(exam_data()['duties'][$duty['pb']]['status'] === 'late' && count(exam_data()['mail']) === 1, 'no address, no mail');
 
-// Absent clears the arrival time.
-exam_mark($id, [$duty['pb'] => 'absent'], [$duty['pb'] => '09:45'], [$duty['pb'] => 'ill'], [], 'admin@x.in');
-$d = exam_data()['duties'][$duty['pb']];
-assert($d['status'] === 'absent' && $d['arrived'] === '' && $d['remark'] === 'ill');
+// Not needed: a reserve who was not called on, out of the attendance counts.
+exam_set_status($id, $duty['pb'], 'na', [], 'admin@x.in');
+assert(exam_data()['duties'][$duty['pb']]['status'] === 'na' && exam_data()['duties'][$duty['pb']]['arrived'] === '');
+
+// Remarks are saved apart from status.
+exam_remarks($id, [$duty['pb'] => '  reserve  '], 'admin@x.in');
+assert(exam_data()['duties'][$duty['pb']]['remark'] === 'reserve' && exam_data()['duties'][$duty['pb']]['status'] === 'na');
+exam_set_status($id, $duty['pb'], 'absent', [], 'admin@x.in');
 
 // --- The hand-off ----------------------------------------------------------------------
 $pending = exam_mail_handoff([]);
@@ -114,17 +123,17 @@ $test = [EXAM_COLUMNS, ['2026-12-03', '15:00', '16:00', '', 'School of Engineeri
 $ut = array_values(array_filter(exam_data()['exams'], fn($x) => $x['subject'] === 'Unit Test'))[0];
 $utDuty = (string) array_key_first(exam_duties_of(exam_data(), $ut['id']));
 assert($added === 1 && $ut['sample'] && !empty(exam_data()['duties'][$utDuty]['sample']), 'a test-data upload flags its exams and duties');
-assert(exam_set_status($ut['id'], $utDuty, 'late', ['pa' => 'a@x.in'], 'admin@x.in') === 0, 'test data never mails');
+assert(exam_set_status($ut['id'], $utDuty, 'present', ['pa' => 'a@x.in'], 'admin@x.in', '2026-12-03 15:00') === 0 && exam_data()['duties'][$utDuty]['status'] === 'late', 'test data never mails');
 exam_clear_sample();
 assert(!isset(exam_data()['exams'][$ut['id']]) && !isset(exam_data()['duties'][$utDuty]), 'and Remove sample data clears it');
 
 // --- One-click status and editing an exam -------------------------------------------------------
 $pd = (string) array_key_first(array_filter(exam_duties_of(exam_data(), $new['id']), fn($d) => $d['person'] === 'pa'));
-assert(exam_set_status($new['id'], $pd, 'late', ['pa' => 'a@x.in'], 'admin@x.in') === 1, 'a click on Late queues the email');
-assert(exam_set_status($new['id'], $pd, 'late', ['pa' => 'a@x.in'], 'admin@x.in') === 0, 'and only once');
+assert(exam_set_status($new['id'], $pd, 'present', ['pa' => 'a@x.in'], 'admin@x.in', '2026-11-25 14:05') === 1, 'a late Present queues the email');
+assert(exam_set_status($new['id'], $pd, 'present', ['pa' => 'a@x.in'], 'admin@x.in', '2026-11-25 14:06') === 0, 'and only once');
 exam_set_status($new['id'], $pd, 'absent', [], 'admin@x.in');
 assert(exam_data()['duties'][$pd]['status'] === 'absent' && exam_data()['duties'][$pd]['arrived'] === '');
-assert(exam_set_status($id, $pd, 'ontime', [], 'admin@x.in') === 0 && exam_data()['duties'][$pd]['status'] === 'absent', 'a duty of another exam is left alone');
+assert(exam_set_status($id, $pd, 'present', [], 'admin@x.in') === 0 && exam_data()['duties'][$pd]['status'] === 'absent', 'a duty of another exam is left alone');
 assert(exam_update($new['id'], ['date' => '2026-11-26', 'start' => '10:00', 'end' => '13:00', 'school' => 'eng', 'class' => 'B.Tech CSE Sem V', 'subject' => 'Physics', 'room' => '202', 'need' => 3]) === '');
 $moved = exam_data()['exams'][$new['id']];
 assert($moved['date'] === '2026-11-26' && $moved['room'] === '202' && $moved['report'] === '09:30' && count(exam_duties_of(exam_data(), $new['id'])) === 2, 'an edit keeps the id and the duties');

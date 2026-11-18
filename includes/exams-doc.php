@@ -94,7 +94,7 @@ function exam_doc_chart(array $data, array $exams, string $st, string $scope, st
             $p = $d['person'] !== '' ? $d['person'] : 'name:' . strtolower($d['name']);
             $people[$p] ??= ['name' => $d['name'], 'cells' => []];
             // A person twice in one session shows the worse of the two.
-            $rank = ['absent' => 3, 'late' => 2, 'allocated' => 1, 'ontime' => 0];
+            $rank = ['absent' => 3, 'late' => 2, 'allocated' => 1, 'ontime' => 0, 'na' => -1];
             $was = $people[$p]['cells'][$k] ?? null;
             if ($was === null || $rank[$d['status']] > $rank[$was]) $people[$p]['cells'][$k] = $d['status'];
         }
@@ -133,7 +133,7 @@ function exam_doc_chart(array $data, array $exams, string $st, string $scope, st
         foreach ($cols as $k => $c) {
             $s = $p['cells'][$k] ?? '';
             if ($s !== '') { $perCol[$k]++; $held[] = date('j M', strtotime($c['date'])) . ' ' . exam_clock($c['start']); }
-            $row .= $s === '' ? '<td></td>' : '<td class="exm-chart-tick exm-st-' . $s . '" title="' . exam_doc_e(EXAM_STATUS_LABEL[$s]) . '">&#10003;</td>';
+            $row .= $s === '' ? '<td></td>' : '<td class="exm-chart-tick exm-st-' . $s . '" title="' . exam_doc_e(EXAM_STATUS_LABEL[$s]) . '">' . ($s === 'na' ? 'N/A' : '&#10003;') . '</td>';
             $line[] = $s === '' ? '' : [['ontime' => 'g', 'late' => 'y', 'absent' => 'r'][$s] ?? '', '✓'];
         }
         $body .= $row . '<td>' . count($held) . '</td></tr>';
@@ -143,7 +143,7 @@ function exam_doc_chart(array $data, array $exams, string $st, string $scope, st
     }
     $foot = '<tr class="exm-chart-total"><td></td><th>Invigilators</th>' . implode('', array_map(fn($v) => "<td>$v</td>", $perCol)) . '<td>' . array_sum($perCol) . '</td></tr>';
     $html = $cols ? '<div class="exm-chart-wrap"><table class="exm-doc-table exm-chart"><thead>' . $head . $sub . '</thead><tbody>' . $body . $foot . '</tbody></table></div>'
-        . '<p class="exm-doc-key"><span class="exm-chip exm-st-allocated">&#10003; on duty</span><span class="exm-chip exm-st-ontime">On time</span><span class="exm-chip exm-st-late">Late</span><span class="exm-chip exm-st-absent">Absent</span></p>'
+        . '<p class="exm-doc-key"><span class="exm-chip exm-st-allocated">&#10003; on duty</span><span class="exm-chip exm-st-ontime">On time</span><span class="exm-chip exm-st-late">Late</span><span class="exm-chip exm-st-absent">Absent</span><span class="exm-chip exm-st-na">N/A not needed</span></p>'
         : '<p class="field-help">No exams match these filters.</p>';
     return ['title' => $title, 'scope' => $scope, 'body' => $html, 'text' => $text, 'sheet' => $sheet,
         'file' => 'exam-duty-chart-' . $fileBit . '.xlsx', 'email' => '', 'subject' => "$title - $scope"];
@@ -221,9 +221,9 @@ function exam_doc_report(array $rows, string $scope, string $fileBit): array {
         $tiles .= '<span class="exm-doc-stat' . ($k ? " is-$k" : '') . '"><small>' . $l . '</small><strong>' . $n . '</strong>' . ($k ? '<em>' . $pct($n) . '</em>' : '') . '</span>';
     }
     $tiles .= '</div>';
-    $text = "Invigilation attendance report\n$scope\n\n{$c['duties']} duties: {$c['ontime']} on time, {$c['late']} late, {$c['absent']} absent, {$c['allocated']} not marked.\n";
+    $text = "Invigilation attendance report\n$scope\n\n{$c['duties']} duties: {$c['ontime']} on time, {$c['late']} late, {$c['absent']} absent, {$c['allocated']} not marked" . ($c['na'] ? ", {$c['na']} not needed" : '') . ".\n";
     $sections = '';
-    foreach ([['absent', 'Missed'], ['late', 'Late'], ['ontime', 'Attended on time'], ['allocated', 'Not marked yet']] as [$k, $label]) {
+    foreach ([['absent', 'Missed'], ['late', 'Late'], ['ontime', 'Attended on time'], ['na', 'Not needed (reserve)'], ['allocated', 'Not marked yet']] as [$k, $label]) {
         $set = array_values(array_filter($rows, fn($r) => $r['duty']['status'] === $k));
         if (!$set) continue;
         $timed = $k === 'late' || $k === 'ontime';

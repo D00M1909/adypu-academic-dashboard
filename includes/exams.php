@@ -17,7 +17,8 @@ require_once __DIR__ . '/attendance.php';
 require_once __DIR__ . '/timetable.php';
 require_once __DIR__ . '/xlsx-read.php';
 
-const EXAM_STATUS_LABEL = ['allocated' => 'Not marked', 'ontime' => 'On time', 'late' => 'Late', 'absent' => 'Absent'];
+// On time and Late are never chosen, only worked out (exam_set_status()).
+const EXAM_STATUS_LABEL = ['allocated' => 'Not marked', 'ontime' => 'On time', 'late' => 'Late', 'absent' => 'Absent', 'na' => 'Not needed'];
 const EXAM_ROLES = ['Invigilator', 'Senior supervisor', 'Squad'];
 // Reporting time when a row or the form gives none: half an hour before.
 const EXAM_REPORT_BEFORE = 30;
@@ -275,56 +276,54 @@ function exam_auto_allocate(array $t, array $faculty, array $ids, string $by): i
     return $added;
 }
 
-// Attendance for one exam, from its marking form: per duty a status, an
-// arrival time and a remark. "On time" with an arrival after the reporting
-// time is Late; so is a time alone. A duty that turns late queues its email.
-function exam_mark(string $examId, array $status, array $arrived, array $remark, array $emails, string $by): int {
-    $queued = 0;
-    exam_save(function (array $d) use ($examId, $status, $arrived, $remark, $emails, $by, &$queued) {
-        $x = $d['exams'][$examId] ?? null;
-        if (!$x) return $d;
-        foreach ($d['duties'] as $id => &$duty) {
-            if ($duty['exam'] !== $examId || !isset($status[$id])) continue;
-            $s = isset(EXAM_STATUS_LABEL[$status[$id]]) ? (string) $status[$id] : 'allocated';
-            $at = exam_parse_time((string) ($arrived[$id] ?? ''));
-            if ($s === 'absent') $at = '';
-            if ($at !== '' && in_array($s, ['allocated', 'ontime', 'late'], true)) $s = exam_min($at) > exam_min($x['report']) ? 'late' : 'ontime';
-            $was = $duty['status'];
-            $duty['status'] = $s;
-            $duty['arrived'] = $at;
-            $duty['remark'] = mb_substr(trim((string) ($remark[$id] ?? '')), 0, 500);
-            $duty['marked_by'] = $by;
-            $duty['marked_at'] = date('Y-m-d H:i');
-            $queued += exam_queue_late($d, (string) $id, $was, $x, $emails);
-        }
-        unset($duty);
-        return $d;
-    });
-    return $queued;
-}
+// The marking buttons: Present, Absent, Not needed. There is no On time or
+// Late button and no arrival time to type, so neither can be chosen: Present
+// stamps this server's clock at the click, and a click after the reporting
+// time is Late (with its email), before it On time. Present on a duty that is
+// already present keeps its first stamp, so it cannot be re-clicked earlier
+// or later. Not needed is a reserve invigilator who was not called on.
+// Returns 1 when a late email was queued. $now ('Y-m-d H:i') is for tests.
+const EXAM_MARKS = ['present' => 'Present', 'absent' => 'Absent', 'na' => 'Not needed'];
 
-// One duty's status from a one-click button. "On time" drops an arrival that
-// says otherwise, "Absent" drops any arrival. Returns 1 when a late email was
-// queued.
-function exam_set_status(string $examId, string $dutyId, string $status, array $emails, string $by): int {
-    if (!isset(EXAM_STATUS_LABEL[$status])) return 0;
+function exam_set_status(string $examId, string $dutyId, string $mark, array $emails, string $by, ?string $now = null): int {
+    if (!isset(EXAM_MARKS[$mark])) return 0;
+    $now ??= date('Y-m-d H:i');
     $queued = 0;
-    exam_save(function (array $d) use ($examId, $dutyId, $status, $emails, $by, &$queued) {
+    exam_save(function (array $d) use ($examId, $dutyId, $mark, $emails, $by, $now, &$queued) {
         $x = $d['exams'][$examId] ?? null;
         if (!$x || ($d['duties'][$dutyId]['exam'] ?? '') !== $examId) return $d;
         $duty = &$d['duties'][$dutyId];
         $was = $duty['status'];
-        if ($status === 'absent' || $status === 'allocated') $duty['arrived'] = '';
-        if ($status === 'ontime' && $duty['arrived'] !== '' && exam_min($duty['arrived']) > exam_min($x['report'])) $duty['arrived'] = '';
-        if ($status === 'late' && $duty['arrived'] !== '' && exam_min($duty['arrived']) <= exam_min($x['report'])) $duty['arrived'] = '';
-        $duty['status'] = $status;
+        if ($mark !== 'present') {
+            $duty['status'] = $mark;
+            $duty['arrived'] = '';
+        } elseif (!in_array($was, ['ontime', 'late'], true)) {
+            // Only the exam's own day has a time worth keeping.
+            $duty['arrived'] = substr($now, 0, 10) === $x['date'] ? substr($now, 11, 5) : '';
+            $duty['status'] = $now > "{$x['date']} {$x['report']}" ? 'late' : 'ontime';
+        }
         $duty['marked_by'] = $by;
-        $duty['marked_at'] = date('Y-m-d H:i');
+        $duty['marked_at'] = $now;
         unset($duty);
         $queued = exam_queue_late($d, $dutyId, $was, $x, $emails);
         return $d;
     });
     return $queued;
+}
+
+// The remarks under an exam, saved together. Status is the buttons' alone.
+function exam_remarks(string $examId, array $remark, string $by): void {
+    exam_save(function (array $d) use ($examId, $remark, $by) {
+        foreach ($d['duties'] as $id => &$duty) {
+            if ($duty['exam'] !== $examId || !isset($remark[$id])) continue;
+            $r = mb_substr(trim((string) $remark[$id]), 0, 500);
+            if ($r === $duty['remark']) continue;
+            $duty['remark'] = $r;
+            $duty['remark_by'] = $by;
+        }
+        unset($duty);
+        return $d;
+    });
 }
 
 // Queues a duty's late email when it has just turned late and an address is
@@ -670,7 +669,7 @@ function exam_report_people(array $rows): array {
     $out = [];
     foreach ($rows as $r) {
         $k = $r['duty']['person'] !== '' ? $r['duty']['person'] : 'name:' . strtolower($r['duty']['name']);
-        $out[$k] ??= ['name' => $r['duty']['name'], 'school' => $r['exam']['school'], 'duties' => 0, 'ontime' => 0, 'late' => 0, 'absent' => 0, 'allocated' => 0];
+        $out[$k] ??= ['name' => $r['duty']['name'], 'school' => $r['exam']['school'], 'duties' => 0, 'ontime' => 0, 'late' => 0, 'absent' => 0, 'allocated' => 0, 'na' => 0];
         $out[$k]['duties']++;
         $out[$k][$r['duty']['status']]++;
     }
@@ -679,7 +678,7 @@ function exam_report_people(array $rows): array {
 }
 
 function exam_counts(array $rows): array {
-    $n = ['duties' => count($rows), 'ontime' => 0, 'late' => 0, 'absent' => 0, 'allocated' => 0];
+    $n = ['duties' => count($rows), 'ontime' => 0, 'late' => 0, 'absent' => 0, 'allocated' => 0, 'na' => 0];
     foreach ($rows as $r) $n[$r['duty']['status']]++;
     return $n;
 }

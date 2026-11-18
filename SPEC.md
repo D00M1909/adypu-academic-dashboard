@@ -211,9 +211,12 @@ remark) and `mail` (late notices).
   upload skips them. By exam and Duty chart show upcoming exams unless Past or All is picked.
 - Allocation is manual or automatic: the exam's own school first, only faculty not teaching
   or on another duty at that time, fewest duties first.
-- Attendance: a status and an arrival time per duty. An arrival after the reporting time is
-  Late. A duty that becomes Late and has an email on file (the duty's, else the faculty
-  member's account) queues one late notice.
+- Attendance: three buttons per duty, Present, Absent and Not needed (a reserve invigilator
+  who was not called on, left out of the percentages). On time and Late are never chosen and
+  no time is typed: Present stamps the server's clock at the click, and a click after the
+  reporting time is Late. Present again keeps the first stamp. A duty that becomes Late and
+  has an email on file (the duty's, else the faculty member's account) queues one late
+  notice. Remarks are saved on their own.
 - Mail: this host cannot send mail. The notice rides in the reply to the Apps Script's next
   push (`mail` in `api/ingest.php`'s response); the script sends it with MailApp from the
   production target only and reports the ids back in the `X-Mail-Sent` header of the push
