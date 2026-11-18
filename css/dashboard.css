@@ -2632,6 +2632,7 @@ a.exm-chip:hover { text-decoration: underline; }
 .exm-chart .exm-chart-date { color: var(--red-ink); font-size: 13px; }
 .exm-chart .exm-chart-time { font-weight: 500; color: var(--ink-muted); white-space: nowrap; }
 .exm-chart-tick { font-weight: 700; font-size: 15px; }
+.exm-chart-tick small { display: block; font-size: 10px; font-weight: 600; line-height: 1.2; white-space: nowrap; }
 .exm-chart-tick.exm-st-allocated { color: var(--ink); }
 .exm-chart-tick.exm-st-ontime { background: var(--good-tint); color: var(--good-ink); }
 .exm-chart-tick.exm-st-late { background: rgba(180, 83, 9, 0.14); color: var(--att-warn); }

@@ -181,10 +181,13 @@ assert(count(exam_duties_of(exam_data(), $s3['id'])) === 2, 'and adds nobody twi
 
 // The chart as the page exports it uploads straight back.
 require_once __DIR__ . '/../includes/exams-doc.php';
+$s3Duty = (string) array_key_first(exam_duties_of(exam_data(), $s3['id']));
+exam_set_status($s3['id'], $s3Duty, 'present', [], 'admin@x.in', '2026-12-08 12:10');
 $ids = array_keys(array_filter(exam_data()['exams'], fn($x) => $x['subject'] === 'Unit Test'));
 $doc = exam_doc_chart(exam_data(), array_intersect_key(exam_data()['exams'], array_flip($ids)), '', 'School of Engineering', 'x');
 assert($doc['title'] === 'Unit Test Duty Chart (Lateral Entry Students)', $doc['title']);
 $flat = array_map(fn($r) => array_map(fn($v) => is_array($v) ? $v[1] : (string) $v, $r), $doc['sheet']);
+assert(in_array('✓ ' . exam_clock('12:10'), array_merge(...$flat), true) && str_contains($doc['body'], '<small>' . exam_clock('12:10') . '</small>'), 'a tick carries the time Present was clicked');
 assert(exam_import($flat, $faculty, 'admin@x.in', true, 'eng')[1] === 3, 'a downloaded chart uploads back as updates');
 exam_clear_sample();
 

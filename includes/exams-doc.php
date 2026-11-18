@@ -92,11 +92,15 @@ function exam_doc_chart(array $data, array $exams, string $st, string $scope, st
         $cols[$k]['subjects'][$x['subject']] = true;
         foreach (exam_duties_of($data, $id) as $d) {
             $p = $d['person'] !== '' ? $d['person'] : 'name:' . strtolower($d['name']);
-            $people[$p] ??= ['name' => $d['name'], 'cells' => []];
+            $people[$p] ??= ['name' => $d['name'], 'cells' => [], 'times' => []];
             // A person twice in one session shows the worse of the two.
             $rank = ['absent' => 3, 'late' => 2, 'allocated' => 1, 'ontime' => 0, 'na' => -1];
             $was = $people[$p]['cells'][$k] ?? null;
-            if ($was === null || $rank[$d['status']] > $rank[$was]) $people[$p]['cells'][$k] = $d['status'];
+            if ($was === null || $rank[$d['status']] > $rank[$was]) {
+                $people[$p]['cells'][$k] = $d['status'];
+                // The time Present was clicked, under the tick.
+                $people[$p]['times'][$k] = exam_arrived($d, $x);
+            }
         }
     }
     if ($st !== '') $people = array_filter($people, fn($p) => in_array($st, $p['cells'], true));
@@ -132,9 +136,12 @@ function exam_doc_chart(array $data, array $exams, string $st, string $scope, st
         $held = [];
         foreach ($cols as $k => $c) {
             $s = $p['cells'][$k] ?? '';
-            if ($s !== '') { $perCol[$k]++; $held[] = date('j M', strtotime($c['date'])) . ' ' . exam_clock($c['start']); }
-            $row .= $s === '' ? '<td></td>' : '<td class="exm-chart-tick exm-st-' . $s . '" title="' . exam_doc_e(EXAM_STATUS_LABEL[$s]) . '">' . ($s === 'na' ? 'N/A' : '&#10003;') . '</td>';
-            $line[] = $s === '' ? '' : [['ontime' => 'g', 'late' => 'y', 'absent' => 'r'][$s] ?? '', '✓'];
+            $at = $p['times'][$k] ?? '';
+            if ($s !== '') { $perCol[$k]++; $held[] = date('j M', strtotime($c['date'])) . ' ' . exam_clock($c['start']) . ($at !== '' ? " (present $at)" : ($s === 'absent' ? ' (absent)' : '')); }
+            $row .= $s === '' ? '<td></td>' : '<td class="exm-chart-tick exm-st-' . $s . '" title="' . exam_doc_e(EXAM_STATUS_LABEL[$s] . ($at !== '' ? ", present at $at" : '')) . '">'
+                . ($s === 'na' ? 'N/A' : '&#10003;') . ($at !== '' ? '<small>' . exam_doc_e($at) . '</small>' : '') . '</td>';
+            // "✓ 3.26 pm": exam_chart_parse() reads the tick and leaves the time.
+            $line[] = $s === '' ? '' : [['ontime' => 'g', 'late' => 'y', 'absent' => 'r'][$s] ?? '', '✓' . ($at !== '' ? " $at" : '')];
         }
         $body .= $row . '<td>' . count($held) . '</td></tr>';
         $line[] = (string) count($held);

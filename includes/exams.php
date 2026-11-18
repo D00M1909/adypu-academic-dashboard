@@ -511,7 +511,9 @@ function exam_chart_parse(array $rows): ?array {
             $name = trim((string) ($p[$nameCol] ?? ''));
             if ($name === '') continue;
             foreach ($sessions as $c => $s) {
-                if (in_array(mb_strtolower(trim((string) ($p[$c] ?? ''))), EXAM_TICKS, true)) $sessions[$c]['names'][] = $name;
+                // A tick may carry the time Present was clicked after it ("✓ 3.26 pm").
+                $cell = preg_split('/\s+/u', mb_strtolower(trim((string) ($p[$c] ?? ''))))[0];
+                if (in_array($cell, EXAM_TICKS, true)) $sessions[$c]['names'][] = $name;
             }
         }
         $subject = trim(preg_replace('/\s*(duty chart|invigilation).*$/i', '', $title), " -–:");
