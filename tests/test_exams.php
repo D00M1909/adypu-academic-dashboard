@@ -206,4 +206,10 @@ assert(exam_signatories(exam_data(), 'eng') === [['Head First Year', '']] && cou
 exam_set_signatories('eng', [''], ['']);
 assert(count(exam_signatories(exam_data(), 'eng')) === 2, 'an empty list goes back to the shared one');
 
+// --- An exam timetable with no duties yet -----------------------------------------------------
+[$x0] = exam_make(['date' => '2026-12-04', 'start' => '14:30', 'end' => '16:30', 'school' => 'eng', 'class' => 'c', 'subject' => 's', 'need' => '0']);
+assert($x0['need'] === 0 && $x0['report'] === '14:00', 'a written 0 is no invigilators yet');
+[$x1] = exam_make(['date' => '2026-12-04', 'start' => '14:30', 'end' => '16:30', 'school' => 'eng', 'class' => 'c', 'subject' => 's', 'need' => '']);
+assert($x1['need'] === EXAM_DEFAULT_NEED, 'an empty one is the default');
+
 echo "OK\n";

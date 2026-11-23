@@ -198,10 +198,12 @@ function exam_make(array $in): array {
     if ($school === '') return [null, 'a school'];
     if ($subject === '' || $class === '') return [null, 'a subject and a class'];
     if ($report === '') $report = exam_hhmm(max(0, exam_min($start) - EXAM_REPORT_BEFORE));
-    $need = (int) ($in['need'] ?? 0);
+    // A written 0 is "not decided yet" (an exam timetable lists no duties);
+    // left empty, the default.
+    $need = trim((string) ($in['need'] ?? '')) === '0' ? 0 : (int) ($in['need'] ?? 0);
     return [['id' => exam_id($date, $start, $class, $subject), 'school' => $school, 'class' => $class, 'subject' => $subject,
         'date' => $date, 'start' => $start, 'end' => $end, 'report' => $report,
-        'room' => trim((string) ($in['room'] ?? '')), 'need' => $need > 0 ? min($need, 40) : EXAM_DEFAULT_NEED,
+        'room' => trim((string) ($in['room'] ?? '')), 'need' => $need > 0 ? min($need, 40) : (trim((string) ($in['need'] ?? '')) === '0' ? 0 : EXAM_DEFAULT_NEED),
         'sample' => !empty($in['sample'])], ''];
 }
 

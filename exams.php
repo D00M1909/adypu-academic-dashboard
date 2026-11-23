@@ -396,7 +396,7 @@ $filterForm = function (string $viewKey, array $with) use ($e, $school, $from, $
   <section class="card aud-course">
     <div class="aud-course-head">
       <div>
-        <h2><?= $e($exam['subject']) ?> <span class="status <?= $gap ? 'exm-short' : 'exm-st-ontime' ?>"><?= count($allDuties) ?>/<?= $need ?> invigilators</span></h2>
+        <h2><?= $e($exam['subject']) ?> <?php if (!$need && !$allDuties): ?><span class="status exm-st-allocated">No invigilators set</span><?php else: ?><span class="status <?= $gap ? 'exm-short' : 'exm-st-ontime' ?>"><?= count($allDuties) ?>/<?= $need ?> invigilators</span><?php endif; ?></h2>
         <p class="aud-meta"><?= $e($exam['class']) ?> &middot; <?= $e($schoolName($exam['school'])) ?></p>
         <p class="aud-meta"><?= $e($day($exam['date'])) ?> &middot; <?= $e($span($exam)) ?> &middot; report by <strong><?= $e(exam_clock($exam['report'])) ?></strong><?= $exam['room'] !== '' ? ' &middot; Room ' . $e($exam['room']) : '' ?></p>
         <?php if (!empty($exam['sample'])): ?><p class="aud-meta">Sample data</p><?php endif; ?>
@@ -424,7 +424,7 @@ $filterForm = function (string $viewKey, array $with) use ($e, $school, $from, $
           <label>Class<input type="text" name="class" value="<?= $e($exam['class']) ?>" maxlength="80" required></label>
           <label>Subject<input type="text" name="subject" value="<?= $e($exam['subject']) ?>" maxlength="120" required></label>
           <label>Room<input type="text" name="room" value="<?= $e($exam['room']) ?>" maxlength="40"></label>
-          <label>Invigilators needed<input type="number" name="need" min="1" max="40" value="<?= (int) $exam['need'] ?>"></label>
+          <label>Invigilators needed<input type="number" name="need" min="0" max="40" value="<?= (int) $exam['need'] ?>"></label>
         </div>
         <button class="btn-quiet" type="submit">Save details</button>
       </form>
@@ -665,7 +665,7 @@ $filterForm = function (string $viewKey, array $with) use ($e, $school, $from, $
         <span><strong><?= $e($x['subject']) ?></strong><small><?= $e($span($x)) ?> (report <?= $e(exam_clock($x['report'])) ?>) &middot; <?= $e($x['class']) ?> &middot; <?= $e($short($x['school'])) ?><?= $x['room'] !== '' ? ' &middot; Room ' . $e($x['room']) : '' ?></small></span>
         <span class="aud-list-end">
           <?php foreach (['ontime' => 'on time', 'late' => 'late', 'absent' => 'absent'] as $k => $l) if ($c[$k]): ?><span class="status exm-st-<?= $k ?>"><?= $c[$k] ?> <?= $l ?></span><?php endif; ?>
-          <span class="status <?= $gap ? 'exm-short' : 'exm-st-ontime' ?>"><?= $have ?>/<?= (int) $x['need'] ?> invigilators</span>
+          <?php if (!(int) $x['need'] && !$have): ?><span class="status exm-st-allocated">No invigilators set</span><?php else: ?><span class="status <?= $gap ? 'exm-short' : 'exm-st-ontime' ?>"><?= $have ?>/<?= (int) $x['need'] ?> invigilators</span><?php endif; ?>
         </span>
       </a></li>
       <?php endforeach; ?>
